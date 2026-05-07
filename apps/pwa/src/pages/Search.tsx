@@ -81,10 +81,8 @@ export function SearchPage() {
     setAiResult(null);
     setAiError(null);
 
-    // Collect up to 30 candidates (from keyword search; if none, use all items capped)
     let candidates = items.slice(0, 30);
     if (candidates.length === 0) {
-      // query didn't hit keyword search, still pass top 30 from all
       const all = (await db.items.toArray()).filter(i => !i.deleted).slice(0, 30);
       candidates = all;
     }
@@ -123,18 +121,25 @@ export function SearchPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">搜索物品</h1>
-      <div className="flex gap-2">
+      <h1 className="text-2xl font-bold text-slate-100">搜索物品</h1>
+
+      {/* ── 搜索栏（sticky）──────────────────────────── */}
+      <div className="flex gap-2 sticky top-14 z-10 bg-slate-950/90 backdrop-blur pb-3 pt-1 -mx-4 px-4">
         <input
           autoFocus
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="如 消毒水、电池、备用灯泡…"
-          className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
+          className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20 transition-all duration-150"
         />
         <button
           onClick={startVoice}
-          className={`px-4 rounded-lg ${listening ? 'bg-rose-500 text-slate-950' : 'border border-slate-700'}`}
+          aria-label="语音输入"
+          className={`w-11 h-11 flex items-center justify-center rounded-xl border text-base transition-all ${
+            listening
+              ? 'bg-rose-600 border-rose-600 animate-pulse text-white'
+              : 'border-slate-800 text-slate-400 hover:border-sky-500/60 hover:text-slate-200'
+          }`}
         >
           🎙
         </button>
@@ -142,7 +147,7 @@ export function SearchPage() {
           <button
             onClick={askAi}
             disabled={aiLoading}
-            className="px-3 rounded-lg bg-violet-600 text-white text-sm disabled:opacity-50"
+            className="px-4 h-11 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-medium text-sm disabled:opacity-50 transition-all duration-150 active:scale-[0.97]"
           >
             {aiLoading ? '思考中…' : '✨ AI 回答'}
           </button>
@@ -153,6 +158,7 @@ export function SearchPage() {
         <p className="text-slate-400 text-sm">没有找到 "{q}"。</p>
       )}
 
+      {/* ── 搜索结果列表 ─────────────────────────────── */}
       {grouped.map(([areaId, list]) => {
         const a = areas.get(areaId);
         const r = a ? rooms.get(a.room_id) : undefined;
@@ -160,21 +166,21 @@ export function SearchPage() {
           <section key={areaId}>
             <Link
               to={`/areas/${areaId}`}
-              className="block text-sm text-slate-400 hover:text-white mb-1"
+              className="block text-xs text-slate-500 font-medium uppercase tracking-wide hover:text-slate-300 mb-1.5 transition-colors"
             >
               {r?.name ?? '?'} / {a?.name ?? '?'}
             </Link>
-            <ul className="space-y-1">
+            <ul className="space-y-1.5">
               {list.map(it => (
                 <li key={it.id}>
                   <Link
                     to={`/items/${it.id}`}
-                    className={`block px-4 py-2 rounded-lg bg-slate-800 border hover:border-sky-500 ${
-                      citedSet.has(it.id) ? 'border-violet-500 ring-1 ring-violet-500/40' : 'border-slate-700'
+                    className={`block px-4 py-2.5 rounded-xl bg-slate-900 border hover:border-sky-500/40 transition-all duration-150 ${
+                      citedSet.has(it.id) ? 'border-violet-600/60 ring-1 ring-violet-600/20' : 'border-slate-800'
                     }`}
                   >
-                    <span className="font-medium">{it.name}</span>
-                    <span className="text-slate-400 text-sm ml-2">× {it.qty}</span>
+                    <span className="text-sm font-medium text-slate-100">{it.name}</span>
+                    <span className="text-slate-500 text-xs ml-2">× {it.qty}</span>
                     {citedSet.has(it.id) && (
                       <span className="ml-2 text-xs text-violet-400">✨ AI 引用</span>
                     )}
@@ -186,9 +192,9 @@ export function SearchPage() {
         );
       })}
 
-      {/* AI Answer section */}
+      {/* ── AI Answer 卡片 ────────────────────────────── */}
       {(aiResult || aiError) && (
-        <section className="mt-4 p-4 rounded-xl bg-slate-800 border border-violet-700 space-y-2">
+        <section className="mt-2 p-4 rounded-2xl bg-slate-900 border border-violet-800/60 space-y-2">
           <div className="flex items-center gap-2 text-sm font-semibold text-violet-300">
             ✨ AI 回答
           </div>
@@ -201,7 +207,7 @@ export function SearchPage() {
         </section>
       )}
 
-      {/* 📌 AI cited items section */}
+      {/* ── 📌 AI 提到的物品 ──────────────────────────── */}
       {citedItems.length > 0 && (
         <section className="mt-2">
           <p className="text-xs text-slate-500 font-medium mb-2">📌 AI 提到的物品</p>
@@ -210,7 +216,7 @@ export function SearchPage() {
               <Link
                 key={it.id}
                 to={`/items/${it.id}`}
-                className="bg-violet-900/40 border border-violet-700/60 text-violet-200 rounded-full px-3 py-1.5 text-xs hover:bg-violet-800/60 transition-colors"
+                className="bg-violet-900/40 border border-violet-700/60 text-violet-200 rounded-full px-3 py-1 text-xs hover:bg-violet-800/60 transition-colors"
               >
                 {it.name}
                 <span className="text-violet-400 ml-1">{it.locationLabel}</span>
