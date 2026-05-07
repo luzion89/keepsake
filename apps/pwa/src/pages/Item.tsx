@@ -150,14 +150,14 @@ export function ItemPage() {
   const [item, setItem] = useState<Item | undefined>();
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState({ name: '', qty: 0, notes: '' });
+  const [draft, setDraft] = useState({ name: '', qty: 0, notes: '', expiresDate: '' });
   const { confirm, dialog } = useConfirm();
 
   const reload = async () => {
     const it = await db.items.get(itemId);
     setItem(it);
     if (it) {
-      setDraft({ name: it.name, qty: it.qty, notes: it.notes ?? '' });
+      setDraft({ name: it.name, qty: it.qty, notes: it.notes ?? '', expiresDate: it.expires_at ? new Date(it.expires_at).toISOString().slice(0, 10) : '' });
       const ps = await PhotoRepo.listFor('area', it.area_id);
       setPhotos(ps);
     }
@@ -167,7 +167,10 @@ export function ItemPage() {
   if (!item) return <p className="text-slate-400">加载中…</p>;
 
   const save = async () => {
-    await ItemRepo.update(item.id, { name: draft.name, qty: draft.qty, notes: draft.notes });
+    const expires_at = draft.expiresDate
+      ? new Date(draft.expiresDate + 'T00:00:00').getTime()
+      : undefined;
+    await ItemRepo.update(item.id, { name: draft.name, qty: draft.qty, notes: draft.notes, expires_at });
     setEditing(false);
     await reload();
   };
@@ -208,6 +211,15 @@ export function ItemPage() {
             rows={3}
             className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
           />
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-slate-400 flex-shrink-0">有效期（用于过期提醒，可选）</span>
+            <input
+              type="date"
+              value={draft.expiresDate}
+              onChange={(e) => setDraft({ ...draft, expiresDate: e.target.value })}
+              className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
+            />
+          </div>
           <div className="flex gap-2">
             <button onClick={save} className="flex-1 px-4 py-2 rounded-lg bg-sky-500 text-slate-950 font-medium">保存</button>
             <button onClick={() => setEditing(false)} className="px-4 py-2 rounded-lg border border-slate-700">取消</button>
