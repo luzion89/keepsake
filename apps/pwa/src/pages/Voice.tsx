@@ -16,9 +16,34 @@ export function VoicePage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const recRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
 
   useEffect(() => { (async () => setArea(await AreaRepo.get(areaId)))(); }, [areaId]);
+
+  // 组件卸载时释放麦克风 stream，确保指示灯熄灭
+  useEffect(() => {
+    return () => {
+      streamRef.current?.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+      recRef.current = null;
+    };
+  }, []);
+
+  /** 将 getUserMedia 的错误名转换为友好中文提示 */
+  function friendlyMicError(e: unknown): string {
+    const name = (e as { name?: string })?.name ?? '';
+    if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+      return '麦克风权限被拒绝，请在浏览器设置中允许访问麦克风后重试。';
+    }
+    if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+      return '未检测到麦克风设备，请确认设备已连接。';
+    }
+    if (name === 'NotSupportedError' || name === 'SecurityError') {
+      return '当前环境不支持录音（需要 HTTPS 或 localhost）。';
+    }
+    return `无法访问麦克风：${(e as { message?: string })?.message ?? String(e)}`;
+  }
 
   const start = async () => {
     setErr(null);
@@ -29,11 +54,14 @@ export function VoicePage() {
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
       chunksRef.current = [];
       const mr = new MediaRecorder(stream);
       mr.ondataavailable = (e) => { if (e.data.size) chunksRef.current.push(e.data); };
       mr.onstop = async () => {
-        stream.getTracks().forEach(t => t.stop());
+        // 停止录音后立即释放 stream tracks
+        streamRef.current?.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
         const audio = new Blob(chunksRef.current, { type: mr.mimeType || 'audio/webm' });
         try {
           setBusy(true);
@@ -49,7 +77,7 @@ export function VoicePage() {
       mr.start();
       recRef.current = mr;
       setRecording(true);
-    } catch (e: any) { setErr(`无法访问麦克风：${e?.message ?? e}`); }
+    } catch (e: unknown) { setErr(friendlyMicError(e)); }
   };
 
   const stop = () => {
