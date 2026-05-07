@@ -1,7 +1,7 @@
 import { db, getDeviceId, kvGet, kvSet } from '../db/dexie.js';
 import {
   type PullResp, type PushReq, type PushResp,
-  mergeRoom, mergeArea, mergeItem, mergePhoto, mergeSnapshot,
+  mergeRoom, mergeArea, mergeItem, mergePhoto, mergeSnapshot, mergeReminderRule,
   type TableName,
 } from '@keepsake/shared';
 import { pullAiConfigFromServer } from '../ai/router.js';
@@ -25,9 +25,11 @@ const MERGE: Record<TableName, (l: any, r: any) => { merged: any }> = {
   item: mergeItem as any,
   photo: mergePhoto as any,
   snapshot: mergeSnapshot as any,
+  reminder_rule: mergeReminderRule as any,
 };
-const TABLE_TO_DEXIE: Record<TableName, 'rooms'|'areas'|'items'|'photos'|'snapshots'> = {
+const TABLE_TO_DEXIE: Record<TableName, 'rooms'|'areas'|'items'|'photos'|'snapshots'|'reminders'> = {
   room: 'rooms', area: 'areas', item: 'items', photo: 'photos', snapshot: 'snapshots',
+  reminder_rule: 'reminders',
 };
 
 async function applyRemote(changes: PullResp['changes']) {

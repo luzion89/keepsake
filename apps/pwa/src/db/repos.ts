@@ -1,5 +1,5 @@
 import { db, getDeviceId } from './dexie.js';
-import type { Room, Area, Item, Photo, Snapshot, TableName } from '@keepsake/shared';
+import type { Room, Area, Item, Photo, Snapshot, ReminderRule, TableName } from '@keepsake/shared';
 import { v4 as uuid } from 'uuid';
 
 async function meta(updated_by?: string) {
@@ -179,5 +179,40 @@ export const SnapshotRepo = {
   },
   async listByArea(areaId: string): Promise<Snapshot[]> {
     return (await db.snapshots.where('area_id').equals(areaId).toArray()).filter(s => !s.deleted);
+  },
+};
+
+// ---------- Reminders ----------
+export const ReminderRepo = {
+  async listByItem(itemId: string): Promise<ReminderRule[]> {
+    return (await db.reminders.where('item_id').equals(itemId).toArray()).filter(r => !r.deleted);
+  },
+  async listAll(): Promise<ReminderRule[]> {
+    return (await db.reminders.toArray()).filter(r => !r.deleted);
+  },
+  async create(input: {
+    item_id: string;
+    kind: ReminderRule['kind'];
+    threshold_at?: number;
+    threshold_qty?: number;
+    note?: string;
+  }): Promise<ReminderRule> {
+    const m = await meta();
+    const row: ReminderRule = { id: uuid(), ...input, ...m };
+    await db.reminders.put(row);
+    await enqueue('reminder_rule', row);
+    return row;
+  },
+  async updateFired(id: string) {
+    const cur = await db.reminders.get(id); if (!cur) return;
+    const next: ReminderRule = { ...cur, last_fired_at: Date.now(), ...(await meta()), version: cur.version + 1 };
+    await db.reminders.put(next);
+    await enqueue('reminder_rule', next);
+  },
+  async remove(id: string) {
+    const cur = await db.reminders.get(id); if (!cur) return;
+    const next = { ...cur, deleted: true, updated_at: Date.now(), updated_by: await getDeviceId(), version: cur.version + 1 };
+    await db.reminders.put(next);
+    await enqueueDelete('reminder_rule', id, next.updated_at);
   },
 };

@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie';
-import type { Room, Area, Item, Photo, Snapshot } from '@keepsake/shared';
+import type { Room, Area, Item, Photo, Snapshot, ReminderRule } from '@keepsake/shared';
 
 export interface OutboxRow {
   client_seq: number;          // pk
@@ -38,6 +38,7 @@ export class KeepsakeDB extends Dexie {
   conflicts!: Table<ConflictRow, number>;
   blobs!: Table<BlobRow, string>;
   kv!: Table<KvRow, string>;
+  reminders!: Table<ReminderRule, string>;
 
   constructor() {
     super('keepsake');
@@ -52,6 +53,9 @@ export class KeepsakeDB extends Dexie {
       blobs: 'id',
       kv: 'key',
     });
+    this.version(2).stores({
+      reminders: 'id, item_id, kind, updated_at, deleted',
+    }).upgrade(() => { /* no data migration needed */ });
   }
 }
 

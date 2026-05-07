@@ -99,3 +99,19 @@ CREATE TABLE IF NOT EXISTS conflict_log (
   device_id TEXT NOT NULL,
   created_at INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS reminders (
+  id TEXT PRIMARY KEY,
+  item_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  threshold_at INTEGER,
+  threshold_qty INTEGER,
+  note TEXT,
+  last_fired_at INTEGER,
+  updated_at INTEGER NOT NULL,
+  updated_by TEXT NOT NULL,
+  deleted INTEGER NOT NULL DEFAULT 0,
+  version INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS reminders_updated_at ON reminders(updated_at);
+CREATE INDEX IF NOT EXISTS reminders_item ON reminders(item_id);
