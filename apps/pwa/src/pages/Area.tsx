@@ -66,34 +66,44 @@ export function AreaPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {dialog}
-      <div className="text-sm text-slate-400">
-        <Link to="/" className="hover:text-white">房间</Link>
-        {room && <> / <Link to={`/rooms/${room.id}`} className="hover:text-white">{room.name}</Link></>}
-      </div>
-      <h1 className="text-2xl font-semibold">{area.name}</h1>
 
-      {/* 主入口：录入物品（主）+ 区域照片（次） */}
+      {/* ── 面包屑 ────────────────────────────────────── */}
+      <nav className="flex items-center gap-1 text-xs text-slate-500">
+        <Link to="/" className="hover:text-slate-300 transition-colors">房间</Link>
+        <span className="text-slate-700">›</span>
+        {room && (
+          <>
+            <Link to={`/rooms/${room.id}`} className="hover:text-slate-300 transition-colors">{room.name}</Link>
+            <span className="text-slate-700">›</span>
+          </>
+        )}
+        <span className="text-slate-300">{area.name}</span>
+      </nav>
+
+      <h1 className="text-2xl font-bold text-slate-100">{area.name}</h1>
+
+      {/* ── 主 CTA 按钮区 ─────────────────────────────── */}
       <section className="flex flex-col gap-3">
         <Link
           to={`/areas/${area.id}/text`}
-          className="px-4 py-4 rounded-xl bg-emerald-500 text-slate-950 font-semibold text-center text-lg"
+          className="w-full py-4 rounded-2xl bg-sky-500 hover:bg-sky-400 active:scale-[0.98] text-white font-semibold text-base text-center shadow-lg shadow-sky-500/20 transition-all duration-150"
         >
           📝 录入物品
         </Link>
         <Link
           to={`/areas/${area.id}/capture`}
-          className="px-4 py-3 rounded-xl bg-slate-700 text-slate-100 font-medium text-center"
+          className="w-full py-3 rounded-2xl bg-slate-900 border border-slate-800 hover:border-sky-500/40 text-slate-100 font-medium text-center transition-all duration-150"
         >
           📷 区域照片
         </Link>
       </section>
 
-      {/* 区域照片缩略图 */}
+      {/* ── 区域照片缩略图 ────────────────────────────── */}
       {photos.length > 0 && (
         <section>
-          <h2 className="text-sm text-slate-400 mb-2">已拍照片 ({photos.length})</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">已拍照片 ({photos.length})</h2>
           <div className="flex gap-2 overflow-x-auto pb-1">
             {photos.map(p => {
               const src = photoBlobUrls[p.id];
@@ -102,10 +112,10 @@ export function AreaPage() {
                   key={p.id}
                   src={src}
                   alt="区域照片"
-                  className="h-20 w-20 object-cover rounded-lg flex-shrink-0 border border-slate-700"
+                  className="h-20 w-20 object-cover rounded-xl flex-shrink-0 border border-slate-800"
                 />
               ) : (
-                <div key={p.id} className="h-20 w-20 rounded-lg flex-shrink-0 bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-500 text-xs">
+                <div key={p.id} className="h-20 w-20 rounded-xl flex-shrink-0 bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-500 text-xs">
                   📷
                 </div>
               );
@@ -114,31 +124,32 @@ export function AreaPage() {
         </section>
       )}
 
-      {/* 兜底：手动添加（折叠） */}
+      {/* ── 手动添加（折叠） ──────────────────────────── */}
       <section>
         <button
           onClick={() => setShowManual(s => !s)}
-          className="text-xs text-slate-400 hover:text-slate-200"
+          className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors"
         >
-          {showManual ? '▼' : '▶'} 手动添加单个物品
+          <span className={`inline-block transition-transform duration-150 ${showManual ? 'rotate-90' : ''}`}>›</span>
+          手动添加单个物品
         </button>
         {showManual && (
-          <div className="mt-2 bg-slate-800/60 border border-slate-700 rounded-xl p-3">
+          <div className="mt-2 bg-slate-900 border border-slate-800 rounded-xl p-3">
             <div className="flex flex-wrap gap-2">
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="物品名"
-                className="flex-1 min-w-0 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2"
+                className="flex-1 min-w-0 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20 transition-all"
               />
               <input
                 type="number"
                 value={qty}
                 min={0}
                 onChange={(e) => setQty(Number(e.target.value))}
-                className="w-20 shrink-0 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2"
+                className="w-20 shrink-0 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm outline-none focus:border-sky-400 transition-all"
               />
-              <button onClick={add} className="shrink-0 px-4 py-2 rounded-lg bg-slate-700 text-slate-100 font-medium">
+              <button onClick={add} className="shrink-0 px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-100 font-medium text-sm transition-all">
                 添加
               </button>
             </div>
@@ -146,25 +157,39 @@ export function AreaPage() {
         )}
       </section>
 
+      {/* ── 物品列表 ──────────────────────────────────── */}
       <section>
-        <h2 className="text-base font-semibold mb-2">物品 ({items.length})</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">
+          物品 {items.length > 0 && `(${items.length})`}
+        </h2>
         {items.length === 0 ? (
-          <p className="text-slate-400 text-sm">这个区域还没有物品。点上面的「📝 录入物品」开始。</p>
+          <div className="flex flex-col items-center py-10 text-center">
+            <span className="text-4xl mb-3">📦</span>
+            <p className="text-slate-400 text-sm">这个区域还没有物品</p>
+            <p className="text-slate-500 text-xs mt-1">点上面的「📝 录入物品」开始</p>
+          </div>
         ) : (
           <ul className="space-y-2">
             {items.map(it => (
-              <li key={it.id} className="flex items-center gap-2 px-4 py-3 rounded-xl bg-slate-800 border border-slate-700">
-                <Link to={`/items/${it.id}`} className="flex-1">
-                  <div className="font-medium">{it.name}</div>
-                  <div className="text-xs text-slate-400">
-                    数量 {it.qty}{it.unit ? ' ' + it.unit : ''}
-                    {it.source !== 'manual' && <> · {it.source}</>}
-                    {it.confidence != null && <> · {(it.confidence * 100).toFixed(0)}%</>}
+              <li key={it.id} className="flex items-center gap-3 px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl shadow-[0_1px_0_0_rgba(255,255,255,0.04)_inset]">
+                <Link to={`/items/${it.id}`} className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-slate-100 truncate">{it.name}</div>
+                  <div className="text-xs text-slate-500">
+                    {it.source !== 'manual' && <span className="mr-1">{it.source}</span>}
+                    {it.confidence != null && <span>{(it.confidence * 100).toFixed(0)}%</span>}
                   </div>
                 </Link>
-                <button onClick={() => ItemRepo.qtyDelta(it.id, -1).then(reload)} className="px-2 py-1 bg-slate-700 rounded">−</button>
-                <span className="w-6 text-center">{it.qty}</span>
-                <button onClick={() => ItemRepo.qtyDelta(it.id, +1).then(reload)} className="px-2 py-1 bg-slate-700 rounded">+</button>
+                <button
+                  onClick={() => ItemRepo.qtyDelta(it.id, -1).then(reload)}
+                  className="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 text-slate-300 hover:border-sky-500 text-sm flex items-center justify-center transition-all"
+                  aria-label="减少数量"
+                >−</button>
+                <span className="text-sm font-medium w-5 text-center text-slate-100">{it.qty}</span>
+                <button
+                  onClick={() => ItemRepo.qtyDelta(it.id, +1).then(reload)}
+                  className="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 text-slate-300 hover:border-sky-500 text-sm flex items-center justify-center transition-all"
+                  aria-label="增加数量"
+                >+</button>
                 <button
                   onClick={async () => {
                     const ok = await confirm(`删除物品「${it.name}」？`, { danger: true, okText: '删除' });
@@ -172,7 +197,7 @@ export function AreaPage() {
                     await ItemRepo.remove(it.id);
                     await reload();
                   }}
-                  className="px-2 py-1 text-rose-300 text-sm hover:text-rose-200"
+                  className="text-slate-600 hover:text-rose-400 text-lg leading-none transition-colors"
                   aria-label={`删除 ${it.name}`}
                 >×</button>
               </li>
