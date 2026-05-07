@@ -114,6 +114,15 @@ async function blobToDataUrl(b: Blob): Promise<string> {
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
+/**
+ * Guard against missing or accidentally-serialised-as-string-"undefined" keys.
+ * Fixes #52: old code paths could store the literal string "undefined" in IndexedDB
+ * which passes `!cfg.apiKey` (truthy non-empty string) but is rejected by OpenRouter (401).
+ */
+export function isValidKey(key?: string): key is string {
+  return typeof key === 'string' && key.trim() !== '' && key.trim() !== 'undefined';
+}
+
 async function callOpenRouterVision(blobs: Blob[], cfg: AiConfig): Promise<RecognitionDraft> {
   const dataUrls = await Promise.all(blobs.map(blobToDataUrl));
   const res = await fetch(OPENROUTER_URL, {
@@ -145,7 +154,7 @@ async function callOpenRouterVision(blobs: Blob[], cfg: AiConfig): Promise<Recog
 
 export async function recognize(blobs: Blob[]): Promise<RecognitionDraft> {
   const cfg = await getAiConfig();
-  if (cfg.mode === 'on' && cfg.apiKey) {
+  if (cfg.mode === 'on' && isValidKey(cfg.apiKey)) {
     try { return await callOpenRouterVision(blobs, cfg); }
     catch (e) {
       logger.error('vision_failed', e instanceof Error ? e.message : String(e), { model: cfg.model });
@@ -188,7 +197,7 @@ export async function pingOpenRouter(
  */
 export async function transcribe(audio: Blob): Promise<{ text: string }> {
   const cfg = await getAiConfig();
-  if (cfg.mode !== 'on' || !cfg.apiKey) throw new Error('AI 未启用或未配置 OpenRouter Key');
+  if (cfg.mode !== 'on' || !isValidKey(cfg.apiKey)) throw new Error('AI 未启用或未配置 OpenRouter Key');
   const fd = new FormData();
   fd.append('file', audio, 'voice.webm');
   fd.append('model', cfg.transcribeModel || DEFAULT_TRANSCRIBE_MODEL);
@@ -233,7 +242,7 @@ export async function searchAnswer(
   contextItems: SearchContext[],
 ): Promise<{ ok: true; result: SearchAnswerResult } | { ok: false; error: string }> {
   const cfg = await getAiConfig();
-  if (cfg.mode !== 'on' || !cfg.apiKey) {
+  if (cfg.mode !== 'on' || !isValidKey(cfg.apiKey)) {
     return { ok: false, error: 'AI 未启用' };
   }
 
@@ -298,7 +307,7 @@ ${contextBlock || '（无匹配物品）'}
  */
 export async function parseVoiceText(text: string): Promise<RecognitionItem[]> {
   const cfg = await getAiConfig();
-  if (cfg.mode !== 'on' || !cfg.apiKey) throw new Error('AI 未启用或未配置 OpenRouter Key');
+  if (cfg.mode !== 'on' || !isValidKey(cfg.apiKey)) throw new Error('AI 未启用或未配置 OpenRouter Key');
   const res = await fetch(OPENROUTER_URL, {
     method: 'POST',
     headers: {
