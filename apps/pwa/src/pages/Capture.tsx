@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import imageCompression from 'browser-image-compression';
-import { AreaRepo, ItemRepo, PhotoRepo } from '../db/repos.js';
+import { AreaRepo, ItemRepo, PhotoRepo, SnapshotRepo } from '../db/repos.js';
 import type { Area } from '@keepsake/shared';
 import { recognize, type RecognitionItem, getAiConfig } from '../ai/router.js';
 
@@ -95,14 +95,24 @@ export function CapturePage() {
         }
       }
       // 2) save selected items
+      const itemIds: string[] = [];
       for (const d of drafts.filter(d => d.selected && d.name.trim())) {
-        await ItemRepo.create({
+        const item = await ItemRepo.create({
           area_id: areaId,
           name: d.name.trim(),
           qty: d.qty || 1,
           source: 'ai',
           confidence: d.confidence,
           photo_ids: photoIds,
+        });
+        itemIds.push(item.id);
+      }
+      // 3) 生成快照，记录本次新建的所有物品 id
+      if (itemIds.length > 0) {
+        await SnapshotRepo.create({
+          area_id: areaId,
+          taken_at: Date.now(),
+          item_ids: itemIds,
         });
       }
       nav(`/areas/${areaId}`);

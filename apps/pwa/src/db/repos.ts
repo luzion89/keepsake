@@ -1,5 +1,5 @@
 import { db, getDeviceId } from './dexie.js';
-import type { Room, Area, Item, Photo, TableName } from '@keepsake/shared';
+import type { Room, Area, Item, Photo, Snapshot, TableName } from '@keepsake/shared';
 import { v4 as uuid } from 'uuid';
 
 async function meta(updated_by?: string) {
@@ -165,5 +165,19 @@ export const PhotoRepo = {
     const next: Photo = { ...cur, recognition_status: status, recognition_result: result, ...(await meta()), version: cur.version + 1 };
     await db.photos.put(next);
     await enqueue('photo', next);
+  },
+};
+
+// ---------- Snapshots ----------
+export const SnapshotRepo = {
+  async create(input: { area_id: string; taken_at: number; item_ids: string[]; note?: string }): Promise<Snapshot> {
+    const m = await meta();
+    const row: Snapshot = { id: uuid(), ...input, ...m };
+    await db.snapshots.put(row);
+    await enqueue('snapshot', row);
+    return row;
+  },
+  async listByArea(areaId: string): Promise<Snapshot[]> {
+    return (await db.snapshots.where('area_id').equals(areaId).toArray()).filter(s => !s.deleted);
   },
 };
