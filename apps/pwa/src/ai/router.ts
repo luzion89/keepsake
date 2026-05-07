@@ -49,11 +49,13 @@ export async function setAiConfig(cfg: AiConfig): Promise<{ ok: boolean; error?:
   await kvSet(KEY, cfgWithTs);
   // Best-effort: mirror to server so the same key works on other devices.
   // Returns ok=false with error message when server is unreachable.
+  // 注意：剔除 updated_at，服务端 AiConfigSchema.strict() 不接受额外字段（fixes #39/#40）
+  const { updated_at: _ts, ...serverPayload } = cfgWithTs;
   try {
     const res = await fetch('/settings/ai', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(cfg),
+      body: JSON.stringify(serverPayload),
     });
     if (!res.ok) {
       const text = await res.text().catch(() => `HTTP ${res.status}`);
