@@ -12,15 +12,15 @@ const LEGACY_MODE_MAP: Record<string, AiMode> = {
   off: 'off',
   on: 'on',
 };
-function normalizeMdode(raw: string): AiMode {
+function normalizeMode(raw: string): AiMode {
   return LEGACY_MODE_MAP[raw] ?? 'off';
 }
 
 describe('getAiConfig 旧 mode 兼容映射', () => {
-  it('client → on', () => expect(normalizeMdode('client')).toBe('on'));
-  it('server → on', () => expect(normalizeMdode('server')).toBe('on'));
-  it('on → on', () => expect(normalizeMdode('on')).toBe('on'));
-  it('off → off', () => expect(normalizeMdode('off')).toBe('off'));
-  it('无效值 fallback 到 off', () => expect(normalizeMdode('unknown')).toBe('off'));
-  it('空字符串 fallback 到 off', () => expect(normalizeMdode('')).toBe('off'));
+  it('client → on', () => expect(normalizeMode('client')).toBe('on'));
+  it('server → on', () => expect(normalizeMode('server')).toBe('on'));
+  it('on → on', () => expect(normalizeMode('on')).toBe('on'));
+  it('off → off', () => expect(normalizeMode('off')).toBe('off'));
+  it('无效值 fallback 到 off', () => expect(normalizeMode('unknown')).toBe('off'));
+  it('空字符串 fallback 到 off', () => expect(normalizeMode('')).toBe('off'));
 });
