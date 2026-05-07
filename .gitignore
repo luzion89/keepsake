@@ -7,6 +7,15 @@ build
 .DS_Store
 apps/server/data/
 apps/server/uploads/
+data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
 coverage
 .vite
 .turbo
+
+# Local secrets (OpenRouter / other API keys used by QA, not for the repo)
+.openrouter*.env
+*.key
+secrets/
