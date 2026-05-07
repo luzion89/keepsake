@@ -6,6 +6,7 @@
 - `01-plan.md` — 项目规划（架构、技术栈、数据模型、同步协议）
 - `02-implementation.md` — 代码实现大纲
 - `03-testing.md` — 测试方案
+- [`HTTPS-SETUP.md`](./docs/HTTPS-SETUP.md) — 本地 HTTPS（mkcert）配置与安卓 CA 安装
 
 ## 项目结构
 
