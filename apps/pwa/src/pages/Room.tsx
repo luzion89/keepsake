@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { Room, Area } from '@keepsake/shared';
 import { AreaRepo, ItemRepo, RoomRepo } from '../db/repos.js';
+import { useConfirm } from '../components/ConfirmDialog.js';
 
 const AREA_PRESETS = ['洗手台柜子', '墙壁柜', '电视柜', '沙发底下', '床底下', '吊柜', '抽屉', '工具箱'];
 
@@ -10,6 +11,7 @@ export function RoomPage() {
   const [room, setRoom] = useState<Room | undefined>();
   const [areas, setAreas] = useState<Area[]>([]);
   const [name, setName] = useState('');
+  const { confirm, dialog } = useConfirm();
 
   const reload = async () => {
     setRoom(await RoomRepo.get(roomId));
@@ -29,6 +31,7 @@ export function RoomPage() {
 
   return (
     <div className="space-y-5">
+      {dialog}
       <div className="text-sm text-slate-400">
         <Link to="/" className="hover:text-white">← 房间</Link>
       </div>
@@ -75,9 +78,10 @@ export function RoomPage() {
                 <button
                   onClick={async () => {
                     const items = await ItemRepo.listByArea(a.id);
-                    const ok = items.length === 0
-                      ? confirm(`删除区域「${a.name}」？`)
-                      : confirm(`「${a.name}」下还有 ${items.length} 个物品，将一并软删除。继续？`);
+                    const message = items.length === 0
+                      ? `删除区域「${a.name}」？`
+                      : `「${a.name}」下还有 ${items.length} 个物品，将一并软删除。继续？`;
+                    const ok = await confirm(message, { danger: true, okText: '删除' });
                     if (!ok) return;
                     for (const it of items) await ItemRepo.remove(it.id);
                     await AreaRepo.remove(a.id);

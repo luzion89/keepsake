@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { Area, Item, Room } from '@keepsake/shared';
 import { AreaRepo, ItemRepo, RoomRepo } from '../db/repos.js';
+import { useConfirm } from '../components/ConfirmDialog.js';
 
 export function AreaPage() {
   const { areaId = '' } = useParams();
@@ -11,6 +12,7 @@ export function AreaPage() {
   const [showManual, setShowManual] = useState(false);
   const [name, setName] = useState('');
   const [qty, setQty] = useState(1);
+  const { confirm, dialog } = useConfirm();
 
   const reload = async () => {
     const a = await AreaRepo.get(areaId);
@@ -31,6 +33,7 @@ export function AreaPage() {
 
   return (
     <div className="space-y-5">
+      {dialog}
       <div className="text-sm text-slate-400">
         <Link to="/" className="hover:text-white">房间</Link>
         {room && <> / <Link to={`/rooms/${room.id}`} className="hover:text-white">{room.name}</Link></>}
@@ -106,7 +109,8 @@ export function AreaPage() {
                 <button onClick={() => ItemRepo.qtyDelta(it.id, +1).then(reload)} className="px-2 py-1 bg-slate-700 rounded">+</button>
                 <button
                   onClick={async () => {
-                    if (!confirm(`删除物品「${it.name}」？`)) return;
+                    const ok = await confirm(`删除物品「${it.name}」？`, { danger: true, okText: '删除' });
+                    if (!ok) return;
                     await ItemRepo.remove(it.id);
                     await reload();
                   }}
