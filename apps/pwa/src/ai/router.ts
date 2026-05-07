@@ -119,7 +119,13 @@ export async function pullAiConfigFromServer(): Promise<void> {
   } catch { /* 离线或服务不可达，静默忽略 */ }
 }
 
-export interface RecognitionItem { name: string; qty: number; confidence?: number; }
+export interface RecognitionItem {
+  name: string;
+  qty: number;
+  confidence?: number;
+  expires_at?: string | null;
+  notes?: string;
+}
 export interface RecognitionDraft {
   status: 'done' | 'pending';
   items: RecognitionItem[];
@@ -380,11 +386,17 @@ ${contextBlock || '（无匹配物品）'}
   }
 }
 
+const PARSE_ITEMS_SYSTEM_PROMPT = `从用户的中文描述中抽取家庭物品清单。每个物品输出 { name, qty, expires_at, notes }：
+- qty: 用户没说默认 1
+- expires_at: 如果用户提到"过期"、"保质期到"、"X 月前买的可以放 X 个月"等可推断的，输出 ISO 日期字符串（YYYY-MM-DD）；不确定就 null
+- notes: 用户对这个物品的额外描述，比如品牌、型号、用途、放置原因等
+仅返回 JSON：{"items":[{"name":string,"qty":number,"expires_at":string|null,"notes":string?}]}`;
+
 /**
  * Parse a free-form Chinese sentence into a list of items.
  * Routes to DeepSeek or OpenRouter based on configured provider.
  */
-export async function parseVoiceText(text: string): Promise<RecognitionItem[]> {
+export async function parseItemsFromText(text: string): Promise<RecognitionItem[]> {
   const cfg = await getAiConfig();
   const provider = getEffectiveProvider(cfg);
   const apiKey = getEffectiveApiKey(cfg);
@@ -416,7 +428,7 @@ export async function parseVoiceText(text: string): Promise<RecognitionItem[]> {
       model,
       response_format: { type: 'json_object' },
       messages: [
-        { role: 'system', content: '从用户的中文口语描述中抽取物品。仅返回 JSON：{"items":[{"name":string,"qty":number}]}。数字未说默认 1。' },
+        { role: 'system', content: PARSE_ITEMS_SYSTEM_PROMPT },
         { role: 'user', content: text },
       ],
     }),
@@ -427,3 +439,9 @@ export async function parseVoiceText(text: string): Promise<RecognitionItem[]> {
   const parsed = JSON.parse(inner);
   return Array.isArray(parsed.items) ? parsed.items : [];
 }
+
+/**
+ * @deprecated Use parseItemsFromText instead.
+ * @alias parseItemsFromText
+ */
+export const parseVoiceText = parseItemsFromText;
