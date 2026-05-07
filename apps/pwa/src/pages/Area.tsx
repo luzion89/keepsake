@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import type { Area, Item, Room } from '@keepsake/shared';
-import { AreaRepo, ItemRepo, RoomRepo } from '../db/repos.js';
+import type { Area, Item, Photo, Room } from '@keepsake/shared';
+import { AreaRepo, ItemRepo, PhotoRepo, RoomRepo } from '../db/repos.js';
 import { useConfirm } from '../components/ConfirmDialog.js';
 
 export function AreaPage() {
@@ -9,6 +9,8 @@ export function AreaPage() {
   const [area, setArea] = useState<Area | undefined>();
   const [room, setRoom] = useState<Room | undefined>();
   const [items, setItems] = useState<Item[]>([]);
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [photoBlobUrls, setPhotoBlobUrls] = useState<Record<string, string>>({});
   const [showManual, setShowManual] = useState(false);
   const [name, setName] = useState('');
   const [qty, setQty] = useState(1);
@@ -19,6 +21,19 @@ export function AreaPage() {
     setArea(a);
     if (a) setRoom(await RoomRepo.get(a.room_id));
     setItems(await ItemRepo.listByArea(areaId));
+    const ps = await PhotoRepo.listFor('area', areaId);
+    setPhotos(ps);
+    // resolve blob_ref → object URLs for local photos
+    const urls: Record<string, string> = {};
+    await Promise.all(ps.map(async (p) => {
+      if (p.remote_url) {
+        urls[p.id] = p.remote_url;
+      } else if (p.blob_ref) {
+        const blob = await PhotoRepo.getBlob(p.blob_ref);
+        if (blob) urls[p.id] = URL.createObjectURL(blob);
+      }
+    }));
+    setPhotoBlobUrls(urls);
   };
   useEffect(() => { reload(); }, [areaId]);
 
@@ -40,21 +55,45 @@ export function AreaPage() {
       </div>
       <h1 className="text-2xl font-semibold">{area.name}</h1>
 
-      {/* 主入口：拍照 + 语音 */}
-      <section className="grid grid-cols-2 gap-3">
+      {/* 主入口：录入物品（主）+ 区域照片（次） */}
+      <section className="flex flex-col gap-3">
+        <Link
+          to={`/areas/${area.id}/text`}
+          className="px-4 py-4 rounded-xl bg-emerald-500 text-slate-950 font-semibold text-center text-lg"
+        >
+          📝 录入物品
+        </Link>
         <Link
           to={`/areas/${area.id}/capture`}
-          className="px-4 py-4 rounded-xl bg-emerald-500 text-slate-950 font-medium text-center"
+          className="px-4 py-3 rounded-xl bg-slate-700 text-slate-100 font-medium text-center"
         >
-          📷 拍照识别
-        </Link>
-        <Link
-          to={`/areas/${area.id}/voice`}
-          className="px-4 py-4 rounded-xl bg-sky-500 text-slate-950 font-medium text-center"
-        >
-          🎤 语音输入
+          📷 区域照片
         </Link>
       </section>
+
+      {/* 区域照片缩略图 */}
+      {photos.length > 0 && (
+        <section>
+          <h2 className="text-sm text-slate-400 mb-2">已拍照片 ({photos.length})</h2>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {photos.map(p => {
+              const src = photoBlobUrls[p.id];
+              return src ? (
+                <img
+                  key={p.id}
+                  src={src}
+                  alt="区域照片"
+                  className="h-20 w-20 object-cover rounded-lg flex-shrink-0 border border-slate-700"
+                />
+              ) : (
+                <div key={p.id} className="h-20 w-20 rounded-lg flex-shrink-0 bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-500 text-xs">
+                  📷
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* 兜底：手动添加（折叠） */}
       <section>
@@ -91,7 +130,7 @@ export function AreaPage() {
       <section>
         <h2 className="text-base font-semibold mb-2">物品 ({items.length})</h2>
         {items.length === 0 ? (
-          <p className="text-slate-400 text-sm">这个区域还没有物品。点上面的「📷 拍照识别」或「🎤 语音输入」开始。</p>
+          <p className="text-slate-400 text-sm">这个区域还没有物品。点上面的「📝 录入物品」开始。</p>
         ) : (
           <ul className="space-y-2">
             {items.map(it => (
