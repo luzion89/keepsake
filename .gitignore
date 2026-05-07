@@ -22,3 +22,7 @@ secrets/
 
 # TLS certificates – generated locally via mkcert, never committed
 apps/server/certs/*.pem
+
+# Playwright
+playwright-report/
+test-results/
