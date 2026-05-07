@@ -4,6 +4,26 @@ import { db, getDeviceId } from '../db/dexie.js';
 import { syncOnce } from '../sync/client.js';
 import { gcSyncedBlobs } from '../sync/blobs.js';
 
+/** Storage quota info from navigator.storage.estimate(), or null if unsupported. */
+interface StorageQuota {
+  usageMB: number;
+  quotaMB: number;
+  pct: number; // 0-100
+}
+
+async function getStorageQuota(): Promise<StorageQuota | null> {
+  if (typeof navigator === 'undefined' || !navigator.storage?.estimate) return null;
+  try {
+    const { usage = 0, quota = 0 } = await navigator.storage.estimate();
+    if (quota === 0) return null;
+    const usageMB = usage / 1024 / 1024;
+    const quotaMB = quota / 1024 / 1024;
+    return { usageMB, quotaMB, pct: Math.round((usage / quota) * 100) };
+  } catch {
+    return null;
+  }
+}
+
 export function SettingsPage() {
   const [cfg, setCfg] = useState<AiConfig>({ mode: 'off' });
   const [deviceId, setDeviceId] = useState('');
@@ -15,6 +35,7 @@ export function SettingsPage() {
   const [aiPingResult, setAiPingResult] = useState<{ ok: boolean; latencyMs?: number; error?: string } | null>(null);
   const [gcResult, setGcResult] = useState<number | null>(null);
   const [gcRunning, setGcRunning] = useState(false);
+  const [quota, setQuota] = useState<StorageQuota | null | 'unsupported'>('unsupported');
 
   const reloadStats = async () => setStats({
     rooms: await db.rooms.count(),
@@ -29,6 +50,8 @@ export function SettingsPage() {
       setCfg(await getAiConfig());
       setDeviceId(await getDeviceId());
       reloadStats();
+      const q = await getStorageQuota();
+      setQuota(q); // null = API missing; StorageQuota = ok
     })();
   }, []);
 
@@ -181,6 +204,27 @@ export function SettingsPage() {
         <h2 className="text-sm font-semibold text-slate-300">本机数据</h2>
         <p>设备 ID: <span className="font-mono">{deviceId}</span></p>
         <p>房间 {stats.rooms} · 区域 {stats.areas} · 物品 {stats.items} · 照片 {stats.photos} · 待同步 {stats.outbox}</p>
+
+        {/* Storage quota — #51 */}
+        <div className="pt-1 space-y-1">
+          {quota === 'unsupported' ? null /* still loading */ : quota === null ? (
+            <p className="text-xs text-slate-500">本地存储：暂不支持</p>
+          ) : (
+            <>
+              <p className={`text-xs ${quota.pct > 80 ? 'text-rose-400 font-semibold' : 'text-slate-400'}`}>
+                本地存储 {quota.usageMB.toFixed(1)} MB / {quota.quotaMB.toFixed(0)} MB（{quota.pct}%）
+                {quota.pct > 80 && ' ⚠️ 空间紧张'}
+              </p>
+              <div className="w-full h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${quota.pct > 80 ? 'bg-rose-500' : 'bg-sky-500'}`}
+                  style={{ width: `${Math.min(quota.pct, 100)}%` }}
+                />
+              </div>
+            </>
+          )}
+        </div>
+
         <div className="flex items-center gap-2 mt-2">
           <button onClick={exportJson} className="px-3 py-2 rounded-lg border border-slate-700">导出 JSON 备份</button>
           <button
