@@ -4,8 +4,11 @@ import type { Area, Item, Photo, Room } from '@keepsake/shared';
 import { AreaRepo, ItemRepo, PhotoRepo, RoomRepo } from '../db/repos.js';
 import { useConfirm } from '../components/ConfirmDialog.js';
 
+type AreaState = 'loading' | 'not-found' | 'ok';
+
 export function AreaPage() {
   const { areaId = '' } = useParams();
+  const [areaState, setAreaState] = useState<AreaState>('loading');
   const [area, setArea] = useState<Area | undefined>();
   const [room, setRoom] = useState<Room | undefined>();
   const [items, setItems] = useState<Item[]>([]);
@@ -18,8 +21,13 @@ export function AreaPage() {
 
   const reload = async () => {
     const a = await AreaRepo.get(areaId);
-    setArea(a);
-    if (a) setRoom(await RoomRepo.get(a.room_id));
+    if (a) {
+      setArea(a);
+      setAreaState('ok');
+      setRoom(await RoomRepo.get(a.room_id));
+    } else {
+      setAreaState('not-found');
+    }
     setItems(await ItemRepo.listByArea(areaId));
     const ps = await PhotoRepo.listFor('area', areaId);
     setPhotos(ps);
@@ -35,7 +43,10 @@ export function AreaPage() {
     }));
     setPhotoBlobUrls(urls);
   };
-  useEffect(() => { reload(); }, [areaId]);
+  useEffect(() => {
+    if (!areaId) { setAreaState('not-found'); return; }
+    reload();
+  }, [areaId]);
 
   const add = async () => {
     if (!name.trim()) return;
@@ -44,7 +55,15 @@ export function AreaPage() {
     await reload();
   };
 
-  if (!area) return <p className="text-slate-400">加载中…</p>;
+  if (areaState === 'loading') return <p className="text-slate-400">加载中…</p>;
+  if (areaState === 'not-found') {
+    return (
+      <div className="space-y-3">
+        <p className="text-rose-300">⚠️ 找不到该区域（可能已被删除）。</p>
+        <Link to="/" className="text-sky-400 hover:text-sky-300 text-sm">← 返回首页</Link>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
