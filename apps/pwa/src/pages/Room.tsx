@@ -44,9 +44,9 @@ export function RoomPage() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="区域名（如 洗手台柜子）"
-            className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 outline-none focus:border-sky-500"
+            className="flex-1 min-w-0 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 outline-none focus:border-sky-500"
           />
-          <button className="px-4 py-2 rounded-lg bg-sky-500 text-slate-950 font-medium">添加</button>
+          <button className="shrink-0 px-4 py-2 rounded-lg bg-sky-500 text-slate-950 font-medium">添加</button>
         </form>
         <div className="mt-2 flex flex-wrap gap-2">
           {AREA_PRESETS.map(p => (
