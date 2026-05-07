@@ -4,6 +4,7 @@ import {
   mergeRoom, mergeArea, mergeItem, mergePhoto, mergeSnapshot,
   type TableName,
 } from '@keepsake/shared';
+import { pullAiConfigFromServer } from '../ai/router.js';
 
 const SYNC_CURSOR_KEY = 'sync_cursor';
 
@@ -93,6 +94,8 @@ export async function syncOnce(): Promise<{ pushed: number; pulled: number; conf
 }
 
 export function startSyncDaemon() {
+  // 启动时拉取服务端 AI 配置（LWW 合并，只读不写，避免循环）
+  pullAiConfigFromServer().catch(() => {});
   syncOnce().catch(() => {});
   window.addEventListener('online', () => syncOnce().catch(() => {}));
   document.addEventListener('visibilitychange', () => {

@@ -26,7 +26,9 @@ export async function getAiConfig(): Promise<AiConfig> {
 }
 
 export async function setAiConfig(cfg: AiConfig): Promise<void> {
-  await kvSet(KEY, cfg);
+  // 保存时附上时间戳，供 LWW 比较使用
+  const cfgWithTs = { ...cfg, updated_at: Date.now() };
+  await kvSet(KEY, cfgWithTs);
   // Best-effort: mirror to server so the same key works on other devices.
   // Failures are silent — sync layer also picks it up via the regular cycle.
   try {
@@ -36,6 +38,33 @@ export async function setAiConfig(cfg: AiConfig): Promise<void> {
       body: JSON.stringify(cfg),
     });
   } catch { /* offline; will retry next sync */ }
+}
+
+/**
+ * 启动时从服务端拉取 AI 配置并与本地合并（Last-Write-Wins by updated_at）。
+ * 策略：
+ *   - 本地无配置（首次使用）→ 直接使用服务端配置。
+ *   - 本地有配置且本地 updated_at ≥ 服务端 updated_at → 本地优先，不覆盖。
+ *   - 服务端 updated_at 较新 → 用服务端配置覆盖本地。
+ * 注意：此函数只 GET，不 PUT，避免循环触发。
+ */
+export async function pullAiConfigFromServer(): Promise<void> {
+  try {
+    const res = await fetch('/settings/ai');
+    if (!res.ok) return;
+    const remote = await res.json() as AiConfig & { updated_at?: number };
+    if (!remote || remote.mode === 'off' && !remote.apiKey) return;
+
+    const local = await kvGet<AiConfig & { updated_at?: number }>(KEY);
+    const localTs = local?.updated_at ?? 0;
+    const remoteTs = remote.updated_at ?? 0;
+
+    if (!local || remoteTs > localTs) {
+      // 去掉 updated_at 字段再存入本地（本地 AiConfig 不含此字段）
+      const { updated_at: _ts, ...cfg } = remote;
+      await kvSet(KEY, cfg as AiConfig);
+    }
+  } catch { /* 离线或服务不可达，静默忽略 */ }
 }
 
 export interface RecognitionItem { name: string; qty: number; confidence?: number; }
