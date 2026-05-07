@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { mergeItem, applyQtyDelta, mergeRoom } from './merge-rules.js';
-import type { Item, Room } from './types.js';
+import { mergeItem, applyQtyDelta, mergeRoom, mergeSnapshot } from './merge-rules.js';
+import type { Item, Room, Snapshot } from './types.js';
 
 const baseItem = (over: Partial<Item> = {}): Item => ({
   id: '00000000-0000-0000-0000-000000000001',
@@ -114,5 +114,60 @@ describe('LWW tie-breaker when updated_at is identical', () => {
     const remote = baseItem({ name: 'dev2-name', updated_at: 200, updated_by: 'device-2' });
     const { merged } = mergeItem(local, remote);
     expect(merged.name).toBe('dev1-name'); // 'device-1' < 'device-2'
+  });
+});
+
+// ---------- #27: mergeSnapshot 边界单测 ----------
+const baseSnapshot = (over: Partial<Snapshot> = {}): Snapshot => ({
+  id: '00000000-0000-0000-0000-000000000010',
+  area_id: '00000000-0000-0000-0000-000000000aaa',
+  taken_at: 1000,
+  item_ids: ['00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002'],
+  updated_at: 100,
+  updated_by: 'A',
+  deleted: false,
+  version: 0,
+  ...over,
+});
+
+describe('mergeSnapshot edge cases (#27)', () => {
+  it('双方 item_ids 完全相同：merged 等于其中一方', () => {
+    const ids = ['00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002'];
+    const a = baseSnapshot({ item_ids: ids, updated_at: 100 });
+    const b = baseSnapshot({ item_ids: [...ids], updated_at: 100, updated_by: 'B' });
+    const { merged } = mergeSnapshot(a, b);
+    // Both same timestamp; 'A' < 'B' → local(a) wins
+    expect(merged.item_ids).toEqual(ids);
+  });
+
+  it('一方 item_ids 为空：LWW 取较新一方', () => {
+    const a = baseSnapshot({ item_ids: [], updated_at: 50 });
+    const b = baseSnapshot({ item_ids: ['00000000-0000-0000-0000-000000000001'], updated_at: 200 });
+    const { merged } = mergeSnapshot(a, b);
+    expect(merged.item_ids).toEqual(['00000000-0000-0000-0000-000000000001']);
+  });
+
+  it('本地 item_ids 重复时，LWW 仍按 updated_at 决定胜者（mergeSnapshot 不去重，原样保留）', () => {
+    const dup = ['id-a', 'id-a', 'id-b'];
+    const a = baseSnapshot({ item_ids: dup, updated_at: 300 });
+    const b = baseSnapshot({ item_ids: ['id-c'], updated_at: 100 });
+    const { merged } = mergeSnapshot(a, b);
+    // local newer → local wins; item_ids preserved as-is
+    expect(merged.item_ids).toEqual(dup);
+  });
+
+  it('deleted=true 的一方胜出（不论 updated_at）', () => {
+    const a = baseSnapshot({ deleted: true, updated_at: 50 });
+    const b = baseSnapshot({ deleted: false, updated_at: 999 });
+    const { merged } = mergeSnapshot(a, b);
+    expect(merged.deleted).toBe(true);
+  });
+
+  it('双方均 deleted=true：LWW by updated_at', () => {
+    const a = baseSnapshot({ deleted: true, updated_at: 100 });
+    const b = baseSnapshot({ deleted: true, updated_at: 200 });
+    const { merged } = mergeSnapshot(a, b);
+    expect(merged.deleted).toBe(true);
+    expect(merged.updated_at).toBe(200);
   });
 });
