@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react';
-import { getAiConfig, setAiConfig, DEFAULT_MODEL, DEFAULT_TRANSCRIBE_MODEL, type AiConfig, pingOpenRouter } from '../ai/router.js';
+import {
+  getAiConfig, setAiConfig,
+  DEFAULT_MODEL, DEFAULT_TRANSCRIBE_MODEL,
+  DEFAULT_DEEPSEEK_MODEL,
+  pingProvider,
+  type AiConfig, type AiProvider,
+} from '../ai/router.js';
 import { db, getDeviceId } from '../db/dexie.js';
 import { syncOnce } from '../sync/client.js';
 import { gcSyncedBlobs } from '../sync/blobs.js';
@@ -47,13 +53,21 @@ export function SettingsPage() {
 
   useEffect(() => {
     (async () => {
-      setCfg(await getAiConfig());
+      const loaded = await getAiConfig();
+      // Compat: old configs without provider field → treat as openrouter
+      if (!loaded.provider) {
+        setCfg({ ...loaded, provider: loaded.apiKey ? 'openrouter' : 'deepseek' });
+      } else {
+        setCfg(loaded);
+      }
       setDeviceId(await getDeviceId());
       reloadStats();
       const q = await getStorageQuota();
-      setQuota(q); // null = API missing; StorageQuota = ok
+      setQuota(q);
     })();
   }, []);
+
+  const effectiveProvider: AiProvider = cfg.provider ?? (cfg.apiKey ? 'openrouter' : 'deepseek');
 
   const save = async () => {
     const result = await setAiConfig(cfg);
@@ -66,11 +80,11 @@ export function SettingsPage() {
   };
 
   const pingAi = async () => {
-    const key = cfg.apiKey?.trim();
+    const key = effectiveProvider === 'deepseek' ? cfg.deepseekApiKey?.trim() : cfg.apiKey?.trim();
     if (!key) { setAiPingResult({ ok: false, error: '请先填写 API Key' }); return; }
     setAiPingState('pinging');
     setAiPingResult(null);
-    const result = await pingOpenRouter(key);
+    const result = await pingProvider(effectiveProvider, key);
     setAiPingState('idle');
     setAiPingResult(result);
   };
@@ -116,10 +130,12 @@ export function SettingsPage() {
       <h1 className="text-xl font-semibold">设置</h1>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-slate-300">AI（OpenRouter）</h2>
+        <h2 className="text-sm font-semibold text-slate-300">AI 助手</h2>
         <p className="text-xs text-slate-400">
-          仅支持 OpenRouter。Key 保存到本地 IndexedDB；保存时立即推送到本地服务器（需服务器在线），其它设备启动时拉取，更新时间最新者胜。注意：此同步仅限 AI 配置，物品与照片数据走独立同步通道。
+          Key 保存到本地 IndexedDB；保存时立即推送到本地服务器（需服务器在线），其它设备启动时拉取，更新时间最新者胜。
         </p>
+
+        {/* AI on/off */}
         <div className="space-y-2 text-sm">
           {(['on','off'] as const).map(m => (
             <label key={m} className="flex items-start gap-2 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 cursor-pointer">
@@ -129,41 +145,103 @@ export function SettingsPage() {
                 onChange={() => setCfg({ ...cfg, mode: m })}
                 className="mt-1"
               />
-              <span>
-                <span className="font-medium">
-                  {m === 'on' && '启用 AI（拍照识别 / 语音输入）'}
-                  {m === 'off' && '关闭 AI（仅手动管理）'}
-                </span>
+              <span className="font-medium">
+                {m === 'on' && '启用 AI（语音输入 / 自然语言搜索）'}
+                {m === 'off' && '关闭 AI（仅手动管理）'}
               </span>
             </label>
           ))}
         </div>
 
         {cfg.mode === 'on' && (
-          <div className="space-y-2">
-            <label className="block text-xs text-slate-400">OpenRouter API Key</label>
-            <input
-              type="password"
-              value={cfg.apiKey ?? ''}
-              onChange={(e) => setCfg({ ...cfg, apiKey: e.target.value })}
-              placeholder="sk-or-v1-..."
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 font-mono text-sm"
-              autoComplete="off"
-            />
-            <label className="block text-xs text-slate-400">视觉模型（默认 {DEFAULT_MODEL}）</label>
-            <input
-              value={cfg.model ?? ''}
-              onChange={(e) => setCfg({ ...cfg, model: e.target.value })}
-              placeholder={DEFAULT_MODEL}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
-            />
-            <label className="block text-xs text-slate-400">语音转写模型（需支持 audio 输入，默认同上）</label>
-            <input
-              value={cfg.transcribeModel ?? ''}
-              onChange={(e) => setCfg({ ...cfg, transcribeModel: e.target.value })}
-              placeholder={DEFAULT_MODEL}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
-            />
+          <div className="space-y-3">
+            {/* Provider selector */}
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">AI 服务商</label>
+              <div className="flex gap-2">
+                {(['deepseek', 'openrouter'] as const).map(p => (
+                  <label
+                    key={p}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border cursor-pointer text-sm ${
+                      effectiveProvider === p
+                        ? 'border-sky-500 bg-sky-900/30 text-sky-200'
+                        : 'border-slate-700 bg-slate-800 text-slate-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      className="sr-only"
+                      checked={effectiveProvider === p}
+                      onChange={() => setCfg({ ...cfg, provider: p })}
+                    />
+                    {p === 'deepseek' ? 'DeepSeek（推荐）' : 'OpenRouter'}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* DeepSeek fields */}
+            {effectiveProvider === 'deepseek' && (
+              <div className="space-y-2">
+                <label className="block text-xs text-slate-400">
+                  DeepSeek API Key{' '}
+                  <a href="https://platform.deepseek.com" target="_blank" rel="noreferrer" className="text-sky-400 underline">
+                    申请 →
+                  </a>
+                </label>
+                <input
+                  type="password"
+                  value={cfg.deepseekApiKey ?? ''}
+                  onChange={(e) => setCfg({ ...cfg, deepseekApiKey: e.target.value })}
+                  placeholder="sk-..."
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 font-mono text-sm"
+                  autoComplete="off"
+                />
+                <p className="text-xs text-slate-500">
+                  DeepSeek 不支持图像识别；拍照识别功能需切换到 OpenRouter。
+                </p>
+                <label className="block text-xs text-slate-400">
+                  模型（默认 {DEFAULT_DEEPSEEK_MODEL}）
+                </label>
+                <input
+                  value={cfg.model ?? ''}
+                  onChange={(e) => setCfg({ ...cfg, model: e.target.value })}
+                  placeholder={DEFAULT_DEEPSEEK_MODEL}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
+                />
+              </div>
+            )}
+
+            {/* OpenRouter fields */}
+            {effectiveProvider === 'openrouter' && (
+              <div className="space-y-2">
+                <label className="block text-xs text-slate-400">OpenRouter API Key</label>
+                <input
+                  type="password"
+                  value={cfg.apiKey ?? ''}
+                  onChange={(e) => setCfg({ ...cfg, apiKey: e.target.value })}
+                  placeholder="sk-or-v1-..."
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 font-mono text-sm"
+                  autoComplete="off"
+                />
+                <label className="block text-xs text-slate-400">视觉模型（默认 {DEFAULT_MODEL}）</label>
+                <input
+                  value={cfg.model ?? ''}
+                  onChange={(e) => setCfg({ ...cfg, model: e.target.value })}
+                  placeholder={DEFAULT_MODEL}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
+                />
+                <label className="block text-xs text-slate-400">语音转写模型（需支持 audio 输入，默认同上）</label>
+                <input
+                  value={cfg.transcribeModel ?? ''}
+                  onChange={(e) => setCfg({ ...cfg, transcribeModel: e.target.value })}
+                  placeholder={DEFAULT_TRANSCRIBE_MODEL}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
+                />
+              </div>
+            )}
+
+            {/* Test connection button */}
             <div className="flex items-center gap-2 pt-1">
               <button
                 onClick={pingAi}
@@ -181,11 +259,15 @@ export function SettingsPage() {
             </div>
           </div>
         )}
+
         <button onClick={save} className="px-4 py-2 rounded-lg bg-sky-500 text-slate-950 font-medium">保存</button>
         {savedAt && !saveError && <span className="ml-2 text-xs text-emerald-300">已同步</span>}
         {savedAt && saveError && (
           <span className="ml-2 text-xs text-rose-400">
-            已保存到本地，服务端推送失败：{saveError}（重新打开应用会重试）
+            已保存到本地，服务端推送失败：{saveError}
+            {saveError.includes('混合内容') || saveError.includes('TLS') ? null : (
+              <span className="block mt-0.5 text-slate-500">（重新打开应用会重试；若持续失败请检查服务端是否在线）</span>
+            )}
           </span>
         )}
       </section>
@@ -207,7 +289,7 @@ export function SettingsPage() {
 
         {/* Storage quota — #51 */}
         <div className="pt-1 space-y-1">
-          {quota === 'unsupported' ? null /* still loading */ : quota === null ? (
+          {quota === 'unsupported' ? null : quota === null ? (
             <p className="text-xs text-slate-500">本地存储：暂不支持</p>
           ) : (
             <>
