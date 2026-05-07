@@ -325,10 +325,13 @@ ${contextBlock || '（无匹配物品）'}
     const j = await res.json();
     const raw = j.choices?.[0]?.message?.content ?? '{}';
     const parsed = JSON.parse(raw);
+    // 防御性清理：即使 AI 不遵守 prompt 约定，也剥除 answer 中的 [id] 标记
+    const rawAnswer = typeof parsed.answer === 'string' ? parsed.answer : '（无回答）';
+    const cleanAnswer = rawAnswer.replace(/\[[^\]]{8,}\]/g, '').replace(/\s{2,}/g, ' ').trim();
     return {
       ok: true,
       result: {
-        answer: typeof parsed.answer === 'string' ? parsed.answer : '（无回答）',
+        answer: cleanAnswer,
         citedIds: Array.isArray(parsed.citedIds) ? parsed.citedIds : [],
       },
     };
