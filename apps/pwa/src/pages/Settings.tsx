@@ -9,6 +9,7 @@ export function SettingsPage() {
   const [stats, setStats] = useState({ rooms: 0, areas: 0, items: 0, photos: 0, outbox: 0 });
   const [serverOk, setServerOk] = useState<boolean | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const reloadStats = async () => setStats({
     rooms: await db.rooms.count(),
@@ -27,8 +28,13 @@ export function SettingsPage() {
   }, []);
 
   const save = async () => {
-    await setAiConfig(cfg);
+    const result = await setAiConfig(cfg);
     setSavedAt(Date.now());
+    if (result.ok) {
+      setSaveError(null);
+    } else {
+      setSaveError(result.error ?? '未知错误');
+    }
   };
 
   const ping = async () => {
@@ -111,7 +117,12 @@ export function SettingsPage() {
           </div>
         )}
         <button onClick={save} className="px-4 py-2 rounded-lg bg-sky-500 text-slate-950 font-medium">保存</button>
-        {savedAt && <span className="ml-2 text-xs text-emerald-300">已保存（已尝试同步到服务端）</span>}
+        {savedAt && !saveError && <span className="ml-2 text-xs text-emerald-300">已同步</span>}
+        {savedAt && saveError && (
+          <span className="ml-2 text-xs text-rose-400">
+            已保存到本地，服务端推送失败：{saveError}（重新打开应用会重试）
+          </span>
+        )}
       </section>
 
       <section className="space-y-2">

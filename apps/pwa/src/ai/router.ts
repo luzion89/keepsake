@@ -43,19 +43,27 @@ export async function getAiConfig(): Promise<AiConfig> {
   return raw;
 }
 
-export async function setAiConfig(cfg: AiConfig): Promise<void> {
+export async function setAiConfig(cfg: AiConfig): Promise<{ ok: boolean; error?: string }> {
   // 保存时附上时间戳，供 LWW 比较使用
   const cfgWithTs = { ...cfg, updated_at: Date.now() };
   await kvSet(KEY, cfgWithTs);
   // Best-effort: mirror to server so the same key works on other devices.
-  // Failures are silent — sync layer also picks it up via the regular cycle.
+  // Returns ok=false with error message when server is unreachable.
   try {
-    await fetch('/settings/ai', {
+    const res = await fetch('/settings/ai', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(cfg),
     });
-  } catch { /* offline; will retry next sync */ }
+    if (!res.ok) {
+      const text = await res.text().catch(() => `HTTP ${res.status}`);
+      return { ok: false, error: text.slice(0, 200) };
+    }
+    return { ok: true };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: msg };
+  }
 }
 
 /**
