@@ -44,6 +44,9 @@ export function VoicePage() {
   /** 将 getUserMedia 的错误名转换为友好中文提示 */
   function friendlyMicError(e: unknown): string {
     const name = (e as { name?: string })?.name ?? '';
+    if (e instanceof TypeError || name === 'TypeError') {
+      return '当前环境不支持录音（需要 HTTPS 或 localhost），无法访问麦克风。';
+    }
     if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
       return '麦克风权限被拒绝，请在浏览器设置中允许访问麦克风后重试。';
     }
@@ -58,6 +61,11 @@ export function VoicePage() {
 
   const start = async () => {
     setErr(null);
+    // 非 HTTPS / 非 localhost 时浏览器不暴露 mediaDevices，提前检测给出友好提示（fixes #41）
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setErr('当前环境不支持录音（需要 HTTPS 或 localhost），无法访问麦克风。');
+      return;
+    }
     const cfg = await getAiConfig();
     if (cfg.mode !== 'on' || !cfg.apiKey) {
       setErr('AI 未启用。请先到「设置」配置 OpenRouter Key，或直接打字录入。');
