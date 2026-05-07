@@ -42,3 +42,8 @@ model: sonnet
 - AI 配置改动同时改：`apps/pwa/src/ai/router.ts`（实现）+ `apps/pwa/src/pages/Settings.tsx`（UI）+ `apps/server/src/routes/ai.ts`（服务端存储）。
 - 同步协议改动必须同时改 `packages/shared/src/sync-protocol.ts` 和服务端 `apps/server/src/routes/sync.ts`。
 - 修 bug 不要顺手改无关代码 —— 那是 PM 的事，由他另开 issue。
+
+## 后台进程清理（强制）
+- 任何用 `&` / `run_in_background` 启动的 dev server、tsc -w、vitest --watch 进程，**任务结束前必须杀掉**。
+- 跑完测试 `kill $PID` + 兜底 `lsof -ti:8443 | xargs kill 2>/dev/null`（如果占用了端口）。
+- 任务汇总末尾要明确写 "后台进程已清理"，否则视为未完成。

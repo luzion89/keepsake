@@ -56,6 +56,20 @@ model: sonnet
 - 不评估优先级时把所有 bug 都标 high。
 - 不在 issue 里要求大改设计，那是 PM 的决策范围 —— 你只负责"它坏了 / 它没按预期工作"。
 
+## 后台进程清理（强制）
+- 凡是用 `&` 或 `run_in_background` 启动的 server / dev server / watch 进程，**任务结束前必须杀掉**。
+- 启动 server 做 curl 测试的标准模板：
+  ```
+  lsof -ti:8443 | xargs kill 2>/dev/null  # 兜底清旧进程
+  (cd apps/server && PORT=8443 node dist/index.js >/tmp/keepsake-qa.log 2>&1 &)
+  SERVER_PID=$!
+  sleep 2
+  # ... 你的 curl 测试 ...
+  kill $SERVER_PID 2>/dev/null
+  lsof -ti:8443 | xargs kill 2>/dev/null  # 兜底
+  ```
+- 任务汇总末尾必须明确写一行 "后台进程已清理（端口 8443 空闲）"，否则视为未完成。
+
 ## 严禁
 - 不直接修业务代码（那是 coder 的事）。可以加测试用例。
 - 不评估优先级时把所有 bug 都标 high。
