@@ -52,11 +52,11 @@ describe('mergeItem', () => {
     expect(merged.deleted).toBe(true);
   });
 
-  it('tie on updated_at: deterministic by updated_by', () => {
+  it('tie on updated_at: deterministic by updated_by (smaller wins)', () => {
     const a = baseItem({ name: 'A-name', updated_at: 100, updated_by: 'A' });
     const b = baseItem({ name: 'B-name', updated_at: 100, updated_by: 'B' });
     const { merged } = mergeItem(a, b);
-    expect(merged.name).toBe('B-name'); // 'B' > 'A'
+    expect(merged.name).toBe('A-name'); // 'A' < 'B', local(a) wins
   });
 });
 
@@ -77,39 +77,42 @@ describe('mergeRoom', () => {
   });
 });
 
-// ---------- #21: LWW updated_at 完全相同时的 tie-breaker 行为 ----------
+// ---------- #21 / #25: LWW updated_at 完全相同时的 tie-breaker 行为（小者胜） ----------
 describe('LWW tie-breaker when updated_at is identical', () => {
-  it('mergeItem: updated_by 字典序较大的设备（"Z" > "A"）在 local 时 local 胜出', () => {
-    // lwwPick: local.updated_by > remote.updated_by → 'local'
-    const local = baseItem({ name: 'local-name', updated_at: 100, updated_by: 'Z' });
-    const remote = baseItem({ name: 'remote-name', updated_at: 100, updated_by: 'A' });
-    const { merged } = mergeItem(local, remote);
-    expect(merged.name).toBe('local-name'); // Z > A，local 胜
-  });
-
-  it('mergeItem: updated_by 字典序较大的设备（"Z"）在 remote 时 remote 胜出', () => {
+  it('mergeItem: updated_by 字典序较小的设备（"A" < "Z"）在 local 时 local 胜出', () => {
+    // lwwPick: local.updated_by < remote.updated_by → 'local'
     const local = baseItem({ name: 'local-name', updated_at: 100, updated_by: 'A' });
     const remote = baseItem({ name: 'remote-name', updated_at: 100, updated_by: 'Z' });
     const { merged } = mergeItem(local, remote);
-    expect(merged.name).toBe('remote-name'); // Z > A，remote 胜
+    expect(merged.name).toBe('local-name'); // A < Z，local 胜
   });
 
-  it('mergeItem: updated_by 完全相同时 local 胜出（字符串相等 → local 分支）', () => {
-    // 当 local.updated_by === remote.updated_by 时，lwwPick 走 else 返回 'remote'
-    // 注意：当前实现 local.updated_by > remote.updated_by 不成立 → 返回 'remote'
-    // 断言实际行为，供 PM 确认
+  it('mergeItem: updated_by 字典序较小的设备（"A"）在 remote 时 remote 胜出', () => {
+    const local = baseItem({ name: 'local-name', updated_at: 100, updated_by: 'Z' });
+    const remote = baseItem({ name: 'remote-name', updated_at: 100, updated_by: 'A' });
+    const { merged } = mergeItem(local, remote);
+    expect(merged.name).toBe('remote-name'); // A < Z，remote 胜
+  });
+
+  it('mergeItem: updated_by 完全相同时 remote 胜出（终极 fallback）', () => {
     const local = baseItem({ name: 'local-same', updated_at: 100, updated_by: 'SAME' });
     const remote = baseItem({ name: 'remote-same', updated_at: 100, updated_by: 'SAME' });
     const { merged } = mergeItem(local, remote);
-    // 当前实现：'SAME' > 'SAME' 为 false → 返回 'remote'（remote 胜）
-    expect(merged.name).toBe('remote-same');
+    expect(merged.name).toBe('remote-same'); // same → remote fallback
   });
 
-  it('mergeRoom: tie-breaker 规则与 mergeItem 一致（updated_by 字典序）', () => {
+  it('mergeRoom: tie-breaker 规则与 mergeItem 一致（updated_by 字典序小者胜）', () => {
     const a = baseRoom({ name: 'room-A', updated_at: 500, updated_by: 'device-A' });
     const b = baseRoom({ name: 'room-B', updated_at: 500, updated_by: 'device-B' });
     const { merged } = mergeRoom(a, b);
-    // 'device-B' > 'device-A' → remote(b) 胜
-    expect(merged.name).toBe('room-B');
+    // 'device-A' < 'device-B' → local(a) 胜
+    expect(merged.name).toBe('room-A');
+  });
+
+  it('mergeItem: updated_by 不同时，小者胜（device-1 < device-2）', () => {
+    const local = baseItem({ name: 'dev1-name', updated_at: 200, updated_by: 'device-1' });
+    const remote = baseItem({ name: 'dev2-name', updated_at: 200, updated_by: 'device-2' });
+    const { merged } = mergeItem(local, remote);
+    expect(merged.name).toBe('dev1-name'); // 'device-1' < 'device-2'
   });
 });

@@ -19,8 +19,10 @@ export interface MergeOutcome<T> {
 function lwwPick(local: SyncMeta, remote: SyncMeta): 'local' | 'remote' {
   if (local.updated_at > remote.updated_at) return 'local';
   if (local.updated_at < remote.updated_at) return 'remote';
-  // Tie: pick higher device id deterministically.
-  return local.updated_by > remote.updated_by ? 'local' : 'remote';
+  // Tie: smaller deviceId wins (deterministic; same id → remote wins as fallback).
+  if (local.updated_by < remote.updated_by) return 'local';
+  if (local.updated_by > remote.updated_by) return 'remote';
+  return 'remote'; // same updated_at + same updated_by → remote as final fallback
 }
 
 function unionArr<T>(a: T[] | undefined, b: T[] | undefined): T[] {
