@@ -18,7 +18,8 @@ export interface AiConfig {
 }
 
 export const DEFAULT_MODEL = 'google/gemini-2.5-flash-lite';
-export const DEFAULT_TRANSCRIBE_MODEL = 'openai/whisper-1';
+/** @deprecated transcribe() now uses chat completions with the same model as vision. */
+export const DEFAULT_TRANSCRIBE_MODEL = DEFAULT_MODEL;
 
 const KEY = 'ai_config';
 
@@ -192,27 +193,56 @@ export async function pingOpenRouter(
 }
 
 /**
- * Transcribe an audio Blob via OpenRouter (Whisper-style model).
- * Note: OpenRouter exposes /audio/transcriptions for select audio models.
+ * Transcribe an audio Blob via OpenRouter using chat completions with input_audio.
+ * OpenRouter does NOT expose /audio/transcriptions; audio goes through the chat
+ * completions endpoint as an input_audio content block (OpenAI-style).
+ * The default model (google/gemini-2.5-flash-lite) natively supports audio input.
+ *
+ * Uses blobToDataUrl + strip-prefix to avoid stack overflows from btoa on large buffers.
  */
 export async function transcribe(audio: Blob): Promise<{ text: string }> {
   const cfg = await getAiConfig();
   if (cfg.mode !== 'on' || !isValidKey(cfg.apiKey)) throw new Error('AI 未启用或未配置 OpenRouter Key');
-  const fd = new FormData();
-  fd.append('file', audio, 'voice.webm');
-  fd.append('model', cfg.transcribeModel || DEFAULT_TRANSCRIBE_MODEL);
-  const res = await fetch('https://openrouter.ai/api/v1/audio/transcriptions', {
+
+  // Derive audio format from MIME type
+  const format = audio.type.includes('webm') ? 'webm'
+    : audio.type.includes('mp4') || audio.type.includes('m4a') ? 'mp4'
+    : audio.type.includes('wav') ? 'wav'
+    : 'webm';
+
+  // Use FileReader-based blobToDataUrl then strip the data-URL prefix to get raw base64.
+  // This avoids stack overflow from btoa(String.fromCharCode(...new Uint8Array(buf)))
+  // on large (>1 MB) buffers.
+  const dataUrl = await blobToDataUrl(audio);
+  const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+
+  // Use transcribeModel if explicitly configured, otherwise fall back to the vision model.
+  const model = (cfg.transcribeModel && cfg.transcribeModel.trim())
+    ? cfg.transcribeModel.trim()
+    : (cfg.model || DEFAULT_MODEL);
+
+  const res = await fetch(OPENROUTER_URL, {
     method: 'POST',
     headers: {
+      'content-type': 'application/json',
       authorization: `Bearer ${cfg.apiKey}`,
       'HTTP-Referer': location.origin,
       'X-Title': 'Keepsake',
     },
-    body: fd,
+    body: JSON.stringify({
+      model,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'text', text: '请把这段音频准确转写成中文文本，只返回转写结果，不要其他说明。' },
+          { type: 'input_audio', input_audio: { data: base64, format } },
+        ],
+      }],
+    }),
   });
   if (!res.ok) throw new Error(`transcribe ${res.status}: ${await res.text()}`);
   const j = await res.json();
-  return { text: j.text ?? '' };
+  return { text: j.choices?.[0]?.message?.content?.trim() ?? '' };
 }
 
 export interface SearchContext {

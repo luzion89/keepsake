@@ -22,6 +22,7 @@ export function VoicePage() {
   const recRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
+  const autoStopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!areaId) { setAreaState('not-found'); return; }
@@ -35,6 +36,7 @@ export function VoicePage() {
   // 组件卸载时释放麦克风 stream，确保指示灯熄灭
   useEffect(() => {
     return () => {
+      if (autoStopRef.current) clearTimeout(autoStopRef.current);
       streamRef.current?.getTracks().forEach(t => t.stop());
       streamRef.current = null;
       recRef.current = null;
@@ -96,10 +98,15 @@ export function VoicePage() {
       mr.start();
       recRef.current = mr;
       setRecording(true);
+      // Auto-stop after 60 s to keep base64 payload manageable
+      autoStopRef.current = setTimeout(() => {
+        if (recRef.current) stop();
+      }, 60_000);
     } catch (e: unknown) { setErr(friendlyMicError(e)); }
   };
 
   const stop = () => {
+    if (autoStopRef.current) { clearTimeout(autoStopRef.current); autoStopRef.current = null; }
     recRef.current?.stop();
     recRef.current = null;
     setRecording(false);
