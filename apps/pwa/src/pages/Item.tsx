@@ -41,15 +41,14 @@ function PhotoThumb({ photo }: { photo: Photo }) {
     })();
     return () => { if (revoked) URL.revokeObjectURL(revoked); };
   }, [photo.id]);
-  if (!url) return <div className="w-full aspect-square bg-slate-800 rounded-lg" />;
-  return <img src={url} alt="" className="w-full aspect-square object-cover rounded-lg" />;
+  if (!url) return <div className="w-full aspect-square bg-slate-800 rounded-xl" />;
+  return <img src={url} alt="" className="w-full aspect-square object-cover rounded-xl" />;
 }
 
 function ReminderSection({ itemId }: { itemId: string }) {
   const [rules, setRules] = useState<ReminderRule[]>([]);
   const [adding, setAdding] = useState(false);
   const [kind, setKind] = useState<ReminderRule['kind']>('expiry');
-  const [thresholdDate, setThresholdDate] = useState('');
   const [thresholdQty, setThresholdQty] = useState(1);
   const [recheckDays, setRecheckDays] = useState(30);
   const [note, setNote] = useState('');
@@ -63,7 +62,6 @@ function ReminderSection({ itemId }: { itemId: string }) {
     let threshold_at: number | undefined;
     let threshold_qty: number | undefined;
     if (kind === 'expiry') {
-      // threshold_at = ms before expiry to trigger (7 days default)
       threshold_at = 7 * 24 * 60 * 60 * 1000;
     } else if (kind === 'low_stock') {
       threshold_qty = thresholdQty;
@@ -85,23 +83,23 @@ function ReminderSection({ itemId }: { itemId: string }) {
     k === 'expiry' ? '过期提醒' : k === 'low_stock' ? '库存不足' : '定期检查';
 
   return (
-    <section className="space-y-2">
+    <section className="border-t border-slate-800 pt-5 space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-slate-300">提醒规则</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">提醒规则</h2>
         <button
           onClick={() => setAdding(v => !v)}
-          className="text-xs text-sky-400 hover:text-sky-200"
+          className="text-xs text-sky-400 hover:text-sky-300 transition-colors"
         >
           ➕ 添加提醒
         </button>
       </div>
 
       {adding && (
-        <div className="bg-slate-800 rounded-lg p-3 space-y-2 text-sm">
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-2 text-sm">
           <select
             value={kind}
             onChange={e => setKind(e.target.value as ReminderRule['kind'])}
-            className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1"
+            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 outline-none focus:border-sky-400 transition-all"
           >
             <option value="expiry">过期提醒（有效期前 7 天）</option>
             <option value="low_stock">库存不足</option>
@@ -115,7 +113,7 @@ function ReminderSection({ itemId }: { itemId: string }) {
                 min={0}
                 value={thresholdQty}
                 onChange={e => setThresholdQty(Number(e.target.value))}
-                className="w-20 bg-slate-700 border border-slate-600 rounded px-2 py-1"
+                className="w-20 bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 outline-none focus:border-sky-400 transition-all"
               />
             </div>
           )}
@@ -127,7 +125,7 @@ function ReminderSection({ itemId }: { itemId: string }) {
                 min={1}
                 value={recheckDays}
                 onChange={e => setRecheckDays(Number(e.target.value))}
-                className="w-20 bg-slate-700 border border-slate-600 rounded px-2 py-1"
+                className="w-20 bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 outline-none focus:border-sky-400 transition-all"
               />
             </div>
           )}
@@ -135,11 +133,11 @@ function ReminderSection({ itemId }: { itemId: string }) {
             value={note}
             onChange={e => setNote(e.target.value)}
             placeholder="备注（可选）"
-            className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1"
+            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 outline-none focus:border-sky-400 transition-all"
           />
           <div className="flex gap-2">
-            <button onClick={save} className="flex-1 px-3 py-1 rounded bg-sky-500 text-slate-950 font-medium">保存</button>
-            <button onClick={() => setAdding(false)} className="px-3 py-1 rounded border border-slate-600 text-slate-300">取消</button>
+            <button onClick={save} className="flex-1 px-3 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-medium transition-all">保存</button>
+            <button onClick={() => setAdding(false)} className="px-3 py-2 rounded-xl border border-slate-800 text-slate-400 hover:text-slate-200 transition-all">取消</button>
           </div>
         </div>
       )}
@@ -147,7 +145,7 @@ function ReminderSection({ itemId }: { itemId: string }) {
       {rules.length > 0 && (
         <ul className="space-y-1">
           {rules.map(r => (
-            <li key={r.id} className="flex items-center gap-2 bg-slate-800/60 rounded px-3 py-2 text-xs">
+            <li key={r.id} className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs">
               <span className="flex-1 text-slate-200">
                 {kindLabel(r.kind)}
                 {r.threshold_qty != null && ` (≤${r.threshold_qty})`}
@@ -156,9 +154,9 @@ function ReminderSection({ itemId }: { itemId: string }) {
               </span>
               <button
                 onClick={() => remove(r.id)}
-                className="text-rose-400 hover:text-rose-200"
+                className="text-slate-600 hover:text-rose-400 transition-colors"
               >
-                删除
+                ×
               </button>
             </li>
           ))}
@@ -205,26 +203,27 @@ export function ItemPage() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {dialog}
-      <div className="text-sm text-slate-400">
-        <Link to={`/areas/${item.area_id}`} className="hover:text-white">← 返回区域</Link>
-      </div>
+      <nav className="text-xs text-slate-500">
+        <Link to={`/areas/${item.area_id}`} className="hover:text-slate-300 transition-colors">← 返回区域</Link>
+      </nav>
 
       {editing ? (
-        <div className="space-y-2">
+        /* ── 编辑模式 ─────────────────────────────────── */
+        <div className="space-y-3">
           <input
             value={draft.name}
             onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-lg font-medium"
+            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-lg font-medium outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20 transition-all"
           />
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-slate-400 w-12">数量</span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-slate-500 w-12">数量</span>
             <input
               type="number"
               value={draft.qty}
               onChange={(e) => setDraft({ ...draft, qty: Number(e.target.value) })}
-              className="w-24 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
+              className="w-24 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-sm outline-none focus:border-sky-400 transition-all"
             />
           </div>
           <textarea
@@ -232,41 +231,65 @@ export function ItemPage() {
             onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
             placeholder="备注"
             rows={3}
-            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
+            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm resize-none outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20 transition-all"
           />
-          <div className="space-y-1">
-            <label className="block text-sm text-slate-400">有效期（用于过期提醒，可选）</label>
+          <div className="space-y-1.5">
+            <label className="block text-xs text-slate-500">有效期（用于过期提醒，可选）</label>
             <input
               type="date"
               value={draft.expiresDate}
               onChange={(e) => setDraft({ ...draft, expiresDate: e.target.value })}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
+              className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm outline-none focus:border-sky-400 transition-all"
             />
           </div>
           <div className="flex gap-2">
-            <button onClick={save} className="flex-1 px-4 py-2 rounded-lg bg-sky-500 text-slate-950 font-medium">保存</button>
-            <button onClick={() => setEditing(false)} className="px-4 py-2 rounded-lg border border-slate-700">取消</button>
+            <button onClick={save} className="flex-1 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-medium shadow-lg shadow-sky-500/20 transition-all active:scale-[0.97]">保存</button>
+            <button onClick={() => setEditing(false)} className="px-4 py-2.5 rounded-xl border border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700 transition-all">取消</button>
           </div>
         </div>
       ) : (
+        /* ── 查看模式 ─────────────────────────────────── */
         <>
+          {/* 物品名 + 过期 badge */}
           <div className="flex items-center flex-wrap gap-1">
-            <h1 className="text-2xl font-semibold">{item.name}</h1>
+            <h1 className="text-2xl font-bold text-slate-100">{item.name}</h1>
             {item.expires_at != null && <ExpiryBadge expiresAt={item.expires_at} />}
           </div>
-          <p className="text-slate-300">数量 {item.qty}{item.unit ? ' ' + item.unit : ''}</p>
-          {item.expires_at != null && (
-            <p className="text-slate-400 text-xs">
-              有效期：{new Date(item.expires_at).toLocaleDateString('zh-CN')}
-            </p>
+
+          {/* 数量大字展示 */}
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-3xl font-bold text-sky-400">{item.qty}</span>
+            {item.unit && <span className="text-slate-400 text-sm">{item.unit}</span>}
+          </div>
+
+          {/* 元信息行 */}
+          <div className="space-y-1 text-xs text-slate-500">
+            {item.expires_at != null && (
+              <p>有效期：{new Date(item.expires_at).toLocaleDateString('zh-CN')}</p>
+            )}
+            {item.source !== 'manual' && (
+              <p>来源：{item.source}{item.confidence != null && ` · 置信度 ${(item.confidence * 100).toFixed(0)}%`}</p>
+            )}
+          </div>
+
+          {item.notes && (
+            <p className="text-slate-300 text-sm whitespace-pre-wrap bg-slate-900 border border-slate-800 rounded-xl px-4 py-3">{item.notes}</p>
           )}
-          {item.notes && <p className="text-slate-400 text-sm whitespace-pre-wrap">{item.notes}</p>}
-          {item.source !== 'manual' && (
-            <p className="text-xs text-slate-500">来源 {item.source}{item.confidence != null && ` · 置信度 ${(item.confidence * 100).toFixed(0)}%`}</p>
-          )}
+
+          {/* 操作按钮 */}
           <div className="flex gap-2">
-            <button onClick={() => setEditing(true)} className="flex-1 px-4 py-2 rounded-lg border border-slate-700 hover:border-sky-500">编辑</button>
-            <button onClick={remove} className="px-4 py-2 rounded-lg border border-rose-700 text-rose-300">删除</button>
+            <button
+              onClick={() => setEditing(true)}
+              className="flex-1 py-2.5 rounded-xl border border-slate-700 hover:border-sky-500 text-slate-100 text-sm font-medium transition-all"
+            >
+              编辑
+            </button>
+            <button
+              onClick={remove}
+              className="px-4 py-2.5 rounded-xl border border-rose-800 text-rose-400 hover:bg-rose-950 text-sm transition-all"
+            >
+              删除
+            </button>
           </div>
         </>
       )}
@@ -274,8 +297,8 @@ export function ItemPage() {
       <ReminderSection itemId={itemId} />
 
       {photos.length > 0 && (
-        <section>
-          <h2 className="text-sm font-semibold text-slate-300 mb-2">区域里的照片</h2>
+        <section className="border-t border-slate-800 pt-5">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">区域里的照片</h2>
           <div className="grid grid-cols-3 gap-2">
             {photos.map(p => <PhotoThumb key={p.id} photo={p} />)}
           </div>
