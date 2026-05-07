@@ -56,6 +56,7 @@ export default defineConfig({
       '/ai': 'http://localhost:8443',
       '/settings': 'http://localhost:8443',
       '/health': 'http://localhost:8443',
+      '/logs': 'http://localhost:8443',
     },
   },
   build: { target: 'es2022' },

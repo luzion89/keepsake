@@ -65,7 +65,22 @@ export async function setAiConfig(cfg: AiConfig): Promise<{ ok: boolean; error?:
     }
     return { ok: true };
   } catch (e: unknown) {
+    // "failed to fetch" / "NetworkError" 表示请求根本没到达服务器，常见原因：
+    // 1. 开发模式：Vite devserver 没代理 /settings → 检查 vite.config.ts
+    // 2. 混合内容：页面通过 HTTPS 访问但服务端未启用 TLS（设置 KEEPSAKE_TLS=1）
+    // 3. 自签证书未信任：在系统/浏览器中信任 mkcert 生成的证书
     const msg = e instanceof Error ? e.message : String(e);
+    const isNetworkError =
+      msg.toLowerCase().includes('failed to fetch') ||
+      msg.toLowerCase().includes('networkerror') ||
+      msg.toLowerCase().includes('network request failed') ||
+      e instanceof TypeError;
+    if (isNetworkError) {
+      const hint = location.protocol === 'https:'
+        ? '网络错误（混合内容或证书未信任）：确认服务端已启用 TLS（KEEPSAKE_TLS=1）且证书已信任'
+        : '网络错误：服务端不可达，请确认本地服务器已启动';
+      return { ok: false, error: hint };
+    }
     return { ok: false, error: msg };
   }
 }
