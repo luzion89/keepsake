@@ -14,8 +14,8 @@
 4. 物品数量字段
 5. 物品备注字段
 6. 物品 expires_at 字段
-7. AI 拍照识别（Capture 页）
-8. AI 路由（vision / text fallback）
+7. 区域照片存档（Capture 页）
+8. AI 路由（text / voice fallback）
 9. 语音输入（Voice 页）
 10. 全文搜索（Search 页）
 11. 提醒规则 CRUD（expiry / low_stock / recheck）
@@ -54,7 +54,7 @@
 ## 人工验收清单（来自 QA round-6）
 
 1. 手机局域网访问 PWA
-2. 拍照 → AI 识别 → 保存物品
+2. 拍照存档区域（Capture 页，不调用 AI）
 3. 语音输入物品
 4. 设 expires_at → 过期提醒 banner 触发
 5. 断网改数据 → 联网自动同步

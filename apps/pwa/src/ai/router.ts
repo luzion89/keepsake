@@ -150,54 +150,6 @@ export function isValidKey(key?: string): key is string {
   return typeof key === 'string' && key.trim() !== '' && key.trim() !== 'undefined';
 }
 
-async function callOpenRouterVision(blobs: Blob[], cfg: AiConfig): Promise<RecognitionDraft> {
-  const dataUrls = await Promise.all(blobs.map(blobToDataUrl));
-  const res = await fetch(OPENROUTER_URL, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      authorization: `Bearer ${cfg.apiKey}`,
-      'HTTP-Referer': location.origin,
-      'X-Title': 'Keepsake',
-    },
-    body: JSON.stringify({
-      model: cfg.model || DEFAULT_MODEL,
-      response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: '你是家庭仓储助手。仅返回 JSON：{"items":[{"name":string,"qty":number,"confidence":0-1}]}。看不清就不要瞎猜。' },
-        { role: 'user', content: [
-          { type: 'text', text: '列出图片中所有可见物品。中文命名。' },
-          ...dataUrls.map(u => ({ type: 'image_url', image_url: { url: u } })),
-        ]},
-      ],
-    }),
-  });
-  if (!res.ok) throw new Error(`openrouter ${res.status}: ${await res.text()}`);
-  const j = await res.json();
-  const text = j.choices?.[0]?.message?.content ?? '{}';
-  const parsed = JSON.parse(text);
-  return { status: 'done', items: Array.isArray(parsed.items) ? parsed.items : [], raw: j };
-}
-
-export async function recognize(blobs: Blob[]): Promise<RecognitionDraft> {
-  const cfg = await getAiConfig();
-  const provider = getEffectiveProvider(cfg);
-
-  // DeepSeek does not support vision — graceful degradation
-  if (provider === 'deepseek') {
-    logger.warn('vision_not_supported', 'DeepSeek provider does not support image recognition; use OpenRouter for vision', { provider });
-    return { status: 'pending', items: [] };
-  }
-
-  if (cfg.mode === 'on' && isValidKey(cfg.apiKey)) {
-    try { return await callOpenRouterVision(blobs, cfg); }
-    catch (e) {
-      logger.error('vision_failed', e instanceof Error ? e.message : String(e), { model: cfg.model });
-    }
-  }
-  return { status: 'pending', items: [] };
-}
-
 /**
  * Ping the configured AI provider to validate the API key.
  * Returns { ok: true, latencyMs } on success, { ok: false, error } on failure.

@@ -198,7 +198,7 @@ export function SettingsPage() {
                   autoComplete="off"
                 />
                 <p className="text-xs text-slate-500">
-                  DeepSeek 不支持图像识别；拍照识别功能需切换到 OpenRouter。
+                  DeepSeek 不支持图像识别；如需 AI 拍照存档请切换到 OpenRouter。
                 </p>
                 <label className="block text-xs text-slate-400">
                   模型（默认 {DEFAULT_DEEPSEEK_MODEL}）

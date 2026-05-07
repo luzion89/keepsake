@@ -5,7 +5,6 @@ import { RoomPage } from '../pages/Room.js';
 import { AreaPage } from '../pages/Area.js';
 import { ItemPage } from '../pages/Item.js';
 import { CapturePage } from '../pages/Capture.js';
-import { VoicePage } from '../pages/Voice.js';
 import { TextInputPage } from '../pages/TextInput.js';
 import { SearchPage } from '../pages/Search.js';
 import { SettingsPage } from '../pages/Settings.js';
