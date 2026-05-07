@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Room } from '@keepsake/shared';
-import { RoomRepo } from '../db/repos.js';
+import { AreaRepo, ItemRepo, RoomRepo } from '../db/repos.js';
 
 const PRESETS = ['厨房', '客厅', '阳台', '主卧', '次卧', '卫生间', '储物间', '玄关'];
 
@@ -53,14 +53,37 @@ export function HomePage() {
         ) : (
           <ul className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {rooms.map(r => (
-              <li key={r.id}>
+              <li key={r.id} className="relative">
                 <Link
                   to={`/rooms/${r.id}`}
                   className="block aspect-square rounded-2xl bg-slate-800 border border-slate-700 hover:border-sky-500 p-4 flex flex-col"
                 >
-                  <span className="text-base font-medium">{r.name}</span>
+                  <span className="text-base font-medium pr-8">{r.name}</span>
                   <span className="mt-auto text-xs text-slate-400">查看 →</span>
                 </Link>
+                <button
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    const areas = await AreaRepo.listByRoom(r.id);
+                    let itemCount = 0;
+                    for (const a of areas) itemCount += (await ItemRepo.listByArea(a.id)).length;
+                    const ok = areas.length === 0
+                      ? confirm(`删除房间「${r.name}」？`)
+                      : confirm(`「${r.name}」下有 ${areas.length} 个区域、${itemCount} 个物品，将一并软删除。继续？`);
+                    if (!ok) return;
+                    for (const a of areas) {
+                      for (const it of await ItemRepo.listByArea(a.id)) await ItemRepo.remove(it.id);
+                      await AreaRepo.remove(a.id);
+                    }
+                    await RoomRepo.remove(r.id);
+                    await reload();
+                  }}
+                  className="absolute top-2 right-2 w-7 h-7 rounded-full bg-slate-900/70 border border-slate-700 text-rose-300 text-xs hover:border-rose-500"
+                  aria-label={`删除房间 ${r.name}`}
+                  title="删除房间"
+                >
+                  ×
+                </button>
               </li>
             ))}
           </ul>

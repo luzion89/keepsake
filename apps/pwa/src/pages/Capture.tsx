@@ -39,7 +39,7 @@ export function CapturePage() {
     if (blobs.length === 0) return;
     const cfg = await getAiConfig();
     if (cfg.mode === 'off') {
-      setErrMsg('AI 未启用。请到「设置」配置 OpenAI/Gemini Key 或开启服务器代理。');
+      setErrMsg('AI 未启用。请到「设置」配置 OpenRouter Key。');
       return;
     }
     setAiState('running'); setErrMsg(null);

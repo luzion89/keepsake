@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { Room, Area } from '@keepsake/shared';
-import { AreaRepo, RoomRepo } from '../db/repos.js';
+import { AreaRepo, ItemRepo, RoomRepo } from '../db/repos.js';
 
 const AREA_PRESETS = ['洗手台柜子', '墙壁柜', '电视柜', '沙发底下', '床底下', '吊柜', '抽屉', '工具箱'];
 
@@ -65,13 +65,29 @@ export function RoomPage() {
         ) : (
           <ul className="space-y-2">
             {areas.map(a => (
-              <li key={a.id}>
+              <li key={a.id} className="flex items-center gap-2">
                 <Link
                   to={`/areas/${a.id}`}
-                  className="block px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 hover:border-sky-500"
+                  className="flex-1 block px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 hover:border-sky-500"
                 >
                   {a.name}
                 </Link>
+                <button
+                  onClick={async () => {
+                    const items = await ItemRepo.listByArea(a.id);
+                    const ok = items.length === 0
+                      ? confirm(`删除区域「${a.name}」？`)
+                      : confirm(`「${a.name}」下还有 ${items.length} 个物品，将一并软删除。继续？`);
+                    if (!ok) return;
+                    for (const it of items) await ItemRepo.remove(it.id);
+                    await AreaRepo.remove(a.id);
+                    await reload();
+                  }}
+                  className="px-3 py-2 text-sm rounded-lg border border-slate-700 text-rose-300 hover:border-rose-500"
+                  aria-label={`删除区域 ${a.name}`}
+                >
+                  删除
+                </button>
               </li>
             ))}
           </ul>

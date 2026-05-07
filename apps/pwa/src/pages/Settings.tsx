@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { getAiConfig, setAiConfig, type AiConfig } from '../ai/router.js';
+import { getAiConfig, setAiConfig, DEFAULT_MODEL, DEFAULT_TRANSCRIBE_MODEL, type AiConfig } from '../ai/router.js';
 import { db, getDeviceId } from '../db/dexie.js';
 import { syncOnce } from '../sync/client.js';
 
 export function SettingsPage() {
-  const [cfg, setCfg] = useState<AiConfig>({ mode: 'off', provider: 'openai' });
+  const [cfg, setCfg] = useState<AiConfig>({ mode: 'off' });
   const [deviceId, setDeviceId] = useState('');
   const [stats, setStats] = useState({ rooms: 0, areas: 0, items: 0, photos: 0, outbox: 0 });
   const [serverOk, setServerOk] = useState<boolean | null>(null);
@@ -60,9 +60,12 @@ export function SettingsPage() {
       <h1 className="text-xl font-semibold">设置</h1>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-slate-300">AI 调用模式</h2>
+        <h2 className="text-sm font-semibold text-slate-300">AI（OpenRouter）</h2>
+        <p className="text-xs text-slate-400">
+          仅支持 OpenRouter。Key 保存到本地 IndexedDB，并自动同步到本地服务器，方便其它设备登录后直接使用。
+        </p>
         <div className="space-y-2 text-sm">
-          {(['client','server','off'] as const).map(m => (
+          {(['on','off'] as const).map(m => (
             <label key={m} className="flex items-start gap-2 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 cursor-pointer">
               <input
                 type="radio"
@@ -72,47 +75,43 @@ export function SettingsPage() {
               />
               <span>
                 <span className="font-medium">
-                  {m === 'client' && '客户端直连云 AI（推荐）'}
-                  {m === 'server' && '通过本地服务器代理'}
-                  {m === 'off' && '关闭 AI（仅手动录入）'}
-                </span>
-                <span className="block text-xs text-slate-400">
-                  {m === 'client' && 'Key 仅存本机 IndexedDB，不会上传或同步。'}
-                  {m === 'server' && '由家里的 Keepsake 服务器持有 Key，需服务器在线。'}
-                  {m === 'off' && '完全离线模式，所有物品手动添加。'}
+                  {m === 'on' && '启用 AI（拍照识别 / 语音输入）'}
+                  {m === 'off' && '关闭 AI（仅手动管理）'}
                 </span>
               </span>
             </label>
           ))}
         </div>
 
-        {cfg.mode === 'client' && (
+        {cfg.mode === 'on' && (
           <div className="space-y-2">
-            <select
-              value={cfg.provider}
-              onChange={(e) => setCfg({ ...cfg, provider: e.target.value as any })}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
-            >
-              <option value="openai">OpenAI (gpt-4o-mini)</option>
-              <option value="gemini">Gemini (TODO)</option>
-            </select>
+            <label className="block text-xs text-slate-400">OpenRouter API Key</label>
             <input
               type="password"
               value={cfg.apiKey ?? ''}
               onChange={(e) => setCfg({ ...cfg, apiKey: e.target.value })}
-              placeholder="sk-..."
+              placeholder="sk-or-v1-..."
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 font-mono text-sm"
+              autoComplete="off"
             />
+            <label className="block text-xs text-slate-400">视觉模型（默认 {DEFAULT_MODEL}）</label>
             <input
               value={cfg.model ?? ''}
               onChange={(e) => setCfg({ ...cfg, model: e.target.value })}
-              placeholder="model（默认 gpt-4o-mini）"
+              placeholder={DEFAULT_MODEL}
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
+            />
+            <label className="block text-xs text-slate-400">语音转写模型（默认 {DEFAULT_TRANSCRIBE_MODEL}）</label>
+            <input
+              value={cfg.transcribeModel ?? ''}
+              onChange={(e) => setCfg({ ...cfg, transcribeModel: e.target.value })}
+              placeholder={DEFAULT_TRANSCRIBE_MODEL}
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
             />
           </div>
         )}
         <button onClick={save} className="px-4 py-2 rounded-lg bg-sky-500 text-slate-950 font-medium">保存</button>
-        {savedAt && <span className="ml-2 text-xs text-emerald-300">已保存</span>}
+        {savedAt && <span className="ml-2 text-xs text-emerald-300">已保存（已尝试同步到服务端）</span>}
       </section>
 
       <section className="space-y-2">

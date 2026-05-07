@@ -54,6 +54,7 @@ export default defineConfig({
       '/sync': 'http://localhost:8443',
       '/blobs': 'http://localhost:8443',
       '/ai': 'http://localhost:8443',
+      '/settings': 'http://localhost:8443',
       '/health': 'http://localhost:8443',
     },
   },
