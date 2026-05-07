@@ -4,6 +4,7 @@ import imageCompression from 'browser-image-compression';
 import { AreaRepo, ItemRepo, PhotoRepo, SnapshotRepo } from '../db/repos.js';
 import type { Area } from '@keepsake/shared';
 import { recognize, type RecognitionItem, getAiConfig } from '../ai/router.js';
+import { logger } from '../logging/logger.js';
 
 interface Draft extends RecognitionItem {
   selected: boolean;
@@ -11,6 +12,72 @@ interface Draft extends RecognitionItem {
 
 /** Area 加载三态 */
 type AreaState = 'loading' | 'not-found' | 'ok';
+
+export type ErrorCategory =
+  | 'key_invalid'
+  | 'network_error'
+  | 'model_not_found'
+  | 'quota_exceeded'
+  | 'image_too_large'
+  | 'unknown';
+
+const ERROR_CATEGORY_LABELS: Record<ErrorCategory, string> = {
+  key_invalid: 'Key 无效（401）',
+  network_error: '网络错误',
+  model_not_found: '模型不存在',
+  quota_exceeded: '配额超限',
+  image_too_large: '图片过大',
+  unknown: '未知错误',
+};
+
+interface ErrorCategoryModalProps {
+  errorMsg: string;
+  onSelect: (cat: ErrorCategory) => void;
+  onClose: () => void;
+}
+
+function ErrorCategoryModal({ errorMsg, onSelect, onClose }: ErrorCategoryModalProps) {
+  const [selected, setSelected] = useState<ErrorCategory>('unknown');
+  const categories = Object.keys(ERROR_CATEGORY_LABELS) as ErrorCategory[];
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="w-full max-w-sm rounded-xl bg-slate-800 border border-slate-700 p-5 space-y-4">
+        <h2 className="text-base font-semibold text-rose-300">识图失败 — 请选择错误类型</h2>
+        <p className="text-xs text-slate-400 break-all">{errorMsg}</p>
+        <ul className="space-y-2">
+          {categories.map(cat => (
+            <li key={cat}>
+              <label className="flex items-center gap-2 cursor-pointer text-sm">
+                <input
+                  type="radio"
+                  name="error_category"
+                  checked={selected === cat}
+                  onChange={() => setSelected(cat)}
+                  className="accent-rose-400"
+                />
+                {ERROR_CATEGORY_LABELS[cat]}
+              </label>
+            </li>
+          ))}
+        </ul>
+        <div className="flex gap-2 justify-end">
+          <button
+            onClick={onClose}
+            className="px-3 py-1.5 rounded-lg text-sm border border-slate-600 text-slate-300"
+          >
+            跳过
+          </button>
+          <button
+            onClick={() => { onSelect(selected); onClose(); }}
+            className="px-3 py-1.5 rounded-lg text-sm bg-rose-500 text-white font-medium"
+          >
+            记录
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function CapturePage() {
   const { areaId = '' } = useParams();
@@ -23,6 +90,8 @@ export function CapturePage() {
   const [busy, setBusy] = useState(false);
   const [aiState, setAiState] = useState<'idle' | 'running' | 'pending' | 'done' | 'error'>('idle');
   const [errMsg, setErrMsg] = useState<string | null>(null);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const pendingErrRef = useRef<string>('');
 
   useEffect(() => {
     if (!areaId) { setAreaState('not-found'); return; }
@@ -65,8 +134,20 @@ export function CapturePage() {
         setDrafts(res.items.map(it => ({ ...it, selected: true })));
       }
     } catch (e: any) {
-      setAiState('error'); setErrMsg(e?.message ?? String(e));
+      const msg: string = e?.message ?? String(e);
+      setAiState('error');
+      setErrMsg(msg);
+      pendingErrRef.current = msg;
+      setShowErrorModal(true);
     }
+  };
+
+  const handleErrorCategory = (cat: ErrorCategory) => {
+    logger.error('vision_user_feedback', `用户反馈错误类型: ${ERROR_CATEGORY_LABELS[cat]}`, {
+      category: cat,
+      raw: pendingErrRef.current,
+      areaId,
+    });
   };
 
   const save = async () => {
@@ -133,6 +214,14 @@ export function CapturePage() {
 
   return (
     <div className="space-y-4">
+      {showErrorModal && (
+        <ErrorCategoryModal
+          errorMsg={pendingErrRef.current}
+          onSelect={handleErrorCategory}
+          onClose={() => setShowErrorModal(false)}
+        />
+      )}
+
       <div className="text-sm text-slate-400">
         <Link to={`/areas/${areaId}`} className="hover:text-white">← 返回 {area!.name}</Link>
       </div>
