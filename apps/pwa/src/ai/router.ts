@@ -21,8 +21,26 @@ export const DEFAULT_TRANSCRIBE_MODEL = 'openai/whisper-1';
 
 const KEY = 'ai_config';
 
+/** 旧版本中使用的 mode 值，升级时需要映射到新枚举。 */
+const LEGACY_MODE_MAP: Record<string, AiMode> = {
+  client: 'on',
+  server: 'on',
+  off: 'off',
+  on: 'on',
+};
+
 export async function getAiConfig(): Promise<AiConfig> {
-  return (await kvGet<AiConfig>(KEY)) ?? { mode: 'off' };
+  const raw = await kvGet<AiConfig>(KEY);
+  if (!raw) return { mode: 'off' };
+  // 兼容旧 mode 值（client/server）：映射到新枚举；无效值 fallback 到 'off'。
+  const normalizedMode: AiMode = LEGACY_MODE_MAP[raw.mode as string] ?? 'off';
+  if (normalizedMode !== raw.mode) {
+    // 顺手写回，避免下次再走兼容路径
+    const migrated: AiConfig = { ...raw, mode: normalizedMode };
+    await kvSet(KEY, migrated);
+    return migrated;
+  }
+  return raw;
 }
 
 export async function setAiConfig(cfg: AiConfig): Promise<void> {
