@@ -172,7 +172,57 @@ describe('mergeSnapshot edge cases (#27)', () => {
   });
 });
 
-// ---------- #14: mergeReminderRule 单测 ----------
+describe('mergeItem — notes / expires_at fields (#61)', () => {
+  it('notes: LWW — remote newer wins', () => {
+    const local = baseItem({ notes: 'old note', updated_at: 100, updated_by: 'A' });
+    const remote = baseItem({ notes: 'new note', updated_at: 200, updated_by: 'B' });
+    const { merged } = mergeItem(local, remote);
+    expect(merged.notes).toBe('new note');
+  });
+
+  it('notes: LWW — local newer wins', () => {
+    const local = baseItem({ notes: 'local note', updated_at: 300, updated_by: 'A' });
+    const remote = baseItem({ notes: 'remote note', updated_at: 100, updated_by: 'B' });
+    const { merged } = mergeItem(local, remote);
+    expect(merged.notes).toBe('local note');
+  });
+
+  it('notes: undefined on both sides → merged notes is undefined', () => {
+    const local = baseItem({ updated_at: 100, updated_by: 'A' });
+    const remote = baseItem({ updated_at: 200, updated_by: 'B' });
+    const { merged } = mergeItem(local, remote);
+    expect(merged.notes).toBeUndefined();
+  });
+
+  it('notes: one side undefined, other has value → no spurious conflict (isEmpty logic)', () => {
+    const local = baseItem({ notes: undefined, updated_at: 100, updated_by: 'A' });
+    const remote = baseItem({ notes: 'something', updated_at: 100, updated_by: 'B' });
+    // same updated_at, 'A' < 'B' → local wins, local.notes=undefined
+    const { merged } = mergeItem(local, remote);
+    expect(merged.notes).toBeUndefined();
+  });
+
+  it('expires_at: LWW — remote newer wins', () => {
+    const local = baseItem({ expires_at: 1_700_000_000, updated_at: 100, updated_by: 'A' });
+    const remote = baseItem({ expires_at: 1_800_000_000, updated_at: 200, updated_by: 'B' });
+    const { merged } = mergeItem(local, remote);
+    expect(merged.expires_at).toBe(1_800_000_000);
+  });
+
+  it('expires_at: LWW — local newer wins', () => {
+    const local = baseItem({ expires_at: 1_900_000_000, updated_at: 400, updated_by: 'A' });
+    const remote = baseItem({ expires_at: 1_800_000_000, updated_at: 200, updated_by: 'B' });
+    const { merged } = mergeItem(local, remote);
+    expect(merged.expires_at).toBe(1_900_000_000);
+  });
+
+  it('expires_at: clearing (set to undefined) propagates via LWW', () => {
+    const local = baseItem({ expires_at: undefined, updated_at: 500, updated_by: 'A' });
+    const remote = baseItem({ expires_at: 1_800_000_000, updated_at: 100, updated_by: 'B' });
+    const { merged } = mergeItem(local, remote);
+    expect(merged.expires_at).toBeUndefined();
+  });
+});
 const baseRule = (over: Partial<ReminderRule> = {}): ReminderRule => ({
   id: '00000000-0000-0000-0000-000000000020',
   item_id: '00000000-0000-0000-0000-000000000001',
