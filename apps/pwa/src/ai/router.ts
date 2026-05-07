@@ -155,6 +155,34 @@ export async function recognize(blobs: Blob[]): Promise<RecognitionDraft> {
 }
 
 /**
+ * Ping OpenRouter by fetching GET /api/v1/models with the current API key.
+ * Validates the key without spending any tokens.
+ * Returns { ok: true, latencyMs } on success, { ok: false, error } on failure.
+ */
+export async function pingOpenRouter(
+  apiKey: string,
+): Promise<{ ok: true; latencyMs: number } | { ok: false; error: string }> {
+  const t0 = Date.now();
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/models', {
+      method: 'GET',
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'HTTP-Referer': location.origin,
+        'X-Title': 'Keepsake',
+      },
+    });
+    const latencyMs = Date.now() - t0;
+    if (res.ok) return { ok: true, latencyMs };
+    let detail = `HTTP ${res.status}`;
+    try { const j = await res.json(); detail = j?.error?.message ?? detail; } catch { /* ignore */ }
+    return { ok: false, error: `${res.status}: ${detail}` };
+  } catch (e: unknown) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/**
  * Transcribe an audio Blob via OpenRouter (Whisper-style model).
  * Note: OpenRouter exposes /audio/transcriptions for select audio models.
  */

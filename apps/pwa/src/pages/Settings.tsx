@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getAiConfig, setAiConfig, DEFAULT_MODEL, DEFAULT_TRANSCRIBE_MODEL, type AiConfig } from '../ai/router.js';
+import { getAiConfig, setAiConfig, DEFAULT_MODEL, DEFAULT_TRANSCRIBE_MODEL, type AiConfig, pingOpenRouter } from '../ai/router.js';
 import { db, getDeviceId } from '../db/dexie.js';
 import { syncOnce } from '../sync/client.js';
 
@@ -10,6 +10,8 @@ export function SettingsPage() {
   const [serverOk, setServerOk] = useState<boolean | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [aiPingState, setAiPingState] = useState<'idle' | 'pinging'>('idle');
+  const [aiPingResult, setAiPingResult] = useState<{ ok: boolean; latencyMs?: number; error?: string } | null>(null);
 
   const reloadStats = async () => setStats({
     rooms: await db.rooms.count(),
@@ -35,6 +37,16 @@ export function SettingsPage() {
     } else {
       setSaveError(result.error ?? '未知错误');
     }
+  };
+
+  const pingAi = async () => {
+    const key = cfg.apiKey?.trim();
+    if (!key) { setAiPingResult({ ok: false, error: '请先填写 API Key' }); return; }
+    setAiPingState('pinging');
+    setAiPingResult(null);
+    const result = await pingOpenRouter(key);
+    setAiPingState('idle');
+    setAiPingResult(result);
   };
 
   const ping = async () => {
@@ -114,6 +126,21 @@ export function SettingsPage() {
               placeholder={DEFAULT_TRANSCRIBE_MODEL}
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
             />
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                onClick={pingAi}
+                disabled={aiPingState === 'pinging'}
+                className="px-3 py-1.5 rounded-lg border border-slate-600 text-sm disabled:opacity-50"
+              >
+                {aiPingState === 'pinging' ? '测试中…' : '测试连通性'}
+              </button>
+              {aiPingResult?.ok === true && (
+                <span className="text-emerald-300 text-xs">✓ 连通（{aiPingResult.latencyMs} ms）</span>
+              )}
+              {aiPingResult?.ok === false && (
+                <span className="text-rose-400 text-xs">✗ 失败：{aiPingResult.error}</span>
+              )}
+            </div>
           </div>
         )}
         <button onClick={save} className="px-4 py-2 rounded-lg bg-sky-500 text-slate-950 font-medium">保存</button>
