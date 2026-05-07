@@ -90,3 +90,40 @@ safeParseConfig 兜底逻辑正常工作。
 2. 确认 `kv` 表 AI 配置是否需要多设备同步（当前架构：PUT 直写 server，client 每次从 server GET，实际已多设备共享，但需确认是否符合产品预期）。
 3. 修复 CI 构建依赖顺序：shared → server（或在 server package.json 中加 `prebuild` 钩子）。
 4. 评估 LWW tie-breaker #25 是否需要升优先级（取决于用户反馈）。
+
+## PM 批注
+
+_批注时间：2026-05-07，PM review commit_
+
+### 接受的建议
+
+| 建议 | 决策 | 关联 issue |
+|---|---|---|
+| 修复 CI 构建依赖顺序（shared → server） | ✅ 接受，下轮处理 | #26 |
+| 补充 mergeSnapshot 边界单测 | ✅ 接受，下轮处理 | #27 |
+| LWW tie-breaker #25 中「tie 时比较 id」优化 | ✅ 接受（低优先级，随机处理） | #25 |
+
+### 延后/驳回的建议
+
+| 建议 | 决策 | 理由 |
+|---|---|---|
+| #25 升优先级（priority:low → med） | ❌ 不升级，维持 low | 同设备同毫秒双写在当前单用户+React单线程架构中概率极低；NTP 精确对齐到毫秒级也不现实；不阻塞任何核心流程 |
+| `kv` 表 AI 配置多设备同步确认 | ⏸ 延后 | 当前「PUT 写 server，client 每次 GET」架构已实现多设备共享，产品预期符合，暂不需要走 outbox 同步。若后续有离线优先需求再立 issue |
+
+### 对 #25（LWW tie-breaker）的 PM 评估
+
+A 方案决策维持不变。QA 指出的「同设备同毫秒双写」是真实但极低概率场景（React 单线程 + 手动操作）；「NTP 时钟对齐」同理。issue #25 保持 open/priority:low，QA 建议的「tie 时比较 id」是合理的防御性改进，可随 backlog 清理时顺手落实。
+
+### 对 CI 顺序问题的 PM 评估
+
+这是实际存在的隐式依赖风险，尤其在 CI 并行 job 场景下会阻断构建。已立 issue #26（type:chore / priority:low / area:tooling），下轮由 coder 在 root `package.json` 串联 build 顺序解决。
+
+### 对 QA 工作的反馈
+
+本轮 QA 质量很高：
+- **主动测脏数据**（直接用 sqlite3 写入非法 JSON 验证降级逻辑）超出标准回归范围，发现了真实防御能力
+- **综合自洽 review**（三态 areaState × pending 路径 × Snapshot 生成的交叉分析）思路清晰，确认无干扰
+- **主动开 issue #25 备案**风险而不是忽略，PM 感谢这种习惯
+- **识别构建依赖隐患**并给出具体复现路径，便于 coder 直接修
+
+下轮继续保持：主动探索边界场景、自洽性 review、及时备案低概率风险。
