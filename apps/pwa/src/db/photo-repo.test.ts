@@ -1,5 +1,6 @@
 /**
  * #19: PhotoRepo.setRecognition pending → done 状态机断言
+ * #66: PhotoRepo.create area photo + listFor area
  * Dexie 需要 indexedDB，jsdom 不支持真实 IDB；改用 mock 隔离纯逻辑。
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -27,6 +28,13 @@ vi.mock('../db/dexie.js', () => ({
     photos: {
       get: vi.fn(async (id: string) => dbPhotos[id] ?? undefined),
       put: vi.fn(async (row: any) => { dbPhotos[row.id] = row; }),
+      where: vi.fn((field: string) => ({
+        equals: vi.fn((val: string) => ({
+          toArray: vi.fn(async () =>
+            Object.values(dbPhotos).filter((p: any) => p[field] === val)
+          ),
+        })),
+      })),
     },
     outbox: {
       add: vi.fn(async (entry: any) => { outboxEntries.push(entry); }),
@@ -90,5 +98,40 @@ describe('PhotoRepo.setRecognition — pending → done 状态切换', () => {
   it('pending → failed 也能正常切换', async () => {
     await PhotoRepo.setRecognition('photo-001', 'failed', { reason: 'timeout' });
     expect(dbPhotos['photo-001'].recognition_status).toBe('failed');
+  });
+});
+
+describe('PhotoRepo.create + listFor area — #66 区域照片存档', () => {
+  it('create 以 parent_type=area 写入 DB', async () => {
+    const blob = new Blob([new Uint8Array([1, 2, 3])], { type: 'image/jpeg' });
+    const photo = await PhotoRepo.create({ type: 'area', id: 'area-001' }, blob);
+    expect(photo.parent_type).toBe('area');
+    expect(photo.parent_id).toBe('area-001');
+    expect(photo.recognition_status).toBe('pending');
+    expect(dbPhotos[photo.id]).toBeDefined();
+  });
+
+  it('create 同时写入 outbox', async () => {
+    const blob = new Blob([new Uint8Array([1])], { type: 'image/jpeg' });
+    const before = outboxEntries.length;
+    await PhotoRepo.create({ type: 'area', id: 'area-001' }, blob);
+    expect(outboxEntries.length).toBe(before + 1);
+    const entry = outboxEntries[outboxEntries.length - 1] as any;
+    expect(entry.op.kind).toBe('upsert');
+    expect(entry.op.table).toBe('photo');
+  });
+
+  it('listFor area 只返回该 area 的未删除照片', async () => {
+    // 插入两张 area-001 和一张 area-002 的照片
+    const blob = new Blob([new Uint8Array([1])], { type: 'image/jpeg' });
+    await PhotoRepo.create({ type: 'area', id: 'area-001' }, blob);
+    await PhotoRepo.create({ type: 'area', id: 'area-001' }, blob);
+    await PhotoRepo.create({ type: 'area', id: 'area-002' }, blob);
+
+    const list = await PhotoRepo.listFor('area', 'area-001');
+    // 过滤掉 mockPhoto（也是 area-001 且 deleted=false）
+    expect(list.every(p => p.parent_type === 'area' && p.parent_id === 'area-001')).toBe(true);
+    expect(list.length).toBeGreaterThanOrEqual(2);
+    expect(list.every(p => !p.deleted)).toBe(true);
   });
 });
