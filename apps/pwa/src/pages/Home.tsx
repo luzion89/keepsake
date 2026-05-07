@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Room } from '@keepsake/shared';
 import { AreaRepo, ItemRepo, RoomRepo } from '../db/repos.js';
+import { useConfirm } from '../components/ConfirmDialog.js';
 
 const PRESETS = ['厨房', '客厅', '阳台', '主卧', '次卧', '卫生间', '储物间', '玄关'];
 
 export function HomePage() {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [name, setName] = useState('');
+  const { confirm, dialog } = useConfirm();
 
   const reload = async () => setRooms(await RoomRepo.list());
   useEffect(() => { reload(); }, []);
@@ -22,6 +24,7 @@ export function HomePage() {
 
   return (
     <div className="space-y-5">
+      {dialog}
       <section>
         <h1 className="text-xl font-semibold mb-3">添加房间</h1>
         <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); add(name); }}>
@@ -67,9 +70,10 @@ export function HomePage() {
                     const areas = await AreaRepo.listByRoom(r.id);
                     let itemCount = 0;
                     for (const a of areas) itemCount += (await ItemRepo.listByArea(a.id)).length;
-                    const ok = areas.length === 0
-                      ? confirm(`删除房间「${r.name}」？`)
-                      : confirm(`「${r.name}」下有 ${areas.length} 个区域、${itemCount} 个物品，将一并软删除。继续？`);
+                    const message = areas.length === 0
+                      ? `删除房间「${r.name}」？`
+                      : `「${r.name}」下有 ${areas.length} 个区域、${itemCount} 个物品，将一并软删除。继续？`;
+                    const ok = await confirm(message, { danger: true, okText: '删除' });
                     if (!ok) return;
                     for (const a of areas) {
                       for (const it of await ItemRepo.listByArea(a.id)) await ItemRepo.remove(it.id);
