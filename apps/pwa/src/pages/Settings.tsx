@@ -260,16 +260,18 @@ export function SettingsPage() {
           </div>
         )}
 
-        <button onClick={save} className="px-4 py-2 rounded-lg bg-sky-500 text-slate-950 font-medium">保存</button>
-        {savedAt && !saveError && <span className="ml-2 text-xs text-emerald-300">已同步</span>}
-        {savedAt && saveError && (
-          <span className="ml-2 text-xs text-rose-400">
-            已保存到本地，服务端推送失败：{saveError}
-            {saveError.includes('混合内容') || saveError.includes('TLS') ? null : (
-              <span className="block mt-0.5 text-slate-500">（重新打开应用会重试；若持续失败请检查服务端是否在线）</span>
-            )}
-          </span>
-        )}
+        <div className="sticky bottom-0 pt-3 pb-1 bg-slate-950/95 backdrop-blur-sm border-t border-slate-800 -mx-4 px-4">
+          <button onClick={save} className="w-full px-4 py-3 rounded-lg bg-sky-500 text-slate-950 font-medium">保存设置</button>
+          {savedAt && !saveError && <span className="block text-center text-xs text-emerald-300 mt-1">已同步</span>}
+          {savedAt && saveError && (
+            <span className="block text-xs text-rose-400 mt-1 text-center">
+              已保存到本地，服务端推送失败：{saveError}
+              {saveError.includes('混合内容') || saveError.includes('TLS') ? null : (
+                <span className="block mt-0.5 text-slate-500">（重新打开应用会重试；若持续失败请检查服务端是否在线）</span>
+              )}
+            </span>
+          )}
+        </div>
       </section>
 
       <section className="space-y-2">

@@ -120,7 +120,7 @@ export function AreaPage() {
           onClick={() => setShowManual(s => !s)}
           className="text-xs text-slate-400 hover:text-slate-200"
         >
-          {showManual ? '▼' : '▶'} 手动添加
+          {showManual ? '▼' : '▶'} 手动添加单个物品
         </button>
         {showManual && (
           <div className="mt-2 bg-slate-800/60 border border-slate-700 rounded-xl p-3">

@@ -234,13 +234,13 @@ export function ItemPage() {
             rows={3}
             className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
           />
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-slate-400 flex-shrink-0">有效期（用于过期提醒，可选）</span>
+          <div className="space-y-1">
+            <label className="block text-sm text-slate-400">有效期（用于过期提醒，可选）</label>
             <input
               type="date"
               value={draft.expiresDate}
               onChange={(e) => setDraft({ ...draft, expiresDate: e.target.value })}
-              className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
             />
           </div>
           <div className="flex gap-2">
