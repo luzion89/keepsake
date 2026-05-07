@@ -6,6 +6,7 @@ import {
 } from '@keepsake/shared';
 import { pullAiConfigFromServer } from '../ai/router.js';
 import { pushPendingBlobs, pullMissingBlobs } from './blobs.js';
+import { pushLogs, logger } from '../logging/logger.js';
 
 const SYNC_CURSOR_KEY = 'sync_cursor';
 
@@ -95,6 +96,9 @@ export async function syncOnce(): Promise<{ pushed: number; pulled: number; conf
     await pushPendingBlobs();
     await pullMissingBlobs();
 
+    // Push client logs to server (best-effort)
+    pushLogs().catch(() => {});
+
     return { pushed, pulled: pull.changes.length, conflicts };
   } finally {
     _running = false;
@@ -104,7 +108,7 @@ export async function syncOnce(): Promise<{ pushed: number; pulled: number; conf
 export function startSyncDaemon() {
   // 启动时拉取服务端 AI 配置（LWW 合并，只读不写，避免循环）
   pullAiConfigFromServer().catch(() => {});
-  syncOnce().catch(() => {});
+  syncOnce().catch(e => logger.error('sync_daemon', 'syncOnce failed', String(e)));
   window.addEventListener('online', () => syncOnce().catch(() => {}));
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') syncOnce().catch(() => {});

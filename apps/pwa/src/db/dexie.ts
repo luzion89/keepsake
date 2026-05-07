@@ -28,6 +28,16 @@ export interface KvRow {
   value: unknown;
 }
 
+export interface ErrorLogRow {
+  id?: number;   // autoinc pk
+  ts: number;
+  level: 'error' | 'warn' | 'info';
+  code: string;
+  message: string;
+  context?: unknown;
+  pushed: 0 | 1;
+}
+
 export class KeepsakeDB extends Dexie {
   rooms!: Table<Room, string>;
   areas!: Table<Area, string>;
@@ -39,6 +49,7 @@ export class KeepsakeDB extends Dexie {
   blobs!: Table<BlobRow, string>;
   kv!: Table<KvRow, string>;
   reminders!: Table<ReminderRule, string>;
+  error_logs!: Table<ErrorLogRow, number>;
 
   constructor() {
     super('keepsake');
@@ -56,6 +67,9 @@ export class KeepsakeDB extends Dexie {
     this.version(2).stores({
       reminders: 'id, item_id, kind, updated_at, deleted',
     }).upgrade(() => { /* no data migration needed */ });
+    this.version(3).stores({
+      error_logs: '++id, ts, pushed',
+    }).upgrade(() => { /* new table */ });
   }
 }
 
