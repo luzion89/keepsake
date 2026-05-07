@@ -286,3 +286,106 @@ describe('parseItemsFromText() #78 — replace/merge 模式 prompt', () => {
     expect(body.messages[0].content).not.toContain('现有物品列表');
   });
 });
+
+// ---------------------------------------------------------------------------
+// searchAnswer() #89 — prompt 不含 [id] 引用要求
+// ---------------------------------------------------------------------------
+describe('searchAnswer() #89 — system prompt 不要求 AI 在 answer 中使用 [id] 标注', () => {
+  const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+
+  beforeEach(() => {
+    vi.stubGlobal('location', { origin: 'https://example.com' });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  it('system prompt 不包含要求在 answer 中嵌入 id 的指令', async () => {
+    const { kvGet } = await import('../db/dexie.js');
+    (kvGet as ReturnType<typeof vi.fn>).mockResolvedValue({
+      mode: 'on', provider: 'openrouter', apiKey: 'sk-or-test',
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{
+          message: {
+            content: JSON.stringify({ answer: '消毒水在主卧的洗手台柜子，共2瓶。', citedIds: ['abc-123'] }),
+          },
+        }],
+      }),
+    }));
+
+    const { searchAnswer } = await import('./router.js');
+    const ctx = [{ id: 'abc-123', name: '消毒水', qty: 2, location: '主卧 / 洗手台柜子' }];
+    await searchAnswer('消毒水在哪里', ctx);
+
+    const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body as string);
+    const sysPrompt: string = body.messages[0].content;
+
+    // Must NOT instruct AI to embed [id] in answer
+    expect(sysPrompt).not.toMatch(/在文中用\s*\[id\]/);
+    expect(sysPrompt).not.toContain('请在文中用 [id] 标注');
+
+    // Must explicitly say not to include ids in answer
+    expect(sysPrompt).toContain('不要在回答中包含任何 id');
+  });
+
+  it('context block 格式把 id 放在行末注释而非行首 [id] 前缀', async () => {
+    const { kvGet } = await import('../db/dexie.js');
+    (kvGet as ReturnType<typeof vi.fn>).mockResolvedValue({
+      mode: 'on', provider: 'openrouter', apiKey: 'sk-or-test',
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{
+          message: {
+            content: JSON.stringify({ answer: '消毒水在主卧。', citedIds: ['abc-123'] }),
+          },
+        }],
+      }),
+    }));
+
+    const { searchAnswer } = await import('./router.js');
+    const ctx = [{ id: 'abc-123', name: '消毒水', qty: 2, location: '主卧 / 洗手台柜子' }];
+    await searchAnswer('消毒水', ctx);
+
+    const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body as string);
+    const sysPrompt: string = body.messages[0].content;
+
+    // id should appear as trailing comment (id:xxx), not as leading [xxx]
+    expect(sysPrompt).toContain('(id:abc-123)');
+    expect(sysPrompt).not.toContain('[abc-123]');
+  });
+
+  it('searchAnswer 正确返回 answer 和 citedIds', async () => {
+    const { kvGet } = await import('../db/dexie.js');
+    (kvGet as ReturnType<typeof vi.fn>).mockResolvedValue({
+      mode: 'on', provider: 'openrouter', apiKey: 'sk-or-test',
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{
+          message: {
+            content: JSON.stringify({ answer: '消毒水在主卧的洗手台柜子。', citedIds: ['abc-123'] }),
+          },
+        }],
+      }),
+    }));
+
+    const { searchAnswer } = await import('./router.js');
+    const ctx = [{ id: 'abc-123', name: '消毒水', qty: 2, location: '主卧 / 洗手台柜子' }];
+    const res = await searchAnswer('消毒水在哪里', ctx);
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.result.answer).toBe('消毒水在主卧的洗手台柜子。');
+      expect(res.result.citedIds).toEqual(['abc-123']);
+      // answer must not contain UUID-like strings
+      expect(res.result.answer).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}/i);
+    }
+  });
+});

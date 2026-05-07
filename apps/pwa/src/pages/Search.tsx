@@ -108,6 +108,19 @@ export function SearchPage() {
   // Highlight items cited by AI
   const citedSet = useMemo(() => new Set(aiResult?.citedIds ?? []), [aiResult]);
 
+  // Build cited items list for the 📌 section
+  const citedItems = useMemo(() => {
+    if (!aiResult?.citedIds?.length) return [];
+    return aiResult.citedIds
+      .map(id => items.find(it => it.id === id))
+      .filter((it): it is Item => it !== undefined)
+      .map(it => {
+        const area = areas.get(it.area_id);
+        const room = area ? rooms.get(area.room_id) : undefined;
+        return { ...it, locationLabel: `${room?.name ?? '?'} / ${area?.name ?? '?'}` };
+      });
+  }, [aiResult, items, areas, rooms]);
+
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">搜索物品</h1>
@@ -185,6 +198,25 @@ export function SearchPage() {
           {aiResult && (
             <p className="text-slate-100 text-sm leading-relaxed whitespace-pre-wrap">{aiResult.answer}</p>
           )}
+        </section>
+      )}
+
+      {/* 📌 AI cited items section */}
+      {citedItems.length > 0 && (
+        <section className="mt-2">
+          <p className="text-xs text-slate-500 font-medium mb-2">📌 AI 提到的物品</p>
+          <div className="flex flex-wrap gap-2">
+            {citedItems.map(it => (
+              <Link
+                key={it.id}
+                to={`/items/${it.id}`}
+                className="bg-violet-900/40 border border-violet-700/60 text-violet-200 rounded-full px-3 py-1.5 text-xs hover:bg-violet-800/60 transition-colors"
+              >
+                {it.name}
+                <span className="text-violet-400 ml-1">{it.locationLabel}</span>
+              </Link>
+            ))}
+          </div>
         </section>
       )}
     </div>
