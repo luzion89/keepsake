@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { getAiConfig, setAiConfig, DEFAULT_MODEL, DEFAULT_TRANSCRIBE_MODEL, type AiConfig, pingOpenRouter } from '../ai/router.js';
 import { db, getDeviceId } from '../db/dexie.js';
 import { syncOnce } from '../sync/client.js';
+import { gcSyncedBlobs } from '../sync/blobs.js';
 
 export function SettingsPage() {
   const [cfg, setCfg] = useState<AiConfig>({ mode: 'off' });
@@ -12,6 +13,8 @@ export function SettingsPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [aiPingState, setAiPingState] = useState<'idle' | 'pinging'>('idle');
   const [aiPingResult, setAiPingResult] = useState<{ ok: boolean; latencyMs?: number; error?: string } | null>(null);
+  const [gcResult, setGcResult] = useState<number | null>(null);
+  const [gcRunning, setGcRunning] = useState(false);
 
   const reloadStats = async () => setStats({
     rooms: await db.rooms.count(),
@@ -71,6 +74,18 @@ export function SettingsPage() {
     a.download = `keepsake-${new Date().toISOString().slice(0,10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const runGc = async () => {
+    setGcRunning(true);
+    setGcResult(null);
+    try {
+      const n = await gcSyncedBlobs();
+      setGcResult(n);
+      reloadStats();
+    } finally {
+      setGcRunning(false);
+    }
   };
 
   return (
@@ -166,7 +181,21 @@ export function SettingsPage() {
         <h2 className="text-sm font-semibold text-slate-300">本机数据</h2>
         <p>设备 ID: <span className="font-mono">{deviceId}</span></p>
         <p>房间 {stats.rooms} · 区域 {stats.areas} · 物品 {stats.items} · 照片 {stats.photos} · 待同步 {stats.outbox}</p>
-        <button onClick={exportJson} className="mt-2 px-3 py-2 rounded-lg border border-slate-700">导出 JSON 备份</button>
+        <div className="flex items-center gap-2 mt-2">
+          <button onClick={exportJson} className="px-3 py-2 rounded-lg border border-slate-700">导出 JSON 备份</button>
+          <button
+            onClick={runGc}
+            disabled={gcRunning}
+            className="px-3 py-2 rounded-lg border border-slate-700 disabled:opacity-50"
+          >
+            {gcRunning ? '清理中…' : '清理本地缓存'}
+          </button>
+          {gcResult !== null && (
+            <span className="text-xs text-emerald-300">
+              {gcResult > 0 ? `已释放 ${gcResult} 个已同步 blob` : '无可清理项'}
+            </span>
+          )}
+        </div>
       </section>
     </div>
   );
