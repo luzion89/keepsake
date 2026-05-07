@@ -157,11 +157,11 @@ export function SettingsPage() {
               placeholder={DEFAULT_MODEL}
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
             />
-            <label className="block text-xs text-slate-400">语音转写模型（默认 {DEFAULT_TRANSCRIBE_MODEL}）</label>
+            <label className="block text-xs text-slate-400">语音转写模型（需支持 audio 输入，默认同上）</label>
             <input
               value={cfg.transcribeModel ?? ''}
               onChange={(e) => setCfg({ ...cfg, transcribeModel: e.target.value })}
-              placeholder={DEFAULT_TRANSCRIBE_MODEL}
+              placeholder={DEFAULT_MODEL}
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
             />
             <div className="flex items-center gap-2 pt-1">
