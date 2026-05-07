@@ -213,3 +213,76 @@ describe('parseItemsFromText() #64 — 抽取 expires_at / notes', () => {
     await expect(parseItemsFromText('随便')).rejects.toThrow();
   });
 });
+
+// ---------------------------------------------------------------------------
+// parseItemsFromText() #78 — replace vs merge mode prompt 形态
+// ---------------------------------------------------------------------------
+describe('parseItemsFromText() #78 — replace/merge 模式 prompt', () => {
+  const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+
+  beforeEach(() => {
+    vi.stubGlobal('location', { origin: 'https://example.com' });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  it('replace 模式：system prompt 不含已有物品列表', async () => {
+    const { kvGet } = await import('../db/dexie.js');
+    (kvGet as ReturnType<typeof vi.fn>).mockResolvedValue({
+      mode: 'on', provider: 'openrouter', apiKey: 'sk-or-test',
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: JSON.stringify({ items: [] }) } }] }),
+    }));
+    const { parseItemsFromText } = await import('./router.js');
+    await parseItemsFromText('两瓶可乐', [], 'replace');
+    const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body as string);
+    const sysPrompt: string = body.messages[0].content;
+    // Replace mode uses the standard prompt — no existing items JSON
+    expect(sysPrompt).not.toContain('现有物品列表');
+    expect(body.messages[0].role).toBe('system');
+  });
+
+  it('merge 模式：system prompt 含已有物品 JSON', async () => {
+    const { kvGet } = await import('../db/dexie.js');
+    (kvGet as ReturnType<typeof vi.fn>).mockResolvedValue({
+      mode: 'on', provider: 'openrouter', apiKey: 'sk-or-test',
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: JSON.stringify({ items: [{ name: '牛奶', qty: 3, expires_at: null }] }) } }],
+      }),
+    }));
+    const { parseItemsFromText } = await import('./router.js');
+    const existing = [{ name: '牛奶', qty: 2, expires_at: '2026-06-01', notes: '全脂' }];
+    const items = await parseItemsFromText('再加一盒牛奶', existing, 'merge');
+    const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body as string);
+    const sysPrompt: string = body.messages[0].content;
+    expect(sysPrompt).toContain('现有物品列表');
+    expect(sysPrompt).toContain('牛奶');
+    expect(items[0].name).toBe('牛奶');
+    // Verify request went to OpenRouter
+    expect((fetch as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe(OPENROUTER_URL);
+  });
+
+  it('merge 模式但无已有物品：降级为标准 prompt', async () => {
+    const { kvGet } = await import('../db/dexie.js');
+    (kvGet as ReturnType<typeof vi.fn>).mockResolvedValue({
+      mode: 'on', provider: 'openrouter', apiKey: 'sk-or-test',
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: JSON.stringify({ items: [] }) } }] }),
+    }));
+    const { parseItemsFromText } = await import('./router.js');
+    await parseItemsFromText('一瓶醋', [], 'merge');
+    const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body as string);
+    // Empty existing → fallback to standard prompt
+    expect(body.messages[0].content).not.toContain('现有物品列表');
+  });
+});
