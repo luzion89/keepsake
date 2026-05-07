@@ -154,3 +154,43 @@ PUT /blobs/../etc/passwd  → 404（Fastify 路由规范化拒绝）✅
 - BackgroundSync (`outbox-flush`) 未注册，iOS 退后台不同步（前台触发兜底）
 - `conflict_log` 未接入服务端 API 下发（本地 IndexedDB 记录，服务端 conflict_log 表数据无法查看）
 - 路径穿越防护靠 Fastify 路由规范化（返回 404 而非 400/403），可加显式校验
+
+---
+
+## PM 批注
+
+**日期**：2026-05-07
+
+### MVP 决策：#36 纳入 MVP，第六轮修复后正式通过
+
+**结论**：#36 必须在 Round 6 修复，MVP 验收暂不通过。
+
+**理由**：
+- Round 4 PM 批注已明确将 #14「过期提醒」列为 MVP 必做项。
+- 功能矩阵第 19 行「过期提醒触发」标注 ⚠️，说明该 kind 端到端不可用——用户无法设置 `expires_at`，规则形同虚设。
+- 修复工作量极小（Item 编辑页加一个 `type=date` input + 写入 ItemRepo），不存在推迟的技术或时间理由。
+- 赖账会造成发布后用户报告「过期提醒没用」的信任损失，代价远大于 30 分钟修复成本。
+
+### 表扬 QA
+
+本轮 QA 走查 MVP 功能矩阵 23 项、全套 50 个自动化测试 + blob 端到端 curl，是历轮 QA 中功能矩阵覆盖最完整的一次。**#36 正是通过功能矩阵逐项比对发现的**——scanner.ts 有逻辑、UI 无入口、用户无感知，这类「静默失效」bug 极易在代码 review 中漏掉，靠矩阵走查抓住意义重大。这是 QA 贡献最高的一次，记录表扬。
+
+### 第六轮任务
+
+| # | 类型 | 描述 | 优先级 |
+|---|------|------|--------|
+| #36 | bug | Item 编辑页加 `expires_at` 日期 input；新建/编辑保存时写入 ItemRepo；不强制必填 | MVP 阻断 |
+
+### 确定的 MVP Backlog（正式发布后处理，不影响本次 MVP 通过）
+
+| 项目 | 说明 |
+|------|------|
+| Web Push (VAPID) | iOS/Android 后台推送；应用内横幅已兜底 |
+| BackgroundSync outbox-flush | iOS 退后台同步；前台触发已兜底 |
+| conflict_log 服务端 API | 本地 IDB 记录可用，服务端数据暂不可查 |
+| 路径穿越显式校验 | 当前靠 Fastify 路由规范化返回 404，可加 400/403 显式拦截 |
+
+### 下一步
+
+- #36 指派 coder，Round 6 修复 + QA 回归
+- Round 6 通过后即正式宣告 MVP 验收完成，发布 `docs/MVP-COMPLETE.md`
