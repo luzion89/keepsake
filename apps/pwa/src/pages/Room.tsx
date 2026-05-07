@@ -30,30 +30,38 @@ export function RoomPage() {
   if (!room) return <p className="text-slate-400">加载中…</p>;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {dialog}
-      <div className="text-sm text-slate-400">
-        <Link to="/" className="hover:text-white">← 房间</Link>
-      </div>
-      <h1 className="text-2xl font-semibold">{room.name}</h1>
 
+      {/* ── 面包屑 ────────────────────────────────────── */}
+      <nav className="flex items-center gap-1 text-xs text-slate-500">
+        <Link to="/" className="hover:text-slate-300 transition-colors">房间</Link>
+        <span className="text-slate-700">›</span>
+        <span className="text-slate-300">{room.name}</span>
+      </nav>
+
+      <h1 className="text-2xl font-bold text-slate-100">{room.name}</h1>
+
+      {/* ── 添加区域表单 ──────────────────────────────── */}
       <section>
-        <h2 className="text-base font-semibold mb-2">添加区域</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">添加区域</h2>
         <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); add(name); }}>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="区域名（如 洗手台柜子）"
-            className="flex-1 min-w-0 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 outline-none focus:border-sky-500"
+            className="flex-1 min-w-0 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20 transition-all duration-150"
           />
-          <button className="shrink-0 px-4 py-2 rounded-lg bg-sky-500 text-slate-950 font-medium">添加</button>
+          <button className="shrink-0 px-4 py-3 rounded-xl bg-sky-500 hover:bg-sky-400 active:scale-[0.97] text-white font-medium text-sm shadow-lg shadow-sky-500/20 transition-all duration-150">
+            添加
+          </button>
         </form>
-        <div className="mt-2 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap gap-2">
           {AREA_PRESETS.map(p => (
             <button
               key={p}
               onClick={() => add(p)}
-              className="text-xs px-2.5 py-1.5 rounded-full bg-slate-800 border border-slate-700 hover:border-sky-500"
+              className="text-xs px-3 py-1.5 rounded-full bg-slate-800 border border-slate-800 hover:border-sky-500/60 hover:bg-slate-700 text-slate-300 transition-all duration-150"
             >
               + {p}
             </button>
@@ -61,17 +69,24 @@ export function RoomPage() {
         </div>
       </section>
 
+      {/* ── 区域列表 ──────────────────────────────────── */}
       <section>
-        <h2 className="text-base font-semibold mb-2">区域 ({areas.length})</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">
+          区域 {areas.length > 0 && `(${areas.length})`}
+        </h2>
         {areas.length === 0 ? (
-          <p className="text-slate-400 text-sm">这个房间还没有区域。</p>
+          <div className="flex flex-col items-center py-10 text-center">
+            <span className="text-4xl mb-3">📦</span>
+            <p className="text-slate-400 text-sm">这个房间还没有区域</p>
+          </div>
         ) : (
-          <ul className="space-y-2">
+          <ul className="grid grid-cols-1 gap-2">
             {areas.map(a => (
-              <li key={a.id} className="flex items-center gap-2">
+              <li key={a.id} className="flex items-center px-4 py-3.5 bg-slate-900 border border-slate-800 rounded-2xl hover:border-sky-500/40 shadow-[0_1px_0_0_rgba(255,255,255,0.04)_inset] transition-all duration-150">
+                <span className="text-base mr-3">📦</span>
                 <Link
                   to={`/areas/${a.id}`}
-                  className="flex-1 block px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 hover:border-sky-500"
+                  className="flex-1 text-sm font-medium text-slate-100 hover:text-white"
                 >
                   {a.name}
                 </Link>
@@ -87,10 +102,10 @@ export function RoomPage() {
                     await AreaRepo.remove(a.id);
                     await reload();
                   }}
-                  className="px-3 py-2 text-sm rounded-lg border border-slate-700 text-rose-300 hover:border-rose-500"
+                  className="text-slate-600 hover:text-rose-400 text-lg leading-none transition-colors ml-2"
                   aria-label={`删除区域 ${a.name}`}
                 >
-                  删除
+                  ×
                 </button>
               </li>
             ))}
