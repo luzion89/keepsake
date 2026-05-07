@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import type { Item, Photo } from '@keepsake/shared';
 import { ItemRepo, PhotoRepo } from '../db/repos.js';
 import { db } from '../db/dexie.js';
+import { useConfirm } from '../components/ConfirmDialog.js';
 
 function PhotoThumb({ photo }: { photo: Photo }) {
   const [url, setUrl] = useState<string | null>(null);
@@ -27,6 +28,7 @@ export function ItemPage() {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({ name: '', qty: 0, notes: '' });
+  const { confirm, dialog } = useConfirm();
 
   const reload = async () => {
     const it = await db.items.get(itemId);
@@ -48,13 +50,14 @@ export function ItemPage() {
   };
 
   const remove = async () => {
-    if (!confirm(`删除 "${item.name}"?`)) return;
+    if (!await confirm(`删除 "${item.name}"?`, { danger: true, okText: '删除' })) return;
     await ItemRepo.remove(item.id);
     history.back();
   };
 
   return (
     <div className="space-y-4">
+      {dialog}
       <div className="text-sm text-slate-400">
         <Link to={`/areas/${item.area_id}`} className="hover:text-white">← 返回区域</Link>
       </div>

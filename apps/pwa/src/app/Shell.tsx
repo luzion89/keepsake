@@ -1,18 +1,83 @@
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { db } from '../db/dexie.js';
+import { db, type ConflictRow } from '../db/dexie.js';
 import { syncOnce } from '../sync/client.js';
+
+function ConflictBanner() {
+  const [count, setCount] = useState(0);
+  const [expanded, setExpanded] = useState(false);
+  const [rows, setRows] = useState<ConflictRow[]>([]);
+
+  useEffect(() => {
+    const tick = async () => {
+      const n = await db.conflicts.where('acknowledged').equals(0).count();
+      setCount(n);
+    };
+    tick();
+    const id = setInterval(tick, 5000);
+    return () => clearInterval(id);
+  }, []);
+
+  if (count === 0) return null;
+
+  const loadRows = async () => {
+    const r = await db.conflicts.where('acknowledged').equals(0).toArray();
+    setRows(r);
+  };
+
+  const toggle = () => {
+    if (!expanded) loadRows();
+    setExpanded(v => !v);
+  };
+
+  const acknowledgeAll = async () => {
+    await db.conflicts.where('acknowledged').equals(0).modify({ acknowledged: 1 });
+    setCount(0);
+    setExpanded(false);
+    setRows([]);
+  };
+
+  return (
+    <div className="bg-rose-950 border-b border-rose-700 px-4 py-2 text-xs">
+      <div className="flex items-center gap-2">
+        <span className="text-rose-300 font-medium">⚠️ 检测到 {count} 条冲突</span>
+        <button
+          onClick={toggle}
+          className="text-rose-200 hover:text-white underline underline-offset-2"
+        >
+          {expanded ? '收起' : '查看详情'}
+        </button>
+      </div>
+      {expanded && (
+        <div className="mt-2 space-y-1">
+          {rows.map(r => (
+            <div key={r.id} className="text-rose-200 bg-rose-900/50 rounded px-2 py-1">
+              <span className="font-mono">{r.table}/{r.row_id}</span> · 字段{' '}
+              <span className="font-medium">{r.field}</span> · 本地{' '}
+              <span className="text-amber-300">{JSON.stringify(r.client)}</span> / 服务端{' '}
+              <span className="text-sky-300">{JSON.stringify(r.server)}</span>
+            </div>
+          ))}
+          <button
+            onClick={acknowledgeAll}
+            className="mt-1 px-3 py-1 rounded bg-rose-700 hover:bg-rose-600 text-white font-medium"
+          >
+            全部确认
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function Shell() {
   const loc = useLocation();
   const [pending, setPending] = useState(0);
-  const [conflicts, setConflicts] = useState(0);
   const [online, setOnline] = useState<boolean>(navigator.onLine);
 
   useEffect(() => {
     const tick = async () => {
       setPending(await db.outbox.count());
-      setConflicts(await db.conflicts.where('acknowledged').equals(0).count());
     };
     tick();
     const i = setInterval(tick, 2000);
@@ -32,11 +97,10 @@ export function Shell() {
         <Link to="/settings" className="text-sm text-slate-300 hover:text-white">设置</Link>
       </header>
 
-      {(pending > 0 || conflicts > 0 || !online) && (
+      {(pending > 0 || !online) && (
         <div className="px-4 py-2 text-xs flex gap-3 bg-slate-800/60 border-b border-slate-700">
           {!online && <span className="text-amber-300">● 离线</span>}
           {pending > 0 && <span className="text-sky-300">待同步 {pending}</span>}
-          {conflicts > 0 && <span className="text-rose-300">冲突 {conflicts}</span>}
           <button
             onClick={() => syncOnce()}
             className="ml-auto text-slate-300 hover:text-white underline-offset-2 hover:underline"
@@ -45,6 +109,8 @@ export function Shell() {
           </button>
         </div>
       )}
+
+      <ConflictBanner />
 
       <main className="flex-1 px-4 py-4 max-w-3xl w-full mx-auto">
         <Outlet />
