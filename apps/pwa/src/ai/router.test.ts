@@ -117,3 +117,99 @@ describe('transcribe() #58 — chat completions 路径', () => {
     await expect(transcribe(blob)).rejects.toThrow('transcribe 401');
   });
 });
+
+// ---------------------------------------------------------------------------
+// parseItemsFromText() — #64: 新系统 prompt，返回 expires_at / notes 字段
+// ---------------------------------------------------------------------------
+describe('parseItemsFromText() #64 — 抽取 expires_at / notes', () => {
+  const DEEPSEEK_URL = 'https://api.deepseek.com/v1/chat/completions';
+  const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+
+  beforeEach(() => {
+    vi.stubGlobal('location', { origin: 'https://example.com' });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  it('OpenRouter provider: 返回含 expires_at 和 notes 的 RecognitionItem[]', async () => {
+    const { kvGet } = await import('../db/dexie.js');
+    (kvGet as ReturnType<typeof vi.fn>).mockResolvedValue({
+      mode: 'on',
+      provider: 'openrouter',
+      apiKey: 'sk-or-test',
+      model: 'google/gemini-2.5-flash-lite',
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              items: [
+                { name: '牛奶', qty: 2, expires_at: '2026-06-01', notes: '全脂' },
+                { name: '面包', qty: 1, expires_at: null },
+              ],
+            }),
+          },
+        }],
+      }),
+    }));
+
+    const { parseItemsFromText } = await import('./router.js');
+    const items = await parseItemsFromText('两盒牛奶（全脂，6月1日到期）和一条面包');
+    expect(items).toHaveLength(2);
+    expect(items[0].expires_at).toBe('2026-06-01');
+    expect(items[0].notes).toBe('全脂');
+    expect(items[1].expires_at).toBeNull();
+
+    // 确认请求发往 OpenRouter
+    const url = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(url).toBe(OPENROUTER_URL);
+  });
+
+  it('DeepSeek provider: 请求发往 DeepSeek base URL，返回含新字段', async () => {
+    const { kvGet } = await import('../db/dexie.js');
+    (kvGet as ReturnType<typeof vi.fn>).mockResolvedValue({
+      mode: 'on',
+      provider: 'deepseek',
+      deepseekApiKey: 'sk-ds-test',
+      model: 'deepseek-chat',
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              items: [{ name: '可乐', qty: 6, expires_at: '2026-12-31', notes: '330ml罐装' }],
+            }),
+          },
+        }],
+      }),
+    }));
+
+    const { parseItemsFromText } = await import('./router.js');
+    const items = await parseItemsFromText('六罐330ml可乐，2026年底过期');
+    expect(items[0].name).toBe('可乐');
+    expect(items[0].expires_at).toBe('2026-12-31');
+    expect(items[0].notes).toBe('330ml罐装');
+
+    const url = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(url).toBe(DEEPSEEK_URL);
+  });
+
+  it('parseVoiceText 是 parseItemsFromText 的别名', async () => {
+    const mod = await import('./router.js');
+    expect(mod.parseVoiceText).toBe(mod.parseItemsFromText);
+  });
+
+  it('未配置 key 时抛出错误', async () => {
+    const { kvGet } = await import('../db/dexie.js');
+    (kvGet as ReturnType<typeof vi.fn>).mockResolvedValue({ mode: 'off' });
+    const { parseItemsFromText } = await import('./router.js');
+    await expect(parseItemsFromText('随便')).rejects.toThrow();
+  });
+});
