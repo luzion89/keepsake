@@ -71,3 +71,12 @@ export type Snapshot = z.infer<typeof SnapshotSchema>;
 
 export const TableNameSchema = z.enum(['room', 'area', 'item', 'photo', 'snapshot']);
 export type TableName = z.infer<typeof TableNameSchema>;
+
+// ---------- AI 配置（跨设备同步，存于 server kv 表） ----------
+export const AiConfigSchema = z.object({
+  mode: z.enum(['on', 'off']),
+  apiKey: z.string().max(200).optional(),
+  model: z.string().max(120).optional(),
+  transcribeModel: z.string().max(120).optional(),
+}).strict();
+export type AiConfig = z.infer<typeof AiConfigSchema>;
