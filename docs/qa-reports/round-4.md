@@ -180,3 +180,61 @@ apps/pwa         vitest run   17 tests  ✅ pass
 - 新开 issue：[#30 Item.tsx window.confirm iOS 阻断](https://github.com/luzion89/keepsake/issues/30)
 - 自动化测试：41 tests passed, 0 failed
 - 下一优先级：#14 → #30 → 图片上传 → 冲突横幅 UI
+
+---
+
+## PM 批注
+
+> 批注人：PM | 日期：2026-05-07
+
+### 一、QA 各条建议接受/驳回
+
+| QA 发现 | 决定 | 说明 |
+|---------|------|------|
+| #30 Item.tsx window.confirm iOS 阻断 | ✅ **接受，必修** | 物品删除在 iOS PWA 完全失效，阻断成功标准 1，第五轮首要任务 |
+| ConfirmDialog 未绑 ESC | ⏸ **暂缓** | 不阻断 MVP，桌面端体验优化，放 backlog（无 issue） |
+| Snapshot 页面无 UI | ⏸ **暂缓** | 数据层已就绪；快照浏览 UI 不在 MVP 成功标准内，放 backlog |
+| Search.tsx 上下文限 30 条 | ✅ **接受作为已知权衡** | 文档已说明 token 预算，无需修改 |
+| conflict_log 无 UI 横幅 | ✅ **接受，纳入 MVP** | 成功标准 2 明确要求"不静默覆盖"，已开 **[#32](https://github.com/luzion89/keepsake/issues/32)** |
+| 图片跨设备二进制同步 /blobs | ✅ **接受，纳入 MVP** | 成功标准 2 依赖跨设备照片可见，已开 **[#31](https://github.com/luzion89/keepsake/issues/31)** |
+| #14 ReminderRule 提醒功能 | ✅ **接受，纳入 MVP** | docs/01-plan.md §8 明确提醒为核心功能，issue #14 已存在 |
+
+---
+
+### 二、MVP 范围明确清单
+
+**✅ 在 MVP 范围内（必须完成才能宣布 MVP）**
+
+1. **#30** — Item.tsx 删除迁移到 useConfirm（iOS 解锁删除）
+2. **#14** — ReminderRule 数据层 + 客户端定时扫描 + 应用内通知（iOS 16.4+ Web Push 为加分项）
+3. **#31** — 图片二进制跨设备同步（`/blobs` 上传 + CacheFirst fallback）
+4. **#32** — 冲突 UI 横幅（sync 后展示 conflict_log 提示）
+
+**❌ 不在 MVP 范围内（放 backlog，理由见右）**
+
+| 功能 | 理由 |
+|------|------|
+| 鉴权（JWT / 登录流程） | 家庭单网络场景，plan.md 已标注"已知缺口"；无成功标准要求 |
+| Snapshot 浏览 UI | 数据层已就绪，查看界面属锦上添花，不影响三条成功标准 |
+| ConfirmDialog ESC 键 | 纯桌面 UX 优化，移动端 MVP 不需要 |
+| Item.qty 加减增量合并 | 当前 LWW 在家庭单用户场景下够用，delta merge 属高级优化 |
+| navigator.storage.persist() | iOS >30 天理论风险，实操中 PWA 安装态已大幅缓解 |
+
+---
+
+### 三、第五轮指派
+
+| Issue | 优先级 | 轮次 | 理由 |
+|-------|--------|------|------|
+| **#30** | 🔴 P0 | 第五轮 | 阻断 iOS 删除，1-2h 工作量，必须立刻消灭 |
+| **#14** | 🟠 P1 | 第五轮 | MVP 主菜，ReminderRule 数据模型 + 扫描 + 应用内提醒 |
+| **#31** | 🟠 P1 | 第五轮 | MVP 阻断，图片无法跨设备是核心体验缺口 |
+| **#32** | 🟡 P2 | 第五轮 | 成功标准 2 要求，工作量小（读已有 conflicts 字段展示横幅） |
+
+---
+
+### 四、表扬 QA
+
+🎉 **QA 这轮抓出 #30 是真实高质量发现。**
+
+本轮其他页面（Home、Room、Area）在 PR #29 中已全部迁移到 useConfirm，但 Item.tsx 单独漏了——这正是"大范围重构后的典型遗漏回归"模式，很容易在 code review 中滑过去。QA 细心对照每个有删除操作的页面逐一验证，准确定位到 `Item.tsx:51` 这一行，并正确推断了 iOS PWA standalone 模式下 `window.confirm` 会被系统拦截、默认返回 false 的行为后果。这条 bug 如果到真机测试才发现，修复成本会高得多。👍
