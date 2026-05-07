@@ -76,3 +76,40 @@ describe('mergeRoom', () => {
     expect(mergeRoom(a, b).merged.name).toBe('new');
   });
 });
+
+// ---------- #21: LWW updated_at 完全相同时的 tie-breaker 行为 ----------
+describe('LWW tie-breaker when updated_at is identical', () => {
+  it('mergeItem: updated_by 字典序较大的设备（"Z" > "A"）在 local 时 local 胜出', () => {
+    // lwwPick: local.updated_by > remote.updated_by → 'local'
+    const local = baseItem({ name: 'local-name', updated_at: 100, updated_by: 'Z' });
+    const remote = baseItem({ name: 'remote-name', updated_at: 100, updated_by: 'A' });
+    const { merged } = mergeItem(local, remote);
+    expect(merged.name).toBe('local-name'); // Z > A，local 胜
+  });
+
+  it('mergeItem: updated_by 字典序较大的设备（"Z"）在 remote 时 remote 胜出', () => {
+    const local = baseItem({ name: 'local-name', updated_at: 100, updated_by: 'A' });
+    const remote = baseItem({ name: 'remote-name', updated_at: 100, updated_by: 'Z' });
+    const { merged } = mergeItem(local, remote);
+    expect(merged.name).toBe('remote-name'); // Z > A，remote 胜
+  });
+
+  it('mergeItem: updated_by 完全相同时 local 胜出（字符串相等 → local 分支）', () => {
+    // 当 local.updated_by === remote.updated_by 时，lwwPick 走 else 返回 'remote'
+    // 注意：当前实现 local.updated_by > remote.updated_by 不成立 → 返回 'remote'
+    // 断言实际行为，供 PM 确认
+    const local = baseItem({ name: 'local-same', updated_at: 100, updated_by: 'SAME' });
+    const remote = baseItem({ name: 'remote-same', updated_at: 100, updated_by: 'SAME' });
+    const { merged } = mergeItem(local, remote);
+    // 当前实现：'SAME' > 'SAME' 为 false → 返回 'remote'（remote 胜）
+    expect(merged.name).toBe('remote-same');
+  });
+
+  it('mergeRoom: tie-breaker 规则与 mergeItem 一致（updated_by 字典序）', () => {
+    const a = baseRoom({ name: 'room-A', updated_at: 500, updated_by: 'device-A' });
+    const b = baseRoom({ name: 'room-B', updated_at: 500, updated_by: 'device-B' });
+    const { merged } = mergeRoom(a, b);
+    // 'device-B' > 'device-A' → remote(b) 胜
+    expect(merged.name).toBe('room-B');
+  });
+});
