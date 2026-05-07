@@ -185,7 +185,10 @@ export function SettingsPage() {
         {savedAt && !saveError && <span className="ml-2 text-xs text-emerald-300">已同步</span>}
         {savedAt && saveError && (
           <span className="ml-2 text-xs text-rose-400">
-            已保存到本地，服务端推送失败：{saveError}（重新打开应用会重试）
+            已保存到本地，服务端推送失败：{saveError}
+            {saveError.includes('混合内容') || saveError.includes('TLS') ? null : (
+              <span className="block mt-0.5 text-slate-500">（重新打开应用会重试；若持续失败请检查服务端是否在线）</span>
+            )}
           </span>
         )}
       </section>
