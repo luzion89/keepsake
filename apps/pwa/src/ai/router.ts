@@ -277,18 +277,18 @@ export async function searchAnswer(
 
   const contextBlock = contextItems
     .map(it => {
-      const parts = [`[${it.id}] ${it.name} ×${it.qty}${it.unit ?? ''}`, `位置：${it.location}`];
+      const parts = [`${it.name} ×${it.qty}${it.unit ?? ''}`, `位置：${it.location}`];
       if (it.notes) parts.push(`备注：${it.notes}`);
       if (it.tags?.length) parts.push(`标签：${it.tags.join('、')}`);
-      return parts.join('；');
+      return parts.join('；') + `  (id:${it.id})`;
     })
     .join('\n');
 
   const systemPrompt = `你是家庭仓储助手。用户查询他们家里存放的物品。
-以下是相关物品列表（格式：[id] 名称 数量 位置 备注）：
+以下是相关物品列表（格式：名称 数量 位置 备注，行末括号内为物品 id）：
 ${contextBlock || '（无匹配物品）'}
 
-请用中文简洁回答用户问题，引用具体物品名称和位置。回答里如需引用物品，请在文中用 [id] 标注。
+请用中文自然语言简洁回答用户问题，提及具体物品名称和位置即可，不要在回答中包含任何 id 或 [括号标记]。所有被提及的物品 id 单独放在 citedIds 数组里。
 仅返回 JSON：{"answer": string, "citedIds": string[]}`;
 
   const url = getEffectiveBaseUrl(cfg);
