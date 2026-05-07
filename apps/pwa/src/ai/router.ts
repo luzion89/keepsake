@@ -165,6 +165,92 @@ export async function transcribe(audio: Blob): Promise<{ text: string }> {
   return { text: j.text ?? '' };
 }
 
+export interface SearchContext {
+  id: string;
+  name: string;
+  qty: number;
+  unit?: string;
+  location: string; // e.g. "厨房 / 洗手台柜子"
+  notes?: string;
+  tags?: string[];
+}
+
+export interface SearchAnswerResult {
+  answer: string;
+  /** item ids explicitly mentioned / cited in the answer */
+  citedIds: string[];
+}
+
+/**
+ * Natural-language search: given a user query and up to 30 candidate items
+ * (pre-filtered by keyword search), ask the model to answer in Chinese,
+ * citing specific items and their locations.
+ * Returns { ok: false, error } on failure so callers can surface the error.
+ */
+export async function searchAnswer(
+  query: string,
+  contextItems: SearchContext[],
+): Promise<{ ok: true; result: SearchAnswerResult } | { ok: false; error: string }> {
+  const cfg = await getAiConfig();
+  if (cfg.mode !== 'on' || !cfg.apiKey) {
+    return { ok: false, error: 'AI 未启用' };
+  }
+
+  // Build a compact context block (~50 chars per item)
+  const contextBlock = contextItems
+    .map(it => {
+      const parts = [`[${it.id}] ${it.name} ×${it.qty}${it.unit ?? ''}`, `位置：${it.location}`];
+      if (it.notes) parts.push(`备注：${it.notes}`);
+      if (it.tags?.length) parts.push(`标签：${it.tags.join('、')}`);
+      return parts.join('；');
+    })
+    .join('\n');
+
+  const systemPrompt = `你是家庭仓储助手。用户查询他们家里存放的物品。
+以下是相关物品列表（格式：[id] 名称 数量 位置 备注）：
+${contextBlock || '（无匹配物品）'}
+
+请用中文简洁回答用户问题，引用具体物品名称和位置。回答里如需引用物品，请在文中用 [id] 标注。
+仅返回 JSON：{"answer": string, "citedIds": string[]}`;
+
+  try {
+    const res = await fetch(OPENROUTER_URL, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${cfg.apiKey}`,
+        'HTTP-Referer': location.origin,
+        'X-Title': 'Keepsake',
+      },
+      body: JSON.stringify({
+        model: cfg.model || DEFAULT_MODEL,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: query },
+        ],
+      }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      return { ok: false, error: `AI 服务错误 (${res.status})：${text.slice(0, 200)}` };
+    }
+    const j = await res.json();
+    const raw = j.choices?.[0]?.message?.content ?? '{}';
+    const parsed = JSON.parse(raw);
+    return {
+      ok: true,
+      result: {
+        answer: typeof parsed.answer === 'string' ? parsed.answer : '（无回答）',
+        citedIds: Array.isArray(parsed.citedIds) ? parsed.citedIds : [],
+      },
+    };
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: `请求失败：${msg}` };
+  }
+}
+
 /**
  * Parse a free-form Chinese sentence ("我在厨房柜子里放了两瓶消毒水")
  * into a list of items. Uses the same chat model as vision.
