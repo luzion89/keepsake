@@ -3,9 +3,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 
 export const aiRoutes: FastifyPluginAsync = async (fastify) => {
-  // Ensure kv table exists (idempotent — migrate may already have created it).
-  fastify.db.exec(`CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT NOT NULL, updated_at INTEGER NOT NULL)`);
-
+  // kv 表已在 schema.sql 中定义，无需运行时建表。
   fastify.get('/settings/ai', async () => {
     const row = fastify.db.prepare('SELECT v FROM kv WHERE k = ?').get('ai_config') as { v: string } | undefined;
     if (!row) return { mode: 'off' };
