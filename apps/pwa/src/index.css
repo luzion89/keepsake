@@ -2,12 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ──────────────────────────────────────────────
+   Design tokens — PR-A (#88)
+   ────────────────────────────────────────────── */
+:root {
+  --bg-l0: theme(colors.slate.950);
+  --bg-l1: theme(colors.slate.900);
+  --bg-l2: theme(colors.slate.800);
+  --bg-l3: theme(colors.slate.700);
+  --border-default: theme(colors.slate.800);
+  --border-hover: theme(colors.sky.500 / 60%);
+  --border-focus: theme(colors.sky.400);
+  --text-body: theme(colors.slate.100);
+  --text-muted: theme(colors.slate.400);
+  --text-caption: theme(colors.slate.500);
+}
+
 html, body, #root { height: 100%; }
 body {
-  background: #0b1220;
-  color: #e2e8f0;
+  background-color: var(--bg-l0);
+  color: var(--text-body);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   -webkit-tap-highlight-color: transparent;
 }
 input, textarea, select, button { font: inherit; color: inherit; }
 button { cursor: pointer; }
+
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }

@@ -1,10 +1,6 @@
 /**
  * TextInput.tsx — 文字录入页 (#65, #78)
- *
- * 流程：用户选择模式（增改/覆盖）→ 输入文字 → parseItemsFromText → 草稿列表（可编辑/删除）→ 确认入库
- *
- * 增改模式（默认）：AI 接收已有物品上下文，输出最终完整列表；前端按 name 匹配 create/update
- * 覆盖模式：先软删该区域所有现有物品，再批量 create 新清单；入库前需二次确认
+ * 视觉重构 PR-C (#88)
  */
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -16,7 +12,6 @@ type AreaState = 'loading' | 'not-found' | 'ok';
 type InputMode = 'merge' | 'replace';
 
 interface Draft extends RecognitionItem {
-  /** ISO date string e.g. "2026-12-31" */
   expiresDate: string;
 }
 
@@ -54,7 +49,6 @@ export function TextInputPage() {
 
   useEffect(() => { loadArea(); }, [areaId]);
 
-  // When mode changes, clear drafts so stale results don't linger
   const switchMode = (m: InputMode) => {
     setMode(m);
     setDrafts([]);
@@ -111,7 +105,6 @@ export function TextInputPage() {
       return;
     }
 
-    // Replace mode: confirm before destructive action
     if (mode === 'replace') {
       const existingCount = existingItems.length;
       const msg = existingCount > 0
@@ -124,47 +117,20 @@ export function TextInputPage() {
     setErrMsg(null);
     try {
       if (mode === 'replace') {
-        // Soft-delete all existing items in this area
-        for (const it of existingItems) {
-          await ItemRepo.remove(it.id);
-        }
-        // Create all draft items
+        for (const it of existingItems) await ItemRepo.remove(it.id);
         for (const d of drafts.filter(d => d.name.trim())) {
-          const expires_at = d.expiresDate
-            ? new Date(d.expiresDate + 'T00:00:00').getTime()
-            : undefined;
-          await ItemRepo.create({
-            area_id: areaId,
-            name: d.name.trim(),
-            qty: d.qty || 1,
-            source: 'manual',
-            expires_at,
-            notes: d.notes || undefined,
-          });
+          const expires_at = d.expiresDate ? new Date(d.expiresDate + 'T00:00:00').getTime() : undefined;
+          await ItemRepo.create({ area_id: areaId, name: d.name.trim(), qty: d.qty || 1, source: 'manual', expires_at, notes: d.notes || undefined });
         }
       } else {
-        // Merge mode: match by name → update or create
         const existingByName = new Map(existingItems.map(it => [it.name.trim().toLowerCase(), it]));
         for (const d of drafts.filter(d => d.name.trim())) {
-          const expires_at = d.expiresDate
-            ? new Date(d.expiresDate + 'T00:00:00').getTime()
-            : undefined;
+          const expires_at = d.expiresDate ? new Date(d.expiresDate + 'T00:00:00').getTime() : undefined;
           const matched = existingByName.get(d.name.trim().toLowerCase());
           if (matched) {
-            await ItemRepo.update(matched.id, {
-              qty: d.qty || 1,
-              expires_at,
-              notes: d.notes || undefined,
-            });
+            await ItemRepo.update(matched.id, { qty: d.qty || 1, expires_at, notes: d.notes || undefined });
           } else {
-            await ItemRepo.create({
-              area_id: areaId,
-              name: d.name.trim(),
-              qty: d.qty || 1,
-              source: 'manual',
-              expires_at,
-              notes: d.notes || undefined,
-            });
+            await ItemRepo.create({ area_id: areaId, name: d.name.trim(), qty: d.qty || 1, source: 'manual', expires_at, notes: d.notes || undefined });
           }
         }
       }
@@ -187,68 +153,69 @@ export function TextInputPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="text-sm text-slate-400">
-        <Link to={`/areas/${areaId}`} className="hover:text-white">← 返回 {area!.name}</Link>
-      </div>
+    <div className="space-y-5">
+      <nav className="flex items-center gap-1 text-xs text-slate-500">
+        <Link to={`/areas/${areaId}`} className="hover:text-slate-300 transition-colors">← {area!.name}</Link>
+      </nav>
       <h1 className="text-xl font-semibold">📝 文字录入 · {area!.name}</h1>
 
-      {/* Mode toggle */}
+      {/* ── 模式切换 segmented control ─────────────────── */}
       <section>
-        <div className="flex rounded-lg border border-slate-700 overflow-hidden text-sm">
+        <div className="bg-slate-900 rounded-xl p-1 flex gap-1 border border-slate-800">
           <button
             onClick={() => switchMode('merge')}
-            className={`flex-1 px-3 py-2 font-medium transition-colors ${
+            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${
               mode === 'merge'
-                ? 'bg-sky-600 text-white'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                ? 'bg-slate-700 text-slate-100'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             增改模式（默认）
           </button>
           <button
             onClick={() => switchMode('replace')}
-            className={`flex-1 px-3 py-2 font-medium transition-colors border-l border-slate-700 ${
+            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${
               mode === 'replace'
-                ? 'bg-amber-600 text-white'
-                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                ? 'bg-amber-600/80 text-amber-100'
+                : 'text-slate-400 hover:text-slate-200'
             }`}
           >
             覆盖模式
           </button>
         </div>
-        <p className="mt-1 text-xs text-slate-500">
+        <p className="mt-2 text-xs text-slate-500">
           {mode === 'merge'
             ? '✏️ AI 将结合现有 ' + existingItems.length + ' 个物品，智能新增或更新'
             : '⚠️ 将清空该区域所有 ' + existingItems.length + ' 个现有物品并全量替换'}
         </p>
       </section>
 
-      {/* Replace mode warning banner */}
+      {/* Replace warning */}
       {mode === 'replace' && existingItems.length > 0 && (
-        <div className="bg-amber-900/40 border border-amber-700 rounded-lg px-3 py-2 text-amber-300 text-sm">
+        <div className="bg-amber-900/40 border border-amber-700 rounded-xl px-4 py-3 text-amber-300 text-sm">
           ⚠️ 覆盖模式：确认入库将删除该区域所有 {existingItems.length} 个现有物品
         </div>
       )}
 
-      {/* Input area */}
-      <section className="space-y-2">
+      {/* ── 输入区 ────────────────────────────────────── */}
+      <section className="space-y-3">
         <textarea
           value={text}
           onChange={e => setText(e.target.value)}
           placeholder="例如：两瓶消毒水、一盒抽纸、洗发水三瓶…"
-          className="w-full min-h-[120px] max-h-[40vh] bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm resize-y"
+          rows={5}
+          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm leading-relaxed resize-none outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20 transition-all duration-150"
         />
-        <p className="text-xs text-slate-400">💡 可使用输入法的语音转文字功能</p>
+        <p className="text-xs text-slate-500">💡 可使用输入法的语音转文字功能</p>
         <div className="flex gap-2">
           <button
             onClick={parse}
             disabled={busy || !text.trim()}
-            className="flex-1 px-4 py-2 rounded-lg bg-sky-500 text-slate-950 font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+            className="flex-1 px-4 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 active:scale-[0.97] text-white font-medium text-sm shadow-lg shadow-sky-500/20 disabled:opacity-50 flex items-center justify-center gap-2 transition-all duration-150"
           >
             {busy ? (
               <>
-                <span className="inline-block w-4 h-4 border-2 border-slate-950/40 border-t-slate-950 rounded-full animate-spin" />
+                <span className="inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                 解析中…
               </>
             ) : '解析'}
@@ -256,7 +223,7 @@ export function TextInputPage() {
           <button
             onClick={clear}
             disabled={busy}
-            className="px-4 py-2 rounded-lg border border-slate-700 text-slate-300 disabled:opacity-50"
+            className="px-4 py-2.5 rounded-xl border border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700 disabled:opacity-50 text-sm transition-all"
           >
             清空
           </button>
@@ -264,16 +231,16 @@ export function TextInputPage() {
       </section>
 
       {errMsg && (
-        <div className="bg-rose-900/40 border border-rose-700 rounded-lg px-3 py-2 text-rose-300 text-sm">
+        <div className="bg-rose-900/40 border border-rose-700 rounded-xl px-4 py-3 text-rose-300 text-sm">
           {errMsg}
         </div>
       )}
 
-      {/* Draft list */}
+      {/* ── 草稿列表 ──────────────────────────────────── */}
       {parsed && (
         <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-slate-300">
-            草稿（请核对，共 {drafts.length} 项）
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            草稿（共 {drafts.length} 项，请核对）
           </h2>
 
           {drafts.length === 0 && (
@@ -286,24 +253,24 @@ export function TextInputPage() {
                 it => it.name.trim().toLowerCase() === d.name.trim().toLowerCase()
               );
               return (
-                <li key={i} className="bg-slate-800 border border-slate-700 rounded-lg p-3 space-y-2">
+                <li key={i} className="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-2">
                   <div className="flex items-center gap-2">
                     <input
                       value={d.name}
                       onChange={e => updateDraft(i, { name: e.target.value })}
                       placeholder="物品名称"
-                      className="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm"
+                      className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-sky-400 transition-all"
                     />
                     <input
                       type="number"
                       value={d.qty}
                       min={0}
                       onChange={e => updateDraft(i, { qty: Number(e.target.value) })}
-                      className="w-16 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm"
+                      className="w-16 bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-sky-400 transition-all"
                       aria-label="数量"
                     />
                     {mode === 'merge' && (
-                      <span className={`text-xs px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                      <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${
                         isExisting
                           ? 'bg-amber-900/60 text-amber-300'
                           : 'bg-emerald-900/60 text-emerald-300'
@@ -313,20 +280,17 @@ export function TextInputPage() {
                     )}
                     <button
                       onClick={() => removeDraft(i)}
-                      className="text-rose-400 hover:text-rose-200 text-lg leading-none px-1"
+                      className="text-slate-600 hover:text-rose-400 text-lg leading-none transition-colors"
                       aria-label="删除此行"
-                      title="删除此行"
-                    >
-                      ×
-                    </button>
+                    >×</button>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <label className="text-xs text-slate-400 w-12">有效期</label>
+                    <label className="text-xs text-slate-500 w-12">有效期</label>
                     <input
                       type="date"
                       value={d.expiresDate}
                       onChange={e => updateDraft(i, { expiresDate: e.target.value })}
-                      className="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm"
+                      className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-sky-400 transition-all"
                     />
                   </div>
                   <textarea
@@ -334,7 +298,7 @@ export function TextInputPage() {
                     onChange={e => updateDraft(i, { notes: e.target.value })}
                     placeholder="备注（可选）"
                     rows={1}
-                    className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm resize-none"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-sm resize-none outline-none focus:border-sky-400 transition-all"
                   />
                 </li>
               );
@@ -343,7 +307,7 @@ export function TextInputPage() {
 
           <button
             onClick={() => setDrafts(arr => [...arr, { name: '', qty: 1, expiresDate: '', notes: '' }])}
-            className="text-sm text-sky-300 hover:text-sky-200"
+            className="text-sm text-sky-400 hover:text-sky-300 transition-colors"
           >
             + 手动追加一项
           </button>
@@ -352,15 +316,15 @@ export function TextInputPage() {
             <button
               onClick={commit}
               disabled={busy}
-              className={`w-full px-4 py-3 rounded-xl font-medium disabled:opacity-50 flex items-center justify-center gap-2 ${
+              className={`w-full py-3.5 rounded-xl font-semibold text-base shadow-lg disabled:opacity-50 flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98] ${
                 mode === 'replace'
-                  ? 'bg-amber-400 text-slate-950'
-                  : 'bg-amber-400 text-slate-950'
+                  ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-500/20'
+                  : 'bg-sky-500 hover:bg-sky-400 text-white shadow-sky-500/20'
               }`}
             >
               {busy ? (
                 <>
-                  <span className="inline-block w-4 h-4 border-2 border-slate-950/40 border-t-slate-950 rounded-full animate-spin" />
+                  <span className="inline-block w-4 h-4 border-2 border-current/40 border-t-current rounded-full animate-spin" />
                   保存中…
                 </>
               ) : mode === 'replace'
