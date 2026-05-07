@@ -62,7 +62,7 @@ export function SettingsPage() {
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-slate-300">AI（OpenRouter）</h2>
         <p className="text-xs text-slate-400">
-          仅支持 OpenRouter。Key 保存到本地 IndexedDB，并自动同步到本地服务器，方便其它设备登录后直接使用。
+          仅支持 OpenRouter。Key 保存到本地 IndexedDB；保存时立即推送到本地服务器（需服务器在线），其它设备启动时拉取，更新时间最新者胜。注意：此同步仅限 AI 配置，物品与照片数据走独立同步通道。
         </p>
         <div className="space-y-2 text-sm">
           {(['on','off'] as const).map(m => (
