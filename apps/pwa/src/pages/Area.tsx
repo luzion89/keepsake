@@ -105,21 +105,21 @@ export function AreaPage() {
         </button>
         {showManual && (
           <div className="mt-2 bg-slate-800/60 border border-slate-700 rounded-xl p-3">
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="物品名"
-                className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2"
+                className="flex-1 min-w-0 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2"
               />
               <input
                 type="number"
                 value={qty}
                 min={0}
                 onChange={(e) => setQty(Number(e.target.value))}
-                className="w-20 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2"
+                className="w-20 shrink-0 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2"
               />
-              <button onClick={add} className="px-4 py-2 rounded-lg bg-slate-700 text-slate-100 font-medium">
+              <button onClick={add} className="shrink-0 px-4 py-2 rounded-lg bg-slate-700 text-slate-100 font-medium">
                 添加
               </button>
             </div>
