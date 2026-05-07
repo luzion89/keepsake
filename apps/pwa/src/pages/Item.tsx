@@ -5,6 +5,29 @@ import { ItemRepo, PhotoRepo, ReminderRepo } from '../db/repos.js';
 import { db } from '../db/dexie.js';
 import { useConfirm } from '../components/ConfirmDialog.js';
 
+/** Calculate remaining days from now to a UTC ms timestamp, using local-date arithmetic. */
+function calcRemainingDays(expiresAtMs: number): number {
+  const now = new Date();
+  const todayUTC = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+  const expDate = new Date(expiresAtMs);
+  const expUTC = Date.UTC(expDate.getFullYear(), expDate.getMonth(), expDate.getDate());
+  return Math.round((expUTC - todayUTC) / 86400000);
+}
+
+function ExpiryBadge({ expiresAt }: { expiresAt: number }) {
+  const days = calcRemainingDays(expiresAt);
+  if (days < 0) {
+    return <span className="ml-2 text-xs font-medium px-2 py-0.5 rounded-full bg-rose-900/60 text-rose-300">已过期</span>;
+  }
+  if (days < 7) {
+    return <span className="ml-2 text-xs font-medium px-2 py-0.5 rounded-full bg-rose-900/60 text-rose-300">剩 {days} 天</span>;
+  }
+  if (days <= 30) {
+    return <span className="ml-2 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-900/60 text-amber-300">剩 {days} 天</span>;
+  }
+  return <span className="ml-2 text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-900/60 text-emerald-300">剩 {days} 天</span>;
+}
+
 function PhotoThumb({ photo }: { photo: Photo }) {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
@@ -227,8 +250,16 @@ export function ItemPage() {
         </div>
       ) : (
         <>
-          <h1 className="text-2xl font-semibold">{item.name}</h1>
+          <div className="flex items-center flex-wrap gap-1">
+            <h1 className="text-2xl font-semibold">{item.name}</h1>
+            {item.expires_at != null && <ExpiryBadge expiresAt={item.expires_at} />}
+          </div>
           <p className="text-slate-300">数量 {item.qty}{item.unit ? ' ' + item.unit : ''}</p>
+          {item.expires_at != null && (
+            <p className="text-slate-400 text-xs">
+              有效期：{new Date(item.expires_at).toLocaleDateString('zh-CN')}
+            </p>
+          )}
           {item.notes && <p className="text-slate-400 text-sm whitespace-pre-wrap">{item.notes}</p>}
           {item.source !== 'manual' && (
             <p className="text-xs text-slate-500">来源 {item.source}{item.confidence != null && ` · 置信度 ${(item.confidence * 100).toFixed(0)}%`}</p>
