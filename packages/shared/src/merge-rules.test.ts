@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { mergeItem, applyQtyDelta, mergeRoom, mergeSnapshot } from './merge-rules.js';
-import type { Item, Room, Snapshot } from './types.js';
+import { mergeItem, applyQtyDelta, mergeRoom, mergeSnapshot, mergeReminderRule } from './merge-rules.js';
+import type { Item, Room, Snapshot, ReminderRule } from './types.js';
 
 const baseItem = (over: Partial<Item> = {}): Item => ({
   id: '00000000-0000-0000-0000-000000000001',
@@ -169,5 +169,55 @@ describe('mergeSnapshot edge cases (#27)', () => {
     const { merged } = mergeSnapshot(a, b);
     expect(merged.deleted).toBe(true);
     expect(merged.updated_at).toBe(200);
+  });
+});
+
+// ---------- #14: mergeReminderRule 单测 ----------
+const baseRule = (over: Partial<ReminderRule> = {}): ReminderRule => ({
+  id: '00000000-0000-0000-0000-000000000020',
+  item_id: '00000000-0000-0000-0000-000000000001',
+  kind: 'expiry',
+  updated_at: 100,
+  updated_by: 'A',
+  deleted: false,
+  version: 0,
+  ...over,
+});
+
+describe('mergeReminderRule (#14)', () => {
+  it('last_fired_at 取 max：local 旧、remote 新 → 取 remote 值', () => {
+    const local = baseRule({ last_fired_at: 1000 });
+    const remote = baseRule({ last_fired_at: 2000 });
+    const { merged } = mergeReminderRule(local, remote);
+    expect(merged.last_fired_at).toBe(2000);
+  });
+
+  it('last_fired_at 取 max：local 新、remote 旧 → 取 local 值', () => {
+    const local = baseRule({ last_fired_at: 5000 });
+    const remote = baseRule({ last_fired_at: 500 });
+    const { merged } = mergeReminderRule(local, remote);
+    expect(merged.last_fired_at).toBe(5000);
+  });
+
+  it('tombstone（deleted=true）优先，无论 updated_at 大小', () => {
+    const local = baseRule({ deleted: true, updated_at: 50 });
+    const remote = baseRule({ deleted: false, updated_at: 9999 });
+    const { merged, conflicts } = mergeReminderRule(local, remote);
+    expect(merged.deleted).toBe(true);
+    expect(conflicts).toHaveLength(0);
+  });
+
+  it('threshold_at LWW：remote 更新则取 remote', () => {
+    const local = baseRule({ threshold_at: 1_700_000_000, updated_at: 100, updated_by: 'A' });
+    const remote = baseRule({ threshold_at: 1_800_000_000, updated_at: 200, updated_by: 'B' });
+    const { merged } = mergeReminderRule(local, remote);
+    expect(merged.threshold_at).toBe(1_800_000_000);
+  });
+
+  it('threshold_qty LWW：local 更新则取 local', () => {
+    const local = baseRule({ threshold_qty: 3, updated_at: 300, updated_by: 'A' });
+    const remote = baseRule({ threshold_qty: 10, updated_at: 100, updated_by: 'B' });
+    const { merged } = mergeReminderRule(local, remote);
+    expect(merged.threshold_qty).toBe(3);
   });
 });

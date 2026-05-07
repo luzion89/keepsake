@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import type { Item, Photo } from '@keepsake/shared';
-import { ItemRepo, PhotoRepo } from '../db/repos.js';
+import type { Item, Photo, ReminderRule } from '@keepsake/shared';
+import { ItemRepo, PhotoRepo, ReminderRepo } from '../db/repos.js';
 import { db } from '../db/dexie.js';
 import { useConfirm } from '../components/ConfirmDialog.js';
 
@@ -20,6 +20,129 @@ function PhotoThumb({ photo }: { photo: Photo }) {
   }, [photo.id]);
   if (!url) return <div className="w-full aspect-square bg-slate-800 rounded-lg" />;
   return <img src={url} alt="" className="w-full aspect-square object-cover rounded-lg" />;
+}
+
+function ReminderSection({ itemId }: { itemId: string }) {
+  const [rules, setRules] = useState<ReminderRule[]>([]);
+  const [adding, setAdding] = useState(false);
+  const [kind, setKind] = useState<ReminderRule['kind']>('expiry');
+  const [thresholdDate, setThresholdDate] = useState('');
+  const [thresholdQty, setThresholdQty] = useState(1);
+  const [recheckDays, setRecheckDays] = useState(30);
+  const [note, setNote] = useState('');
+
+  const reload = async () => {
+    setRules(await ReminderRepo.listByItem(itemId));
+  };
+  useEffect(() => { reload(); }, [itemId]);
+
+  const save = async () => {
+    let threshold_at: number | undefined;
+    let threshold_qty: number | undefined;
+    if (kind === 'expiry') {
+      // threshold_at = ms before expiry to trigger (7 days default)
+      threshold_at = 7 * 24 * 60 * 60 * 1000;
+    } else if (kind === 'low_stock') {
+      threshold_qty = thresholdQty;
+    } else if (kind === 'recheck') {
+      threshold_at = recheckDays * 24 * 60 * 60 * 1000;
+    }
+    await ReminderRepo.create({ item_id: itemId, kind, threshold_at, threshold_qty, note: note || undefined });
+    setAdding(false);
+    setNote('');
+    await reload();
+  };
+
+  const remove = async (id: string) => {
+    await ReminderRepo.remove(id);
+    await reload();
+  };
+
+  const kindLabel = (k: ReminderRule['kind']) =>
+    k === 'expiry' ? '过期提醒' : k === 'low_stock' ? '库存不足' : '定期检查';
+
+  return (
+    <section className="space-y-2">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-slate-300">提醒规则</h2>
+        <button
+          onClick={() => setAdding(v => !v)}
+          className="text-xs text-sky-400 hover:text-sky-200"
+        >
+          ➕ 添加提醒
+        </button>
+      </div>
+
+      {adding && (
+        <div className="bg-slate-800 rounded-lg p-3 space-y-2 text-sm">
+          <select
+            value={kind}
+            onChange={e => setKind(e.target.value as ReminderRule['kind'])}
+            className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1"
+          >
+            <option value="expiry">过期提醒（有效期前 7 天）</option>
+            <option value="low_stock">库存不足</option>
+            <option value="recheck">定期检查</option>
+          </select>
+          {kind === 'low_stock' && (
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 text-xs w-20">库存阈值</span>
+              <input
+                type="number"
+                min={0}
+                value={thresholdQty}
+                onChange={e => setThresholdQty(Number(e.target.value))}
+                className="w-20 bg-slate-700 border border-slate-600 rounded px-2 py-1"
+              />
+            </div>
+          )}
+          {kind === 'recheck' && (
+            <div className="flex items-center gap-2">
+              <span className="text-slate-400 text-xs w-20">间隔天数</span>
+              <input
+                type="number"
+                min={1}
+                value={recheckDays}
+                onChange={e => setRecheckDays(Number(e.target.value))}
+                className="w-20 bg-slate-700 border border-slate-600 rounded px-2 py-1"
+              />
+            </div>
+          )}
+          <input
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            placeholder="备注（可选）"
+            className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1"
+          />
+          <div className="flex gap-2">
+            <button onClick={save} className="flex-1 px-3 py-1 rounded bg-sky-500 text-slate-950 font-medium">保存</button>
+            <button onClick={() => setAdding(false)} className="px-3 py-1 rounded border border-slate-600 text-slate-300">取消</button>
+          </div>
+        </div>
+      )}
+
+      {rules.length > 0 && (
+        <ul className="space-y-1">
+          {rules.map(r => (
+            <li key={r.id} className="flex items-center gap-2 bg-slate-800/60 rounded px-3 py-2 text-xs">
+              <span className="flex-1 text-slate-200">
+                {kindLabel(r.kind)}
+                {r.threshold_qty != null && ` (≤${r.threshold_qty})`}
+                {r.kind === 'recheck' && r.threshold_at != null && ` (每${Math.round(r.threshold_at / 86400000)}天)`}
+                {r.note && <span className="text-slate-400 ml-1">— {r.note}</span>}
+              </span>
+              <button
+                onClick={() => remove(r.id)}
+                className="text-rose-400 hover:text-rose-200"
+              >
+                删除
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
 }
 
 export function ItemPage() {
@@ -104,6 +227,8 @@ export function ItemPage() {
           </div>
         </>
       )}
+
+      <ReminderSection itemId={itemId} />
 
       {photos.length > 0 && (
         <section>

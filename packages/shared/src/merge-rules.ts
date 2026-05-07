@@ -9,7 +9,7 @@
  * - deleted=true beats any concurrent edit.
  */
 
-import type { Item, Room, Area, Photo, Snapshot, SyncMeta } from './types.js';
+import type { Item, Room, Area, Photo, Snapshot, ReminderRule, SyncMeta } from './types.js';
 
 export interface MergeOutcome<T> {
   merged: T;
@@ -158,4 +158,23 @@ export function mergeSnapshot(local: Snapshot, remote: Snapshot): MergeOutcome<S
     merged: lwwPick(local, remote) === 'local' ? local : remote,
     conflicts: [],
   };
+}
+
+export function mergeReminderRule(local: ReminderRule, remote: ReminderRule): MergeOutcome<ReminderRule> {
+  const tomb = tombstoneCheck(local, remote);
+  if (tomb) return { merged: tomb, conflicts: [] };
+  const conflicts: MergeOutcome<ReminderRule>['conflicts'] = [];
+  const merged: ReminderRule = {
+    ...local,
+    item_id: mergeScalar(local, remote, 'item_id', conflicts),
+    kind: mergeScalar(local, remote, 'kind', conflicts),
+    threshold_at: mergeScalar(local, remote, 'threshold_at', conflicts),
+    threshold_qty: mergeScalar(local, remote, 'threshold_qty', conflicts),
+    note: mergeScalar(local, remote, 'note', conflicts),
+    last_fired_at: Math.max(local.last_fired_at ?? 0, remote.last_fired_at ?? 0) || undefined,
+    updated_at: Math.max(local.updated_at, remote.updated_at),
+    updated_by: lwwPick(local, remote) === 'local' ? local.updated_by : remote.updated_by,
+    version: Math.max(local.version, remote.version) + 1,
+  };
+  return { merged, conflicts };
 }

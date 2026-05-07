@@ -1,7 +1,9 @@
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { db, type ConflictRow } from '../db/dexie.js';
 import { syncOnce } from '../sync/client.js';
+import { scanReminders, type TriggeredReminder } from '../notifications/scanner.js';
+import { ReminderRepo } from '../db/repos.js';
 
 function ConflictBanner() {
   const [count, setCount] = useState(0);
@@ -70,6 +72,51 @@ function ConflictBanner() {
   );
 }
 
+function NotificationBanner() {
+  const [triggered, setTriggered] = useState<TriggeredReminder[]>([]);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const run = async () => {
+      const t = await scanReminders();
+      setTriggered(t);
+    };
+    run();
+    const id = setInterval(run, 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  if (triggered.length === 0) return null;
+
+  const dismiss = async (t: TriggeredReminder) => {
+    await ReminderRepo.updateFired(t.rule.id);
+    setTriggered(prev => prev.filter(x => x.rule.id !== t.rule.id));
+  };
+
+  return (
+    <div className="bg-amber-950 border-b border-amber-700 px-4 py-2 text-xs space-y-1">
+      <p className="text-amber-300 font-medium">🔔 {triggered.length} 条提醒待处理</p>
+      {triggered.map(t => (
+        <div key={t.rule.id} className="flex items-center gap-2 text-amber-200">
+          <span className="flex-1">{t.reason}</span>
+          <button
+            onClick={() => navigate(`/items/${t.item.id}`)}
+            className="underline underline-offset-2 hover:text-white"
+          >
+            查看
+          </button>
+          <button
+            onClick={() => dismiss(t)}
+            className="text-amber-400 hover:text-white"
+          >
+            知道了
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function Shell() {
   const loc = useLocation();
   const [pending, setPending] = useState(0);
@@ -111,6 +158,7 @@ export function Shell() {
       )}
 
       <ConflictBanner />
+      <NotificationBanner />
 
       <main className="flex-1 px-4 py-4 max-w-3xl w-full mx-auto">
         <Outlet />

@@ -69,7 +69,17 @@ export const SnapshotSchema = SyncMetaSchema.extend({
 });
 export type Snapshot = z.infer<typeof SnapshotSchema>;
 
-export const TableNameSchema = z.enum(['room', 'area', 'item', 'photo', 'snapshot']);
+export const ReminderRuleSchema = SyncMetaSchema.extend({
+  item_id: z.string().uuid(),
+  kind: z.enum(['expiry', 'low_stock', 'recheck']),
+  threshold_at: z.number().int().nonnegative().optional(),
+  threshold_qty: z.number().int().optional(),
+  note: z.string().max(500).optional(),
+  last_fired_at: z.number().int().nonnegative().optional(),
+});
+export type ReminderRule = z.infer<typeof ReminderRuleSchema>;
+
+export const TableNameSchema = z.enum(['room', 'area', 'item', 'photo', 'snapshot', 'reminder_rule']);
 export type TableName = z.infer<typeof TableNameSchema>;
 
 // ---------- AI 配置（跨设备同步，存于 server kv 表） ----------

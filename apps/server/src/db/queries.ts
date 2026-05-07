@@ -1,8 +1,8 @@
 import type Database from 'better-sqlite3';
 import {
-  type Item, type Room, type Area, type Photo, type Snapshot,
+  type Item, type Room, type Area, type Photo, type Snapshot, type ReminderRule,
   type TableName,
-  mergeRoom, mergeArea, mergeItem, mergePhoto, mergeSnapshot,
+  mergeRoom, mergeArea, mergeItem, mergePhoto, mergeSnapshot, mergeReminderRule,
 } from '@keepsake/shared';
 
 // ---------- Row <-> Object encoding ----------
@@ -12,6 +12,7 @@ const JSON_FIELDS: Record<TableName, string[]> = {
   item: ['tags', 'photo_ids', 'bbox'],
   photo: ['recognition_result'],
   snapshot: ['item_ids'],
+  reminder_rule: [],
 };
 
 function encode(table: TableName, row: any): any {
@@ -41,6 +42,7 @@ const TABLE_MAP: Record<TableName, string> = {
   item: 'items',
   photo: 'photos',
   snapshot: 'snapshots',
+  reminder_rule: 'reminders',
 };
 
 const COLS: Record<TableName, string[]> = {
@@ -49,6 +51,7 @@ const COLS: Record<TableName, string[]> = {
   item: ['id','area_id','name','qty','unit','tags','photo_ids','expires_at','source','confidence','bbox','notes','updated_at','updated_by','deleted','version'],
   photo: ['id','parent_type','parent_id','taken_at','blob_ref','remote_url','recognition_status','recognition_result','updated_at','updated_by','deleted','version'],
   snapshot: ['id','area_id','taken_at','item_ids','note','updated_at','updated_by','deleted','version'],
+  reminder_rule: ['id','item_id','kind','threshold_at','threshold_qty','note','last_fired_at','updated_at','updated_by','deleted','version'],
 };
 
 export function getRow(db: Database.Database, table: TableName, id: string): any | null {
@@ -90,6 +93,7 @@ const MERGE_FNS: Record<TableName, MergeFn> = {
   item: mergeItem as MergeFn,
   photo: mergePhoto as MergeFn,
   snapshot: mergeSnapshot as MergeFn,
+  reminder_rule: mergeReminderRule as MergeFn,
 };
 
 export function mergeUpsert(db: Database.Database, table: TableName, incoming: any): { applied: any; conflicts: Array<{field:string;client:unknown;server:unknown}> } {
