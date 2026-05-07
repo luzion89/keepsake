@@ -344,11 +344,44 @@ const PARSE_ITEMS_SYSTEM_PROMPT = `从用户的中文描述中抽取家庭物品
 - notes: 用户对这个物品的额外描述，比如品牌、型号、用途、放置原因等
 仅返回 JSON：{"items":[{"name":string,"qty":number,"expires_at":string|null,"notes":string?}]}`;
 
+function buildMergeSystemPrompt(existingItems: ExistingItem[]): string {
+  const existingJson = JSON.stringify(existingItems, null, 2);
+  return `你是家庭仓储助手。以下是该区域现有物品列表（JSON）：
+${existingJson}
+
+请结合用户新输入，输出**最终完整物品列表**（含已有未变动项 + 新增项 + 修改项）。
+合并规则：
+- 用户提到的物品，若与现有物品名称相同（忽略空格大小写），则更新其 qty（累加或以用户指定为准）、expires_at、notes
+- 用户提到的新物品直接加入列表
+- 未被用户提及的现有物品保留原样（qty/expires_at/notes 不变）
+- qty: 用户没说数量默认 1，若是追加说明则累加到现有数量
+- expires_at: ISO 日期字符串（YYYY-MM-DD）或 null
+- notes: 合并有意义的备注，重复的去掉
+仅返回 JSON：{"items":[{"name":string,"qty":number,"expires_at":string|null,"notes":string?}]}`;
+}
+
+export interface ExistingItem {
+  name: string;
+  qty: number;
+  expires_at?: string | null;
+  notes?: string;
+}
+
+export type ParseMode = 'replace' | 'merge';
+
 /**
  * Parse a free-form Chinese sentence into a list of items.
  * Routes to DeepSeek or OpenRouter based on configured provider.
+ *
+ * @param text - User input text
+ * @param existingItems - Existing items in the area (for merge mode)
+ * @param mode - 'replace' (default) ignores existing items; 'merge' feeds them to AI for context-aware output
  */
-export async function parseItemsFromText(text: string): Promise<RecognitionItem[]> {
+export async function parseItemsFromText(
+  text: string,
+  existingItems?: ExistingItem[],
+  mode: ParseMode = 'replace',
+): Promise<RecognitionItem[]> {
   const cfg = await getAiConfig();
   const provider = getEffectiveProvider(cfg);
   const apiKey = getEffectiveApiKey(cfg);
@@ -373,6 +406,10 @@ export async function parseItemsFromText(text: string): Promise<RecognitionItem[
     headers['X-Title'] = 'Keepsake';
   }
 
+  const systemPrompt = (mode === 'merge' && existingItems && existingItems.length > 0)
+    ? buildMergeSystemPrompt(existingItems)
+    : PARSE_ITEMS_SYSTEM_PROMPT;
+
   const res = await fetch(url, {
     method: 'POST',
     headers,
@@ -380,7 +417,7 @@ export async function parseItemsFromText(text: string): Promise<RecognitionItem[
       model,
       response_format: { type: 'json_object' },
       messages: [
-        { role: 'system', content: PARSE_ITEMS_SYSTEM_PROMPT },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: text },
       ],
     }),
