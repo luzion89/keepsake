@@ -10,6 +10,7 @@ import { syncRoutes } from './routes/sync.js';
 import { blobRoutes } from './routes/blobs.js';
 import { aiRoutes } from './routes/ai.js';
 import { healthRoutes } from './routes/health.js';
+import { logsRoutes } from './routes/logs.js';
 import type Database from 'better-sqlite3';
 
 declare module 'fastify' {
@@ -30,6 +31,7 @@ export async function buildServer() {
   await fastify.register(syncRoutes);
   await fastify.register(blobRoutes);
   await fastify.register(aiRoutes);
+  await fastify.register(logsRoutes);
 
   // Serve PWA static build (if present after `pnpm build`)
   const __dirname = dirname(fileURLToPath(import.meta.url));

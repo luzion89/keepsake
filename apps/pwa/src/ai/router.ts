@@ -3,6 +3,7 @@
 // settings sync record so other devices/the server can read the same config.
 
 import { kvGet, kvSet } from '../db/dexie.js';
+import { logger } from '../logging/logger.js';
 
 export type AiMode = 'on' | 'off';
 
@@ -146,7 +147,9 @@ export async function recognize(blobs: Blob[]): Promise<RecognitionDraft> {
   const cfg = await getAiConfig();
   if (cfg.mode === 'on' && cfg.apiKey) {
     try { return await callOpenRouterVision(blobs, cfg); }
-    catch (e) { console.warn('openrouter vision failed', e); }
+    catch (e) {
+      logger.error('vision_failed', e instanceof Error ? e.message : String(e), { model: cfg.model });
+    }
   }
   return { status: 'pending', items: [] };
 }
