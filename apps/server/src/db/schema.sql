@@ -100,6 +100,13 @@ CREATE TABLE IF NOT EXISTS conflict_log (
   created_at INTEGER NOT NULL
 );
 
+-- Blob metadata: tracks uploaded blobs for cross-device sync
+CREATE TABLE IF NOT EXISTS blob_meta (
+  id TEXT PRIMARY KEY,
+  path TEXT NOT NULL,
+  uploaded_at INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS reminders (
   id TEXT PRIMARY KEY,
   item_id TEXT NOT NULL,
