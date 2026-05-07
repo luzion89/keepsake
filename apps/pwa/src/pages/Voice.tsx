@@ -6,9 +6,13 @@ import { transcribe, parseVoiceText, getAiConfig, type RecognitionItem } from '.
 
 interface Draft extends RecognitionItem { selected: boolean; }
 
+/** Area 加载三态 */
+type AreaState = 'loading' | 'not-found' | 'ok';
+
 export function VoicePage() {
   const { areaId = '' } = useParams();
   const nav = useNavigate();
+  const [areaState, setAreaState] = useState<AreaState>('loading');
   const [area, setArea] = useState<Area | undefined>();
   const [recording, setRecording] = useState(false);
   const [text, setText] = useState('');
@@ -19,7 +23,14 @@ export function VoicePage() {
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
 
-  useEffect(() => { (async () => setArea(await AreaRepo.get(areaId)))(); }, [areaId]);
+  useEffect(() => {
+    if (!areaId) { setAreaState('not-found'); return; }
+    (async () => {
+      const a = await AreaRepo.get(areaId);
+      if (a) { setArea(a); setAreaState('ok'); }
+      else { setAreaState('not-found'); }
+    })();
+  }, [areaId]);
 
   // 组件卸载时释放麦克风 stream，确保指示灯熄灭
   useEffect(() => {
@@ -96,6 +107,17 @@ export function VoicePage() {
   };
 
   const save = async () => {
+    // 保存前再次校验 area 仍存在，防止孤儿物品
+    if (!areaId) {
+      setErr('区域 ID 为空，无法保存。');
+      return;
+    }
+    const current = await AreaRepo.get(areaId);
+    if (!current) {
+      setErr('该区域已不存在，无法保存物品。请返回首页重新选择区域。');
+      setAreaState('not-found');
+      return;
+    }
     setBusy(true);
     try {
       for (const d of drafts.filter(d => d.selected && d.name.trim())) {
@@ -111,14 +133,22 @@ export function VoicePage() {
     } finally { setBusy(false); }
   };
 
-  if (!area) return <p className="text-slate-400">加载中…</p>;
+  if (areaState === 'loading') return <p className="text-slate-400">加载中…</p>;
+  if (areaState === 'not-found') {
+    return (
+      <div className="space-y-3">
+        <p className="text-rose-300">⚠️ 找不到该区域（可能已被删除）。</p>
+        <Link to="/" className="text-sky-400 hover:text-sky-300 text-sm">← 返回首页</Link>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
       <div className="text-sm text-slate-400">
-        <Link to={`/areas/${areaId}`} className="hover:text-white">← 返回 {area.name}</Link>
+        <Link to={`/areas/${areaId}`} className="hover:text-white">← 返回 {area!.name}</Link>
       </div>
-      <h1 className="text-xl font-semibold">🎤 语音输入 · {area.name}</h1>
+      <h1 className="text-xl font-semibold">🎤 语音输入 · {area!.name}</h1>
 
       <div className="flex gap-2">
         {!recording ? (

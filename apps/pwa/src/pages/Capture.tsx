@@ -9,10 +9,14 @@ interface Draft extends RecognitionItem {
   selected: boolean;
 }
 
+/** Area 加载三态 */
+type AreaState = 'loading' | 'not-found' | 'ok';
+
 export function CapturePage() {
   const { areaId = '' } = useParams();
   const nav = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
+  const [areaState, setAreaState] = useState<AreaState>('loading');
   const [area, setArea] = useState<Area | undefined>();
   const [blobs, setBlobs] = useState<{ blob: Blob; url: string }[]>([]);
   const [drafts, setDrafts] = useState<Draft[]>([]);
@@ -20,7 +24,15 @@ export function CapturePage() {
   const [aiState, setAiState] = useState<'idle' | 'running' | 'pending' | 'done' | 'error'>('idle');
   const [errMsg, setErrMsg] = useState<string | null>(null);
 
-  useEffect(() => { (async () => setArea(await AreaRepo.get(areaId)))(); }, [areaId]);
+  useEffect(() => {
+    if (!areaId) { setAreaState('not-found'); return; }
+    (async () => {
+      const a = await AreaRepo.get(areaId);
+      if (a) { setArea(a); setAreaState('ok'); }
+      else { setAreaState('not-found'); }
+    })();
+  }, [areaId]);
+
   useEffect(() => () => blobs.forEach(b => URL.revokeObjectURL(b.url)), []);
 
   const onPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -58,6 +70,17 @@ export function CapturePage() {
   };
 
   const save = async () => {
+    // 保存前再次校验 area 仍存在，防止孤儿物品
+    if (!areaId) {
+      setErrMsg('区域 ID 为空，无法保存。');
+      return;
+    }
+    const current = await AreaRepo.get(areaId);
+    if (!current) {
+      setErrMsg('该区域已不存在，无法保存物品。请返回首页重新选择区域。');
+      setAreaState('not-found');
+      return;
+    }
     setBusy(true);
     try {
       // 1) save photos
@@ -88,14 +111,22 @@ export function CapturePage() {
     }
   };
 
-  if (!area) return <p className="text-slate-400">加载中…</p>;
+  if (areaState === 'loading') return <p className="text-slate-400">加载中…</p>;
+  if (areaState === 'not-found') {
+    return (
+      <div className="space-y-3">
+        <p className="text-rose-300">⚠️ 找不到该区域（可能已被删除）。</p>
+        <Link to="/" className="text-sky-400 hover:text-sky-300 text-sm">← 返回首页</Link>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
       <div className="text-sm text-slate-400">
-        <Link to={`/areas/${areaId}`} className="hover:text-white">← 返回 {area.name}</Link>
+        <Link to={`/areas/${areaId}`} className="hover:text-white">← 返回 {area!.name}</Link>
       </div>
-      <h1 className="text-xl font-semibold">📷 盘点 · {area.name}</h1>
+      <h1 className="text-xl font-semibold">📷 盘点 · {area!.name}</h1>
 
       <input
         ref={fileRef}
