@@ -5,6 +5,7 @@ import {
   type TableName,
 } from '@keepsake/shared';
 import { pullAiConfigFromServer } from '../ai/router.js';
+import { pushPendingBlobs, pullMissingBlobs } from './blobs.js';
 
 const SYNC_CURSOR_KEY = 'sync_cursor';
 
@@ -89,6 +90,11 @@ export async function syncOnce(): Promise<{ pushed: number; pulled: number; conf
     }
 
     await kvSet(SYNC_CURSOR_KEY, pull.serverTime);
+
+    // Blob sync (after metadata sync)
+    await pushPendingBlobs();
+    await pullMissingBlobs();
+
     return { pushed, pulled: pull.changes.length, conflicts };
   } finally {
     _running = false;
