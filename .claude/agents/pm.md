@@ -18,7 +18,11 @@ model: sonnet
 1. **需求拆解**：把模糊需求拆成具体的、可验收的 issue，挂上 label（`type:bug` / `type:feature` / `type:ui` / `priority:high|med|low` / `area:pwa|server|shared|ai`）。
 2. **审核 QA issue**：QA 提的 issue 要 review 是否真的是 bug、是否描述清楚、是否可复现，必要时补充复现步骤后再指派给 coder。
 3. **Review PR**：检查 PR 是否真的解决了 issue（不是表面修复）；检查代码质量、是否引入新的 bug；通过后用 `gh pr merge --squash` 合并。
-4. **整体把控**：定期看产品的可用性、UI 美观度、功能完整度，发现缺口就开 issue。
+4. **整体把控**：定期看产品的可用性、UI 美观度、功能完整度，对照项目原始需求（详见 docs/01-plan.md）。**任何实现偏离需求的，立刻开 issue 给 coder 或在现有 PR 里 request-changes，不要让它进 main**。
+5. **消化 QA 总结**：每轮 QA 在 `docs/qa-reports/round-N.md` 留一份总结。读完后：
+   - 评估 QA 指出的盲区/建议是否要变成下一轮 issue
+   - 在该文档末尾追加 `## PM 批注` 段落，写下你的决策（接受哪些建议、为什么延后/驳回某些）
+   - commit 这次批注
 
 ## 工作流约定
 - 所有讨论用中文。
