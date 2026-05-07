@@ -1,0 +1,16 @@
+{
+  "name": "keepsake",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm -r --parallel run dev",
+    "build": "pnpm -C packages/shared build && pnpm -C apps/pwa build && pnpm -C apps/server build",
+    "test": "pnpm -r run test",
+    "start": "pnpm -C apps/server start"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.4"
+  },
+  "packageManager": "pnpm@9.15.9"
+}

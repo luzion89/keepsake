@@ -1,0 +1,102 @@
+import { db, getDeviceId, kvGet, kvSet } from '../db/dexie.js';
+import {
+  type PullResp, type PushReq, type PushResp,
+  mergeRoom, mergeArea, mergeItem, mergePhoto, mergeSnapshot,
+  type TableName,
+} from '@keepsake/shared';
+
+const SYNC_CURSOR_KEY = 'sync_cursor';
+
+export async function isServerReachable(): Promise<boolean> {
+  if (!navigator.onLine) return false;
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 2500);
+    const r = await fetch('/health', { signal: ctrl.signal });
+    clearTimeout(t);
+    return r.ok;
+  } catch { return false; }
+}
+
+const MERGE: Record<TableName, (l: any, r: any) => { merged: any }> = {
+  room: mergeRoom as any,
+  area: mergeArea as any,
+  item: mergeItem as any,
+  photo: mergePhoto as any,
+  snapshot: mergeSnapshot as any,
+};
+const TABLE_TO_DEXIE: Record<TableName, 'rooms'|'areas'|'items'|'photos'|'snapshots'> = {
+  room: 'rooms', area: 'areas', item: 'items', photo: 'photos', snapshot: 'snapshots',
+};
+
+async function applyRemote(changes: PullResp['changes']) {
+  for (const c of changes) {
+    const t = TABLE_TO_DEXIE[c.table];
+    const row = c.row as any;
+    const local = await (db as any)[t].get(row.id);
+    if (!local) {
+      await (db as any)[t].put(row);
+    } else {
+      const { merged } = MERGE[c.table](local, row);
+      await (db as any)[t].put(merged);
+    }
+  }
+}
+
+let _running = false;
+export async function syncOnce(): Promise<{ pushed: number; pulled: number; conflicts: number } | null> {
+  if (_running) return null;
+  if (!(await isServerReachable())) return null;
+  _running = true;
+  try {
+    const since = (await kvGet<number>(SYNC_CURSOR_KEY)) ?? 0;
+
+    // PULL
+    const pullRes = await fetch(`/sync/pull?since=${since}`);
+    if (!pullRes.ok) return null;
+    const pull = (await pullRes.json()) as PullResp;
+    await applyRemote(pull.changes);
+
+    // PUSH (drain outbox)
+    const pending = await db.outbox.orderBy('client_seq').limit(500).toArray();
+    let pushed = 0, conflicts = 0;
+    if (pending.length > 0) {
+      const deviceId = await getDeviceId();
+      const body: PushReq = { deviceId, ops: pending.map(p => p.op) };
+      const pushRes = await fetch('/sync/push', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (pushRes.ok) {
+        const push = (await pushRes.json()) as PushResp;
+        // record conflicts
+        for (const c of push.conflicts) {
+          await db.conflicts.add({
+            table: c.table, row_id: c.id, field: c.field,
+            client: c.client, server: c.server,
+            seen_at: Date.now(), acknowledged: 0,
+          });
+          conflicts++;
+        }
+        // ack accepted ops
+        await db.outbox.where('client_seq').belowOrEqual(pending[pending.length-1]!.client_seq).delete();
+        pushed = pending.length;
+      }
+    }
+
+    await kvSet(SYNC_CURSOR_KEY, pull.serverTime);
+    return { pushed, pulled: pull.changes.length, conflicts };
+  } finally {
+    _running = false;
+  }
+}
+
+export function startSyncDaemon() {
+  syncOnce().catch(() => {});
+  window.addEventListener('online', () => syncOnce().catch(() => {}));
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') syncOnce().catch(() => {});
+  });
+  setInterval(() => syncOnce().catch(() => {}), 60_000);
+}

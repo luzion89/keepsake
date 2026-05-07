@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:chat.deepseek.com)",
+      "Bash(pnpm -v)",
+      "Bash(npm -v)",
+      "Bash(npm i *)",
+      "Bash(node -e ' *)",
+      "Bash(pnpm install *)",
+      "Bash(pnpm -C packages/shared test)",
+      "Bash(pnpm -C apps/server test)",
+      "Bash(pnpm -C apps/pwa build)",
+      "Bash(pnpm -C apps/server build)",
+      "Bash(KEEPSAKE_DB=./data/smoke.sqlite PORT=8443 pnpm *)",
+      "Bash(curl -sf http://127.0.0.1:8443/health)",
+      "Bash(kill %1)",
+      "Bash(pkill -f \"until curl\")",
+      "Bash(pnpm -C packages/shared build)",
+      "Bash(curl -s http://127.0.0.1:8443/health)",
+      "Bash(curl -sI http://127.0.0.1:8443/)",
+      "Bash(curl -s http://127.0.0.1:8443/manifest.webmanifest)",
+      "Bash(curl -sI http://127.0.0.1:8443/sw.js)",
+      "Bash(pkill -f \"node dist/index.js\")"
+    ]
+  }
+}

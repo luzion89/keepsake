@@ -1,0 +1,73 @@
+import { z } from 'zod';
+
+// ---------- Sync metadata mixin ----------
+export const SyncMetaSchema = z.object({
+  id: z.string().uuid(),
+  updated_at: z.number().int().nonnegative(),
+  updated_by: z.string().min(1), // deviceId
+  deleted: z.boolean().default(false),
+  version: z.number().int().nonnegative().default(0),
+});
+export type SyncMeta = z.infer<typeof SyncMetaSchema>;
+
+// ---------- Domain ----------
+export const RoomSchema = SyncMetaSchema.extend({
+  name: z.string().min(1).max(60),
+  icon: z.string().max(40).optional(),
+  photo_ids: z.array(z.string().uuid()).default([]),
+  note: z.string().max(2000).optional(),
+});
+export type Room = z.infer<typeof RoomSchema>;
+
+export const AreaSchema = SyncMetaSchema.extend({
+  room_id: z.string().uuid(),
+  name: z.string().min(1).max(80),
+  photo_ids: z.array(z.string().uuid()).default([]),
+  note: z.string().max(2000).optional(),
+});
+export type Area = z.infer<typeof AreaSchema>;
+
+export const BBoxSchema = z.object({
+  photoId: z.string().uuid(),
+  x: z.number(),
+  y: z.number(),
+  w: z.number(),
+  h: z.number(),
+});
+
+export const ItemSchema = SyncMetaSchema.extend({
+  area_id: z.string().uuid(),
+  name: z.string().min(1).max(120),
+  qty: z.number().int(),
+  unit: z.string().max(20).optional(),
+  tags: z.array(z.string().max(40)).default([]),
+  photo_ids: z.array(z.string().uuid()).default([]),
+  expires_at: z.number().int().nonnegative().optional(),
+  source: z.enum(['ai', 'voice', 'manual']),
+  confidence: z.number().min(0).max(1).optional(),
+  bbox: BBoxSchema.optional(),
+  notes: z.string().max(4000).optional(),
+});
+export type Item = z.infer<typeof ItemSchema>;
+
+export const PhotoSchema = SyncMetaSchema.extend({
+  parent_type: z.enum(['room', 'area', 'item']),
+  parent_id: z.string().uuid(),
+  taken_at: z.number().int().nonnegative(),
+  blob_ref: z.string().min(1).optional(),     // local IDB key
+  remote_url: z.string().url().optional(),    // after upload
+  recognition_status: z.enum(['pending', 'done', 'failed', 'skipped']),
+  recognition_result: z.unknown().optional(),
+});
+export type Photo = z.infer<typeof PhotoSchema>;
+
+export const SnapshotSchema = SyncMetaSchema.extend({
+  area_id: z.string().uuid(),
+  taken_at: z.number().int().nonnegative(),
+  item_ids: z.array(z.string().uuid()),
+  note: z.string().max(2000).optional(),
+});
+export type Snapshot = z.infer<typeof SnapshotSchema>;
+
+export const TableNameSchema = z.enum(['room', 'area', 'item', 'photo', 'snapshot']);
+export type TableName = z.infer<typeof TableNameSchema>;
