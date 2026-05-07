@@ -54,11 +54,11 @@ export default defineConfig({
       '/sync': 'http://localhost:8443',
       '/blobs': 'http://localhost:8443',
       '/ai': 'http://localhost:8443',
-      '/settings': 'http://localhost:8443',
+      '/settings/ai': 'http://localhost:8443',
       '/health': 'http://localhost:8443',
       '/logs': 'http://localhost:8443',
     },
   },
   build: { target: 'es2022' },
-  test: { environment: 'jsdom' },
+  test: { environment: 'jsdom', exclude: ['e2e/**', 'node_modules/**'] },
 });
