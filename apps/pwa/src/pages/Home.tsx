@@ -1,76 +1,54 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { Room } from '@keepsake/shared';
+import type { Area, Room } from '@keepsake/shared';
 import { AreaRepo, ItemRepo, RoomRepo } from '../db/repos.js';
 import { useConfirm } from '../components/ConfirmDialog.js';
 
 const PRESETS = ['厨房', '客厅', '阳台', '主卧', '次卧', '卫生间', '储物间', '玄关'];
 
-/** 房间卡片内联设置菜单（固定定位，避免 overflow 裁剪） */
-function RoomSettingsMenu({
-  room,
-  onRename,
-  onDelete,
-}: {
-  room: Room;
-  onRename: () => void;
-  onDelete: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
-  const btnRef = useRef<HTMLButtonElement>(null);
+interface RoomMeta { room: Room; areaCount: number }
 
-  const openMenu = (e: React.MouseEvent) => {
+/** Three-dot dropdown menu — fixed 定位，自动向上/下翻转，避免被 overflow 裁剪 */
+function DotMenu({ children }: { children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => { setOpen(false); };
+    document.addEventListener('mousedown', close, { once: true });
+    return () => document.removeEventListener('mousedown', close);
+  }, [open]);
+  const toggle = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (!open && btnRef.current) {
       const rect = btnRef.current.getBoundingClientRect();
-      // 菜单尺寸约 120×80，检测底部空间
-      const menuH = 88;
+      const menuH = 92;
       const spaceBelow = window.innerHeight - rect.bottom;
       const top = spaceBelow >= menuH ? rect.bottom + 4 : rect.top - menuH - 4;
-      setMenuPos({ top, right: window.innerWidth - rect.right });
+      setPos({ top, right: window.innerWidth - rect.right });
     }
-    setOpen(o => !o);
+    setOpen(v => !v);
   };
-
-  // 点击外部关闭
-  useEffect(() => {
-    if (!open) return;
-    const handler = () => setOpen(false);
-    document.addEventListener('pointerdown', handler, { once: true });
-    return () => document.removeEventListener('pointerdown', handler);
-  }, [open]);
-
   return (
     <>
       <button
         ref={btnRef}
-        onClick={openMenu}
-        className="absolute top-2 right-2 min-w-[44px] min-h-[44px] rounded-full bg-paper-dark text-ink-muted text-base opacity-0 group-hover:opacity-100 hover:bg-paper-dark/80 transition-all duration-150 flex items-center justify-center z-10"
-        aria-label={`${room.name} 设置`}
-        title="设置"
+        onClick={toggle}
+        className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-ink-muted hover:text-ink transition-colors"
+        aria-label="更多操作"
       >
-        ···
+        ⋯
       </button>
-      {open && menuPos && (
+      {open && pos && (
         <div
-          className="fixed z-50 bg-paper-card border border-[var(--border-default)] rounded-[12px] shadow-lg py-1 min-w-[120px]"
-          style={{ top: menuPos.top, right: menuPos.right }}
-          onPointerDown={e => e.stopPropagation()}
+          className="fixed z-50 bg-paper-card border border-[var(--border-default)] rounded-[12px] shadow-lg overflow-hidden min-w-[120px]"
+          style={{ top: pos.top, right: pos.right }}
+          onMouseDown={e => e.stopPropagation()}
+          onClick={() => setOpen(false)}
         >
-          <button
-            onClick={(e) => { e.stopPropagation(); setOpen(false); onRename(); }}
-            className="w-full text-left px-4 py-2.5 text-sm text-ink hover:bg-paper-dark transition-colors"
-          >
-            ✏️ 改名
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); setOpen(false); onDelete(); }}
-            className="w-full text-left px-4 py-2.5 text-sm text-danger-text hover:bg-danger-bg/30 transition-colors"
-          >
-            🗑 删除
-          </button>
+          {children}
         </div>
       )}
     </>
@@ -78,16 +56,24 @@ function RoomSettingsMenu({
 }
 
 export function HomePage() {
-  const [rooms, setRooms] = useState<Room[]>([]);
+  const [metas, setMetas] = useState<RoomMeta[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fabOpen, setFabOpen] = useState(false);
   const [name, setName] = useState('');
-  const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const editRef = useRef<HTMLInputElement>(null);
   const { confirm, dialog } = useConfirm();
 
   const reload = async () => {
-    const list = await RoomRepo.list();
-    setRooms(list);
+    const rooms = await RoomRepo.list();
+    const result: RoomMeta[] = await Promise.all(
+      rooms.map(async r => {
+        const areas = await AreaRepo.listByRoom(r.id);
+        return { room: r, areaCount: areas.length };
+      })
+    );
+    setMetas(result);
     setLoading(false);
   };
   useEffect(() => { reload(); }, []);
@@ -97,18 +83,20 @@ export function HomePage() {
     if (!trimmed) return;
     await RoomRepo.create({ name: trimmed });
     setName('');
+    setFabOpen(false);
     await reload();
   };
 
-  const startRename = (room: Room) => {
-    setRenamingId(room.id);
-    setRenameValue(room.name);
+  const startRename = (r: Room) => {
+    setEditingId(r.id);
+    setEditName(r.name);
+    setTimeout(() => editRef.current?.focus(), 50);
   };
 
-  const commitRename = async () => {
-    if (!renamingId || !renameValue.trim()) { setRenamingId(null); return; }
-    await RoomRepo.update(renamingId, { name: renameValue.trim() });
-    setRenamingId(null);
+  const commitRename = async (id: string) => {
+    const trimmed = editName.trim();
+    if (trimmed) await RoomRepo.update(id, { name: trimmed });
+    setEditingId(null);
     await reload();
   };
 
@@ -130,92 +118,110 @@ export function HomePage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {dialog}
-
-      {/* 改名对话框 */}
-      {renamingId && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/30" onPointerDown={() => setRenamingId(null)}>
-          <div className="bg-paper-card rounded-[16px] p-5 w-72 shadow-lg space-y-3" onPointerDown={e => e.stopPropagation()}>
-            <p className="text-sm font-medium text-ink">重命名房间</p>
-            <input
-              autoFocus
-              value={renameValue}
-              onChange={e => setRenameValue(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingId(null); }}
-              className="w-full bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
-            />
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => setRenamingId(null)} className="px-3 py-2 text-sm text-ink-muted hover:text-ink transition-colors">取消</button>
-              <button onClick={commitRename} className="px-4 py-2 rounded-[12px] bg-accent hover:bg-accent-hover text-paper text-sm font-medium transition-all">确认</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── 添加房间表单 ──────────────────────────────── */}
-      <section>
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted mb-3">添加房间</h2>
-        <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); add(name); }}>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="房间名（如 厨房）"
-            className="flex-1 min-w-0 bg-paper-card border border-[var(--border-default)] rounded-[12px] px-4 py-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-150 text-ink placeholder:text-ink-muted"
-          />
-          <button className="shrink-0 px-4 py-3 rounded-[12px] bg-accent hover:bg-accent-hover active:scale-[0.97] text-paper font-medium text-sm shadow-card transition-all duration-150">
-            添加
-          </button>
-        </form>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {PRESETS.map(p => (
-            <button
-              key={p}
-              onClick={() => add(p)}
-              className="text-xs px-3 py-2 min-h-[44px] rounded-full bg-paper-card border border-[var(--border-default)] hover:border-accent/50 hover:bg-paper-dark text-ink-muted transition-all duration-150"
-            >
-              + {p}
-            </button>
-          ))}
-        </div>
-      </section>
 
       {/* ── 房间列表 ──────────────────────────────────── */}
       <section>
         <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted mb-3">
-          我的房间 {rooms.length > 0 && `(${rooms.length})`}
+          我的房间 {metas.length > 0 && `(${metas.length})`}
         </h2>
         {loading ? (
           <div className="flex flex-col items-center py-12 text-center">
             <p className="text-ink-muted text-sm">加载中…</p>
           </div>
-        ) : rooms.length === 0 ? (
+        ) : metas.length === 0 ? (
           <div className="flex flex-col items-center py-12 text-center">
             <span className="text-4xl mb-3">🏠</span>
             <p className="text-ink-muted text-sm font-medium">还没有房间</p>
-            <p className="text-ink-muted/70 text-xs mt-1">点上面的预设或输入自定义名称添加</p>
+            <p className="text-ink-muted/70 text-xs mt-1">点右下角 + 添加第一个房间</p>
           </div>
         ) : (
-          <ul className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {rooms.map(r => (
-              <li key={r.id} className="relative group">
-                <Link
-                  to={`/rooms/${r.id}`}
-                  className="block aspect-square rounded-[12px] bg-paper-card border border-[var(--border-default)] hover:border-accent/40 hover:shadow-card p-4 flex flex-col transition-all duration-150"
-                >
-                  <span className="text-base font-semibold font-serif text-ink pr-8">{r.name}</span>
-                  <span className="mt-auto text-xs text-ink-muted">→</span>
-                </Link>
-                <RoomSettingsMenu
-                  room={r}
-                  onRename={() => startRename(r)}
-                  onDelete={() => deleteRoom(r)}
-                />
+          <ul className="bg-paper-card border border-[var(--border-default)] rounded-[12px] overflow-hidden divide-y divide-[var(--border-subtle)]">
+            {metas.map(({ room: r, areaCount }) => (
+              <li key={r.id} className="flex items-center px-4 min-h-[52px]">
+                <span className="text-base mr-3">🏠</span>
+                {editingId === r.id ? (
+                  <input
+                    ref={editRef}
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    onBlur={() => commitRename(r.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') commitRename(r.id);
+                      if (e.key === 'Escape') setEditingId(null);
+                    }}
+                    className="flex-1 bg-paper-dark border border-accent rounded-[8px] px-2 py-1 text-sm outline-none text-ink"
+                  />
+                ) : (
+                  <Link
+                    to={`/rooms/${r.id}`}
+                    className="flex-1 font-serif text-base text-ink hover:text-ink-hover transition-colors"
+                  >
+                    {r.name}
+                  </Link>
+                )}
+                <span className="text-xs text-ink-muted mr-1">{areaCount} 个区域</span>
+                <DotMenu>
+                  <button
+                    className="w-full text-left px-4 py-2.5 text-sm text-ink hover:bg-paper-dark transition-colors"
+                    onClick={() => startRename(r)}
+                  >
+                    ✏️ 改名
+                  </button>
+                  <button
+                    className="w-full text-left px-4 py-2.5 text-sm text-danger-text hover:bg-danger-bg transition-colors"
+                    onClick={() => deleteRoom(r)}
+                  >
+                    🗑 删除
+                  </button>
+                </DotMenu>
               </li>
             ))}
           </ul>
         )}
       </section>
+
+      {/* ── FAB 添加房间 ──────────────────────────────── */}
+      <div
+        className="fixed z-30"
+        style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 72px)', right: '20px' }}
+      >
+        {fabOpen && (
+          <div className="mb-3 bg-paper-card border border-[var(--border-default)] rounded-[12px] shadow-lg p-3 space-y-2 w-64">
+            <form onSubmit={(e) => { e.preventDefault(); add(name); }} className="flex gap-2">
+              <input
+                autoFocus
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="房间名（如 厨房）"
+                className="flex-1 min-w-0 bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-2 text-sm outline-none focus:border-accent text-ink placeholder:text-ink-muted"
+              />
+              <button className="shrink-0 px-3 py-2 rounded-[12px] bg-accent hover:bg-accent-hover text-paper text-sm font-medium transition-all">
+                添加
+              </button>
+            </form>
+            <div className="flex flex-wrap gap-1.5">
+              {PRESETS.map(p => (
+                <button
+                  key={p}
+                  onClick={() => add(p)}
+                  className="text-xs px-2.5 py-1.5 rounded-full bg-paper-dark border border-[var(--border-default)] hover:border-accent/50 text-ink-muted transition-all"
+                >
+                  + {p}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        <button
+          onClick={() => setFabOpen(v => !v)}
+          className="w-14 h-14 rounded-full bg-accent hover:bg-accent-hover text-paper text-2xl shadow-lg flex items-center justify-center transition-all active:scale-[0.95]"
+          aria-label="添加房间"
+        >
+          {fabOpen ? '×' : '+'}
+        </button>
+      </div>
     </div>
   );
 }

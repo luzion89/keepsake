@@ -6,18 +6,34 @@ import { ItemRepo } from '../db/repos.js';
 import { getAiConfig, searchAnswer } from '../ai/router.js';
 import type { SearchContext, SearchAnswerResult } from '../ai/router.js';
 
+/** Simple in-app toast (auto-dismisses after 2.5 s) */
+function useToast() {
+  const [msg, setMsg] = useState<string | null>(null);
+  const show = (m: string) => {
+    setMsg(m);
+    setTimeout(() => setMsg(null), 2500);
+  };
+  const node = msg ? (
+    <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-[12px] bg-ink text-paper text-sm shadow-lg whitespace-nowrap pointer-events-none">
+      {msg}
+    </div>
+  ) : null;
+  return { show, node };
+}
+
 export function SearchPage() {
   const [q, setQ] = useState('');
   const [items, setItems] = useState<Item[]>([]);
   const [areas, setAreas] = useState<Map<string, Area>>(new Map());
   const [rooms, setRooms] = useState<Map<string, Room>>(new Map());
-  const [listening, setListening] = useState(false);
 
   // AI answer state
   const [aiEnabled, setAiEnabled] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState<SearchAnswerResult | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
+
+  const toast = useToast();
 
   // Check if AI is available
   useEffect(() => {
@@ -58,24 +74,12 @@ export function SearchPage() {
     return Array.from(g.entries());
   }, [items]);
 
-  const startVoice = () => {
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) { alert('当前浏览器不支持语音识别，请手动输入。'); return; }
-    const rec = new SR();
-    rec.lang = 'zh-CN';
-    rec.continuous = false;
-    rec.interimResults = false;
-    rec.onstart = () => setListening(true);
-    rec.onend = () => setListening(false);
-    rec.onerror = () => setListening(false);
-    rec.onresult = (e: any) => {
-      const text = Array.from(e.results).map((r: any) => r[0].transcript).join('');
-      setQ(text);
-    };
-    rec.start();
-  };
 
   const askAi = async () => {
+    if (!aiEnabled) {
+      toast.show('请先在设置里启用 AI 功能');
+      return;
+    }
     if (!q.trim()) return;
     setAiLoading(true);
     setAiResult(null);
@@ -121,44 +125,55 @@ export function SearchPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold text-ink">搜索物品</h1>
+      {toast.node}
 
-      {/* ── 搜索栏（sticky）──────────────────────────── */}
-      <div className="flex gap-2 sticky top-14 z-10 bg-paper/95 backdrop-blur pb-3 pt-1 -mx-4 px-4 border-b border-ink-faint">
-        <input
-          autoFocus
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="如 消毒水、电池、备用灯泡…"
-          className="flex-1 bg-paper-card border border-[var(--border-default)] rounded-[12px] px-4 py-2.5 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-150 text-ink placeholder:text-ink-muted"
-        />
-        <button
-          onClick={startVoice}
-          aria-label="语音输入"
-          className={`w-11 h-11 flex items-center justify-center rounded-[12px] border text-base transition-all ${
-            listening
-              ? 'bg-danger border-danger animate-pulse text-paper'
-              : 'border-[var(--border-default)] text-ink-muted hover:border-accent/60 hover:text-ink'
-          }`}
-        >
-          🎙
-        </button>
-        {aiEnabled && q.trim() && (
-          <button
-            onClick={askAi}
-            disabled={aiLoading}
-            className="px-4 h-11 rounded-[12px] bg-accent hover:bg-accent-hover text-paper font-medium text-sm disabled:opacity-50 transition-all duration-150 active:scale-[0.97]"
-          >
-            {aiLoading ? '思考中…' : '✨ AI 回答'}
-          </button>
-        )}
+      <h1 className="text-2xl font-bold font-serif text-ink">搜索物品</h1>
+
+      {/* ── 使用提示卡片 ──────────────────────────────── */}
+      <div className="bg-paper-card border border-ink/10 rounded-[12px] px-4 py-3 text-sm text-ink-muted leading-relaxed">
+        直接搜索关键词，也可以用语音输入一段模糊的描述，让 AI 帮忙查找符合描述的物品
       </div>
 
+      {/* ── 搜索输入框 + AI 按钮 ─────────────────────── */}
+      <div className="flex gap-2">
+        <textarea
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value);
+            e.target.style.height = 'auto';
+            e.target.style.height = e.target.scrollHeight + 'px';
+          }}
+          onFocus={(e) => {
+            e.target.style.height = 'auto';
+            e.target.style.height = e.target.scrollHeight + 'px';
+          }}
+          onBlur={(e) => {
+            e.target.style.height = '';
+          }}
+          placeholder="输入关键词…"
+          rows={1}
+          className="flex-1 bg-paper-card border border-[var(--border-default)] rounded-[12px] px-4 py-3 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-150 text-ink placeholder:text-ink-muted resize-none overflow-hidden leading-[1.5]"
+          style={{ minHeight: '48px' }}
+        />
+        {/* AI 按钮 — 始终渲染 */}
+        <button
+          onClick={askAi}
+          disabled={aiLoading}
+          className={`self-start h-12 px-4 flex items-center justify-center gap-1.5 rounded-[12px] font-medium text-sm transition-all duration-150 active:scale-[0.97] ${
+            aiEnabled && q.trim()
+              ? 'bg-accent hover:bg-accent-hover text-paper'
+              : 'border border-[var(--border-default)] text-ink-muted opacity-60'
+          }`}
+        >
+          {aiLoading ? '思考中…' : '✨ AI'}
+        </button>
+      </div>
+
+      {/* ── 搜索结果 ──────────────────────────────────── */}
       {q.trim() && items.length === 0 && (
-        <p className="text-ink-muted text-sm">没有找到 "{q}"。</p>
+        <p className="text-ink-muted text-sm pt-2">没有找到 "{q}"。</p>
       )}
 
-      {/* ── 搜索结果列表 ─────────────────────────────── */}
       {grouped.map(([areaId, list]) => {
         const a = areas.get(areaId);
         const r = a ? rooms.get(a.room_id) : undefined;
