@@ -230,7 +230,13 @@ export function SettingsPage() {
                   </div>
                   <div>
                     <label className="block text-xs text-ink-muted mb-1.5">视觉模型（默认 {DEFAULT_MODEL}）</label>
-                    <input value={cfg.model ?? ''} onChange={(e) => setCfg({ ...cfg, model: e.target.value })} placeholder={DEFAULT_MODEL} className={inputCls} />
+                    {/* 若 model 等于 DeepSeek 默认值，说明是 DeepSeek 侧写入的，OpenRouter 显示为空 */}
+                    <input
+                      value={cfg.model === DEFAULT_DEEPSEEK_MODEL ? '' : (cfg.model ?? '')}
+                      onChange={(e) => setCfg({ ...cfg, model: e.target.value })}
+                      placeholder={DEFAULT_MODEL}
+                      className={inputCls}
+                    />
                   </div>
                   <div>
                     <label className="block text-xs text-ink-muted mb-1.5">语音转写模型（需支持 audio 输入，默认同上）</label>

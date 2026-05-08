@@ -53,7 +53,7 @@ export function CapturePage() {
 
   const removeBlob = (i: number) => {
     setBlobs(prev => {
-      URL.revokeObjectURL(prev[i].url);
+      const item = prev[i]; if (item) URL.revokeObjectURL(item.url);
       return prev.filter((_, j) => j !== i);
     });
   };
@@ -83,20 +83,20 @@ export function CapturePage() {
     }
   };
 
-  if (areaState === 'loading') return <p className="text-slate-400">加载中…</p>;
+  if (areaState === 'loading') return <p className="text-ink-muted">加载中…</p>;
   if (areaState === 'not-found') {
     return (
       <div className="space-y-3">
-        <p className="text-rose-300">⚠️ 找不到该区域（可能已被删除）。</p>
-        <Link to="/" className="text-sky-400 hover:text-sky-300 text-sm">← 返回首页</Link>
+        <p className="text-danger-text">⚠️ 找不到该区域（可能已被删除）。</p>
+        <Link to="/" className="text-accent hover:text-accent-hover text-sm">← 返回首页</Link>
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      <div className="text-sm text-slate-400">
-        <Link to={`/areas/${areaId}`} className="hover:text-white">← 返回 {area!.name}</Link>
+      <div className="text-sm text-ink-muted">
+        <Link to={`/areas/${areaId}`} className="hover:text-ink">← 返回 {area!.name}</Link>
       </div>
       <h1 className="text-xl font-semibold">📷 拍照存档 · {area!.name}</h1>
 
@@ -112,16 +112,16 @@ export function CapturePage() {
 
       <button
         onClick={() => fileRef.current?.click()}
-        className="w-full px-4 py-3 rounded-xl bg-emerald-500 text-slate-950 font-medium"
+        className="w-full h-11 flex items-center justify-center rounded-[12px] bg-paper-card border border-[var(--border-default)] hover:border-accent/40 text-ink font-medium text-sm transition-all duration-150"
       >
-        + 拍照 / 选图（可多张）
+        📷 拍照（可多张）
       </button>
 
-      {errMsg && <p className="text-rose-300 text-sm">{errMsg}</p>}
+      {errMsg && <p className="text-danger-text text-sm">{errMsg}</p>}
 
       {blobs.length > 0 && (
         <section>
-          <h2 className="text-sm font-semibold text-slate-300 mb-2">已选 {blobs.length} 张</h2>
+          <h2 className="text-sm font-semibold text-ink-muted mb-2">已选 {blobs.length} 张</h2>
           <div className="grid grid-cols-3 gap-2">
             {blobs.map((b, i) => (
               <div key={i} className="relative">
@@ -143,7 +143,7 @@ export function CapturePage() {
         <button
           onClick={save}
           disabled={busy}
-          className="w-full px-4 py-3 rounded-xl bg-amber-400 text-slate-950 font-medium disabled:opacity-50"
+          className="w-full h-11 flex items-center justify-center rounded-[12px] bg-accent hover:bg-accent-hover active:scale-[0.98] text-paper font-medium text-sm shadow-card transition-all duration-150 disabled:opacity-50"
         >
           {busy ? '保存中…' : `存档 ${blobs.length} 张照片`}
         </button>

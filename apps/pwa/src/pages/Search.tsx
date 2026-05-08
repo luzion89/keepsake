@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import type { Item, Area, Room } from '@keepsake/shared';
 import { db } from '../db/dexie.js';
 import { ItemRepo } from '../db/repos.js';
-import { getAiConfig, searchAnswer } from '../ai/router.js';
+import { getAiConfig, getEffectiveApiKey, searchAnswer } from '../ai/router.js';
 import type { SearchContext, SearchAnswerResult } from '../ai/router.js';
 
 /** Simple in-app toast (auto-dismisses after 2.5 s) */
@@ -37,7 +37,7 @@ export function SearchPage() {
 
   // Check if AI is available
   useEffect(() => {
-    getAiConfig().then(cfg => setAiEnabled(cfg.mode === 'on' && !!cfg.apiKey));
+    getAiConfig().then(cfg => setAiEnabled(cfg.mode === 'on' && !!getEffectiveApiKey(cfg)));
   }, []);
 
   useEffect(() => {
@@ -144,11 +144,15 @@ export function SearchPage() {
             e.target.style.height = e.target.scrollHeight + 'px';
           }}
           onFocus={(e) => {
+            // 聚焦：展开多行
+            e.target.style.overflow = 'hidden';
             e.target.style.height = 'auto';
             e.target.style.height = e.target.scrollHeight + 'px';
           }}
           onBlur={(e) => {
-            e.target.style.height = '';
+            // 失焦：收缩回单行
+            e.target.style.height = '48px';
+            e.target.style.overflow = 'hidden';
           }}
           placeholder="输入关键词…"
           rows={1}
