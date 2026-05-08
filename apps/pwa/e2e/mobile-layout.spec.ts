@@ -18,7 +18,7 @@ test.describe('移动端布局不溢出（#76 回归）', () => {
     expect(containerBox).not.toBeNull();
     const containerRight = containerBox!.x + containerBox!.width;
 
-    const buttons = container.locator('button, a[role="button"], a.rounded-xl, a.rounded-2xl');
+    const buttons = container.locator('button, a[role="button"], a.rounded-\\[12px\\], a.rounded-xl, a.rounded-2xl');
     const count = await buttons.count();
     expect(count).toBeGreaterThan(0);
 
@@ -85,8 +85,8 @@ test.describe('移动端布局不溢出（#76 回归）', () => {
     // 等待展开动画
     await page.waitForTimeout(200);
 
-    // 检查手动添加的输入框和按钮容器（类名随 PR-B 重构更新为 bg-slate-900）
-    const manualSection = page.locator('.bg-slate-900').filter({ has: page.locator('input[placeholder="物品名"]') }).first();
+    // 检查手动添加的输入框和按钮容器（v3 使用 bg-paper-card）
+    const manualSection = page.locator('.bg-paper-card').filter({ has: page.locator('input[placeholder="物品名"]') }).first();
     await expect(manualSection).toBeVisible();
 
     const manualBox = await manualSection.boundingBox();
