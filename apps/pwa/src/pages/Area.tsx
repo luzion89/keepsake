@@ -49,6 +49,7 @@ export function AreaPage() {
   const [qty, setQty] = useState(1);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editItemName, setEditItemName] = useState('');
+  const [lightbox, setLightbox] = useState<{ src: string; photoId: string } | null>(null);
   const editItemRef = useRef<HTMLInputElement>(null);
   const { confirm, dialog } = useConfirm();
 
@@ -249,36 +250,118 @@ export function AreaPage() {
         )}
       </section>
 
-      {/* ── 区域照片（可折叠，置底） ──────────────────── */}
+      {/* ── 区域照片时间线 ──────────────────────────── */}
       {photos.length > 0 && (
         <section>
           <button
             onClick={() => setShowPhotos(v => !v)}
-            className="flex items-center gap-1 text-xs text-ink-muted hover:text-ink transition-colors mb-2"
+            className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-ink-muted hover:text-ink transition-colors mb-2"
           >
             <span className={`inline-block transition-transform duration-150 ${showPhotos ? 'rotate-90' : ''}`}>›</span>
             已拍照片 ({photos.length})
           </button>
-          {showPhotos && (
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {photos.map(p => {
-                const src = photoBlobUrls[p.id];
-                return src ? (
-                  <img
-                    key={p.id}
-                    src={src}
-                    alt="区域照片"
-                    className="h-20 w-20 object-cover rounded-[12px] flex-shrink-0 border border-[var(--border-default)]"
-                  />
-                ) : (
-                  <div key={p.id} className="h-20 w-20 rounded-[12px] flex-shrink-0 bg-paper-dark border border-[var(--border-default)] flex items-center justify-center text-ink-muted text-xs">
-                    📷
+          {showPhotos && (() => {
+            // 按月分组
+            const grouped = new Map<string, typeof photos>();
+            for (const p of [...photos].sort((a, b) => b.taken_at - a.taken_at)) {
+              const d = new Date(p.taken_at);
+              const key = `${d.getFullYear()} 年 ${d.getMonth() + 1} 月`;
+              if (!grouped.has(key)) grouped.set(key, []);
+              grouped.get(key)!.push(p);
+            }
+            return (
+              <div className="space-y-4">
+                {Array.from(grouped.entries()).map(([month, ps]) => (
+                  <div key={month}>
+                    <p className="text-xs text-ink-muted mb-2">{month}</p>
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {ps.map(p => {
+                        const src = photoBlobUrls[p.id];
+                        const dateStr = new Date(p.taken_at).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' });
+                        return (
+                          <div key={p.id} className="flex-shrink-0 relative group/photo">
+                            {src ? (
+                              <img
+                                src={src}
+                                alt={`区域照片 ${dateStr}`}
+                                onClick={() => setLightbox({ src, photoId: p.id })}
+                                className="h-20 w-20 object-cover rounded-[12px] border border-[var(--border-default)] cursor-pointer active:scale-95 transition-transform"
+                              />
+                            ) : (
+                              <div className="h-20 w-20 rounded-[12px] bg-paper-dark border border-[var(--border-default)] flex items-center justify-center text-ink-muted text-xs">
+                                📷
+                              </div>
+                            )}
+                            <span className="absolute bottom-1 left-0 right-0 text-center text-[10px] text-paper/80 drop-shadow-sm pointer-events-none">
+                              {dateStr}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
+                ))}
+              </div>
+            );
+          })()}
         </section>
+      )}
+
+      {/* ── 照片灯箱 ────────────────────────────────── */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col bg-black/90"
+          onClick={(e) => { if (e.target === e.currentTarget) setLightbox(null); }}
+        >
+          {/* 顶部工具栏 */}
+          <div className="flex items-center justify-between px-4 py-3 shrink-0">
+            <button
+              onClick={() => setLightbox(null)}
+              className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-white/80 hover:text-white text-xl transition-colors"
+              aria-label="关闭"
+            >
+              ✕
+            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={async () => {
+                  // 保存到相册
+                  const a = document.createElement('a');
+                  a.href = lightbox.src;
+                  a.download = `keepsake-photo-${Date.now()}.jpg`;
+                  a.click();
+                }}
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-white/80 hover:text-white text-xl transition-colors"
+                aria-label="保存到相册"
+                title="保存到相册"
+              >
+                ⬇
+              </button>
+              <button
+                onClick={async () => {
+                  const ok = await confirm('删除这张照片？', { danger: true, okText: '删除' });
+                  if (!ok) return;
+                  await PhotoRepo.remove(lightbox.photoId);
+                  setLightbox(null);
+                  await reload();
+                }}
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-white/80 hover:text-danger-text text-xl transition-colors"
+                aria-label="删除照片"
+                title="删除"
+              >
+                🗑
+              </button>
+            </div>
+          </div>
+          {/* 照片主区域 */}
+          <div className="flex-1 flex items-center justify-center overflow-hidden px-4 pb-4">
+            <img
+              src={lightbox.src}
+              alt="照片预览"
+              className="max-w-full max-h-full object-contain rounded-[8px]"
+            />
+          </div>
+        </div>
       )}
     </div>
   );
