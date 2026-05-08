@@ -166,6 +166,14 @@ export const PhotoRepo = {
     await db.photos.put(next);
     await enqueue('photo', next);
   },
+  async remove(id: string) {
+    const cur = await db.photos.get(id); if (!cur) return;
+    const next = { ...cur, deleted: true, updated_at: Date.now(), updated_by: await getDeviceId(), version: cur.version + 1 };
+    await db.photos.put(next);
+    await enqueueDelete('photo', id, next.updated_at);
+    // 同步删除本地 blob
+    await db.blobs.delete(id).catch(() => {});
+  },
 };
 
 // ---------- Snapshots ----------
