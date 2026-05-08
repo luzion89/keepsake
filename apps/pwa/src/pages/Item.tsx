@@ -51,7 +51,7 @@ function ReminderSection({ itemId }: { itemId: string }) {
   const [adding, setAdding] = useState(false);
   const [kind, setKind] = useState<ReminderRule['kind']>('expiry');
   const [thresholdQty, setThresholdQty] = useState(1);
-  const [recheckDays, setRecheckDays] = useState(30);
+  const [recheckDaysStr, setRecheckDaysStr] = useState('30');
   const [note, setNote] = useState('');
 
   const reload = async () => {
@@ -67,7 +67,7 @@ function ReminderSection({ itemId }: { itemId: string }) {
     } else if (kind === 'low_stock') {
       threshold_qty = thresholdQty;
     } else if (kind === 'recheck') {
-      threshold_at = recheckDays * 24 * 60 * 60 * 1000;
+      threshold_at = (Math.max(1, parseInt(recheckDaysStr, 10) || 30)) * 24 * 60 * 60 * 1000;
     }
     await ReminderRepo.create({ item_id: itemId, kind, threshold_at, threshold_qty, note: note || undefined });
     setAdding(false);
@@ -125,8 +125,12 @@ function ReminderSection({ itemId }: { itemId: string }) {
               <input
                 type="number"
                 min={1}
-                value={recheckDays}
-                onChange={e => setRecheckDays(Number(e.target.value))}
+                value={recheckDaysStr}
+                onChange={e => setRecheckDaysStr(e.target.value)}
+                onBlur={() => {
+                  const n = parseInt(recheckDaysStr, 10);
+                  setRecheckDaysStr(String(isNaN(n) || n < 1 ? 30 : n));
+                }}
                 className="w-20 bg-paper-card border border-[var(--border-default)] rounded-[12px] px-3 py-1.5 outline-none focus:border-accent transition-all text-ink"
               />
             </div>
