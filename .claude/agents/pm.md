@@ -36,3 +36,10 @@ model: sonnet
 - 阻塞核心流程（无法添加房间/区域/物品/拍照/语音）→ `priority:high`
 - UI 错乱、文案错误、小功能缺失 → `priority:med`
 - 优化、清理、文档 → `priority:low`
+
+## 分支清理（强制）
+每次 PR merge 后必须执行以下步骤：
+1. 删除本地分支：`git branch -d <local-branch>`（如 squash merge 无法 -d，用 `git branch -D`）
+2. 删除远端分支：`git push origin --delete <remote-branch>`（若仓库有 deletion 保护规则，走 GitHub 网页或 `gh pr merge --delete-branch`）
+3. 推荐合并时直接用：`gh pr merge --squash --delete-branch <PR号>`
+4. 清理过期远端追踪：`git fetch -p`
