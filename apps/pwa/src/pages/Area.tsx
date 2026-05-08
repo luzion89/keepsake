@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useParams } from 'react-router-dom';
 import type { Area, Item, Photo, Room } from '@keepsake/shared';
 import { AreaRepo, ItemRepo, PhotoRepo, RoomRepo } from '../db/repos.js';
@@ -8,28 +9,55 @@ type AreaState = 'loading' | 'not-found' | 'ok';
 
 function DotMenu({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, right: 0 });
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!open) return;
     const close = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+      if (
+        !btnRef.current?.contains(e.target as Node) &&
+        !menuRef.current?.contains(e.target as Node)
+      ) setOpen(false);
     };
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, [open]);
+
+  const handleOpen = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setPos({
+        top: rect.bottom + window.scrollY + 4,
+        right: window.innerWidth - rect.right,
+      });
+    }
+    setOpen(v => !v);
+  };
+
   return (
-    <div ref={ref} className="relative">
+    <div className="relative">
       <button
-        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(v => !v); }}
+        ref={btnRef}
+        onClick={handleOpen}
         className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-ink-muted hover:text-ink transition-colors"
         aria-label="更多操作"
       >
         ⋯
       </button>
-      {open && (
-        <div className="absolute right-0 top-full mt-1 z-20 bg-paper-card border border-[var(--border-default)] rounded-[12px] shadow-lg overflow-hidden min-w-[120px]" onClick={() => setOpen(false)}>
+      {open && createPortal(
+        <div
+          ref={menuRef}
+          style={{ position: 'fixed', top: pos.top, right: pos.right, zIndex: 9999 }}
+          className="bg-paper-card border border-[var(--border-default)] rounded-[12px] shadow-lg overflow-hidden min-w-[120px]"
+          onClick={() => setOpen(false)}
+        >
           {children}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -49,7 +77,8 @@ export function AreaPage() {
   const [qty, setQty] = useState(1);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editItemName, setEditItemName] = useState('');
-  const [lightbox, setLightbox] = useState<{ src: string; photoId: string } | null>(null);
+  const [lightbox, setLightbox] = useState<{ src: string; photoId: string; index: number } | null>(null);
+  const touchStartX = useRef<number | null>(null);
   const editItemRef = useRef<HTMLInputElement>(null);
   const { confirm, dialog } = useConfirm();
 
@@ -277,14 +306,19 @@ export function AreaPage() {
                     <div className="flex gap-2 overflow-x-auto pb-1">
                       {ps.map(p => {
                         const src = photoBlobUrls[p.id];
-                        const dateStr = new Date(p.taken_at).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' });
+                        const _d = new Date(p.taken_at);
+                        const dateStr = `${_d.getMonth() + 1}月${_d.getDate()}日`;
                         return (
                           <div key={p.id} className="flex-shrink-0 relative group/photo">
                             {src ? (
                               <img
                                 src={src}
                                 alt={`区域照片 ${dateStr}`}
-                                onClick={() => setLightbox({ src, photoId: p.id })}
+                                onClick={() => {
+                                  const sortedAll = [...photos].sort((a, b) => b.taken_at - a.taken_at);
+                                  const idx = sortedAll.findIndex(x => x.id === p.id);
+                                  setLightbox({ src, photoId: p.id, index: idx });
+                                }}
                                 className="h-20 w-20 object-cover rounded-[12px] border border-[var(--border-default)] cursor-pointer active:scale-95 transition-transform"
                               />
                             ) : (
@@ -308,61 +342,146 @@ export function AreaPage() {
       )}
 
       {/* ── 照片灯箱 ────────────────────────────────── */}
-      {lightbox && (
-        <div
-          className="fixed inset-0 z-50 flex flex-col bg-black/90"
-          onClick={(e) => { if (e.target === e.currentTarget) setLightbox(null); }}
-        >
-          {/* 顶部工具栏 */}
-          <div className="flex items-center justify-between px-4 py-3 shrink-0">
-            <button
-              onClick={() => setLightbox(null)}
-              className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-white/80 hover:text-white text-xl transition-colors"
-              aria-label="关闭"
+      {lightbox && (() => {
+        const sortedPhotos = [...photos].sort((a, b) => b.taken_at - a.taken_at);
+        const currentIdx = lightbox.index;
+        const total = sortedPhotos.length;
+        const currentPhoto = sortedPhotos[currentIdx];
+        const fullDateStr = currentPhoto
+          ? new Date(currentPhoto.taken_at).toLocaleString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+          : '';
+
+        const goNext = () => {
+          const nextIdx = (currentIdx + 1) % total;
+          const np = sortedPhotos[nextIdx];
+          if (!np) return;
+          const src = photoBlobUrls[np.id];
+          if (src) setLightbox({ src, photoId: np.id, index: nextIdx });
+        };
+        const goPrev = () => {
+          const prevIdx = (currentIdx - 1 + total) % total;
+          const pp = sortedPhotos[prevIdx];
+          if (!pp) return;
+          const src = photoBlobUrls[pp.id];
+          if (src) setLightbox({ src, photoId: pp.id, index: prevIdx });
+        };
+
+        return (
+          <div
+            className="fixed inset-0 z-50 flex flex-col bg-black/90"
+            onClick={(e) => { if (e.target === e.currentTarget) setLightbox(null); }}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowLeft') goPrev();
+              if (e.key === 'ArrowRight') goNext();
+              if (e.key === 'Escape') setLightbox(null);
+            }}
+            tabIndex={-1}
+          >
+            {/* 顶部工具栏 */}
+            <div className="flex items-center justify-between px-4 py-3 shrink-0">
+              {/* 关闭 */}
+              <button
+                onClick={() => setLightbox(null)}
+                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-white/80 hover:text-white transition-colors"
+                aria-label="关闭"
+              >
+                {/* X icon */}
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+              {/* 日期 + 页码 */}
+              <span className="text-white/60 text-xs text-center leading-tight">
+                <span className="block">{fullDateStr}</span>
+                {total > 1 && <span>{currentIdx + 1} / {total}</span>}
+              </span>
+              {/* 操作按钮 */}
+              <div className="flex gap-1">
+                <button
+                  onClick={async () => {
+                    const a = document.createElement('a');
+                    a.href = lightbox.src;
+                    a.download = `keepsake-photo-${Date.now()}.jpg`;
+                    a.click();
+                  }}
+                  className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-white/80 hover:text-white transition-colors"
+                  aria-label="下载照片"
+                  title="下载"
+                >
+                  {/* Download icon */}
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                </button>
+                <button
+                  onClick={async () => {
+                    const ok = await confirm('删除这张照片？', { danger: true, okText: '删除' });
+                    if (!ok) return;
+                    await PhotoRepo.remove(lightbox.photoId);
+                    setLightbox(null);
+                    await reload();
+                  }}
+                  className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-white/80 hover:text-red-400 transition-colors"
+                  aria-label="删除照片"
+                  title="删除"
+                >
+                  {/* Trash icon */}
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                    <path d="M10 11v6"/><path d="M14 11v6"/>
+                    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* 照片主区域（支持触摸滑动） */}
+            <div
+              className="flex-1 flex items-center justify-center overflow-hidden px-4 pb-4 relative"
+              onTouchStart={(e) => { touchStartX.current = e.touches[0]?.clientX ?? null; }}
+              onTouchEnd={(e) => {
+                if (touchStartX.current === null) return;
+                const delta = (e.changedTouches[0]?.clientX ?? 0) - touchStartX.current;
+                touchStartX.current = null;
+                if (Math.abs(delta) < 50) return;
+                if (delta < 0) goNext(); else goPrev();
+              }}
             >
-              ✕
-            </button>
-            <div className="flex gap-2">
-              <button
-                onClick={async () => {
-                  // 保存到相册
-                  const a = document.createElement('a');
-                  a.href = lightbox.src;
-                  a.download = `keepsake-photo-${Date.now()}.jpg`;
-                  a.click();
-                }}
-                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-white/80 hover:text-white text-xl transition-colors"
-                aria-label="保存到相册"
-                title="保存到相册"
-              >
-                ⬇
-              </button>
-              <button
-                onClick={async () => {
-                  const ok = await confirm('删除这张照片？', { danger: true, okText: '删除' });
-                  if (!ok) return;
-                  await PhotoRepo.remove(lightbox.photoId);
-                  setLightbox(null);
-                  await reload();
-                }}
-                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-white/80 hover:text-danger-text text-xl transition-colors"
-                aria-label="删除照片"
-                title="删除"
-              >
-                🗑
-              </button>
+              <img
+                src={lightbox.src}
+                alt="照片预览"
+                className="max-w-full max-h-full object-contain rounded-[8px]"
+              />
+              {/* 左右箭头 (仅多张时显示) */}
+              {total > 1 && (
+                <>
+                  <button
+                    onClick={goPrev}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-black/30 text-white/80 hover:text-white hover:bg-black/50 transition-all"
+                    aria-label="上一张"
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="15 18 9 12 15 6"/>
+                    </svg>
+                  </button>
+                  <button
+                    onClick={goNext}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-black/30 text-white/80 hover:text-white hover:bg-black/50 transition-all"
+                    aria-label="下一张"
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                  </button>
+                </>
+              )}
             </div>
           </div>
-          {/* 照片主区域 */}
-          <div className="flex-1 flex items-center justify-center overflow-hidden px-4 pb-4">
-            <img
-              src={lightbox.src}
-              alt="照片预览"
-              className="max-w-full max-h-full object-contain rounded-[8px]"
-            />
-          </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
