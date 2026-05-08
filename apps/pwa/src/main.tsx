@@ -5,6 +5,11 @@ import { router } from './app/router.js';
 import { startSyncDaemon } from './sync/client.js';
 import './index.css';
 
+// 纸张颗粒：读取用户偏好
+if (localStorage.getItem('noise_disabled') === '1') {
+  document.documentElement.style.setProperty('--noise-opacity', '0');
+}
+
 startSyncDaemon();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
