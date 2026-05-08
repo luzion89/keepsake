@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useParams } from 'react-router-dom';
+import {
+  AlertTriangle, Camera, ChevronLeft, ChevronRight, Download,
+  FileText, MoreHorizontal, Package, Pencil, Trash2, X,
+} from 'lucide-react';
 import type { Area, Item, Photo, Room } from '@keepsake/shared';
 import { AreaRepo, ItemRepo, PhotoRepo, RoomRepo } from '../db/repos.js';
 import { useConfirm } from '../components/ConfirmDialog.js';
@@ -46,7 +50,7 @@ function DotMenu({ children }: { children: React.ReactNode }) {
         className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-ink-muted hover:text-ink transition-colors"
         aria-label="更多操作"
       >
-        ⋯
+        <MoreHorizontal size={18} strokeWidth={1.5} />
       </button>
       {open && createPortal(
         <div
@@ -134,8 +138,14 @@ export function AreaPage() {
   if (areaState === 'not-found') {
     return (
       <div className="space-y-3">
-        <p className="text-danger-text">⚠️ 找不到该区域（可能已被删除）。</p>
-        <Link to="/" className="text-accent hover:text-accent-hover text-sm">← 返回首页</Link>
+        <p className="text-danger-text flex items-center gap-1.5">
+          <AlertTriangle size={14} strokeWidth={1.5} className="shrink-0" />
+          找不到该区域（可能已被删除）。
+        </p>
+        <Link to="/" className="text-accent hover:text-accent-hover text-sm flex items-center gap-1">
+          <ChevronLeft size={14} strokeWidth={1.5} />
+          返回首页
+        </Link>
       </div>
     );
   }
@@ -163,13 +173,15 @@ export function AreaPage() {
           to={`/areas/${area!.id}/text`}
           className="flex-1 h-10 flex items-center justify-center gap-1.5 rounded-[12px] bg-accent hover:bg-accent-hover active:scale-[0.98] text-paper font-medium text-sm shadow-card transition-all duration-150"
         >
-          📝 录入物品
+          <FileText size={16} strokeWidth={1.5} />
+          录入物品
         </Link>
         <Link
           to={`/areas/${area!.id}/capture`}
           className="flex-1 h-10 flex items-center justify-center gap-1.5 rounded-[12px] bg-paper-card border border-[var(--border-default)] hover:border-accent/40 text-ink font-medium text-sm transition-all duration-150"
         >
-          📷 区域照片
+          <Camera size={16} strokeWidth={1.5} />
+          区域照片
         </Link>
       </div>
 
@@ -213,9 +225,9 @@ export function AreaPage() {
         </h2>
         {items.length === 0 ? (
           <div className="flex flex-col items-center py-10 text-center">
-            <span className="text-4xl mb-3">📦</span>
+            <Package size={40} strokeWidth={1.5} className="text-ink-muted/40 mb-3" />
             <p className="text-ink-muted text-sm">这个区域还没有物品</p>
-            <p className="text-ink-muted/70 text-xs mt-1">点上面的「📝 录入物品」开始</p>
+            <p className="text-ink-muted/70 text-xs mt-1">点上面的「录入物品」开始</p>
           </div>
         ) : (
           <ul className="space-y-2">
@@ -256,13 +268,14 @@ export function AreaPage() {
                 >+</button>
                 <DotMenu>
                   <button
-                    className="w-full text-left px-4 py-2.5 text-sm text-ink hover:bg-paper-dark transition-colors"
+                    className="w-full text-left px-4 py-2.5 text-sm text-ink hover:bg-paper-dark transition-colors flex items-center gap-2"
                     onClick={() => startRenameItem(it)}
                   >
-                    ✏️ 改名
+                    <Pencil size={14} strokeWidth={1.5} />
+                    改名
                   </button>
                   <button
-                    className="w-full text-left px-4 py-2.5 text-sm text-danger-text hover:bg-danger-bg transition-colors"
+                    className="w-full text-left px-4 py-2.5 text-sm text-danger-text hover:bg-danger-bg transition-colors flex items-center gap-2"
                     onClick={async () => {
                       const ok = await confirm(`删除物品「${it.name}」？`, { danger: true, okText: '删除' });
                       if (!ok) return;
@@ -270,7 +283,8 @@ export function AreaPage() {
                       await reload();
                     }}
                   >
-                    🗑 删除
+                    <Trash2 size={14} strokeWidth={1.5} />
+                    删除
                   </button>
                 </DotMenu>
               </li>
@@ -322,8 +336,8 @@ export function AreaPage() {
                                 className="h-20 w-20 object-cover rounded-[12px] border border-[var(--border-default)] cursor-pointer active:scale-95 transition-transform"
                               />
                             ) : (
-                              <div className="h-20 w-20 rounded-[12px] bg-paper-dark border border-[var(--border-default)] flex items-center justify-center text-ink-muted text-xs">
-                                📷
+                              <div className="h-20 w-20 rounded-[12px] bg-paper-dark border border-[var(--border-default)] flex items-center justify-center text-ink-muted">
+                                <Camera size={20} strokeWidth={1.5} />
                               </div>
                             )}
                             <span className="absolute bottom-1 left-0 right-0 text-center text-[10px] text-paper/80 drop-shadow-sm pointer-events-none">
@@ -385,10 +399,7 @@ export function AreaPage() {
                 className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-white/80 hover:text-white transition-colors"
                 aria-label="关闭"
               >
-                {/* X icon */}
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
+                <X size={22} strokeWidth={1.5} />
               </button>
               {/* 日期 + 页码 */}
               <span className="text-white/60 text-xs text-center leading-tight">
@@ -408,12 +419,7 @@ export function AreaPage() {
                   aria-label="下载照片"
                   title="下载"
                 >
-                  {/* Download icon */}
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="7 10 12 15 17 10"/>
-                    <line x1="12" y1="15" x2="12" y2="3"/>
-                  </svg>
+                  <Download size={20} strokeWidth={1.5} />
                 </button>
                 <button
                   onClick={async () => {
@@ -427,13 +433,7 @@ export function AreaPage() {
                   aria-label="删除照片"
                   title="删除"
                 >
-                  {/* Trash icon */}
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="3 6 5 6 21 6"/>
-                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                    <path d="M10 11v6"/><path d="M14 11v6"/>
-                    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
-                  </svg>
+                  <Trash2 size={20} strokeWidth={1.5} />
                 </button>
               </div>
             </div>
@@ -463,18 +463,14 @@ export function AreaPage() {
                     className="absolute left-2 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-black/30 text-white/80 hover:text-white hover:bg-black/50 transition-all"
                     aria-label="上一张"
                   >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="15 18 9 12 15 6"/>
-                    </svg>
+                    <ChevronLeft size={20} strokeWidth={1.5} />
                   </button>
                   <button
                     onClick={goNext}
                     className="absolute right-2 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-black/30 text-white/80 hover:text-white hover:bg-black/50 transition-all"
                     aria-label="下一张"
                   >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="9 18 15 12 9 6"/>
-                    </svg>
+                    <ChevronRight size={20} strokeWidth={1.5} />
                   </button>
                 </>
               )}

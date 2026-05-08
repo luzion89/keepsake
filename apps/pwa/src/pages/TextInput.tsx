@@ -7,6 +7,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { AreaRepo, ItemRepo } from '../db/repos.js';
 import { parseItemsFromText, type RecognitionItem, type ExistingItem } from '../ai/router.js';
 import type { Area, Item } from '@keepsake/shared';
+import { AlertTriangle, ChevronLeft, FileText, Lightbulb, Pencil, X } from 'lucide-react';
 
 type AreaState = 'loading' | 'not-found' | 'ok';
 type InputMode = 'merge' | 'replace';
@@ -146,8 +147,8 @@ export function TextInputPage() {
   if (areaState === 'not-found') {
     return (
       <div className="space-y-3">
-        <p className="text-danger-text">⚠️ 找不到该区域（可能已被删除）。</p>
-        <Link to="/" className="text-accent hover:text-accent-hover text-sm">← 返回首页</Link>
+        <p className="text-danger-text flex items-center gap-1.5"><AlertTriangle size={16} strokeWidth={1.5} />找不到该区域（可能已被删除）。</p>
+        <Link to="/" className="text-accent hover:text-accent-hover text-sm flex items-center gap-1"><ChevronLeft size={16} strokeWidth={1.5} />返回首页</Link>
       </div>
     );
   }
@@ -155,9 +156,9 @@ export function TextInputPage() {
   return (
     <div className="space-y-5">
       <nav className="flex items-center gap-1 text-xs text-ink-muted">
-        <Link to={`/areas/${areaId}`} className="hover:text-ink transition-colors">← {area!.name}</Link>
+        <Link to={`/areas/${areaId}`} className="hover:text-ink transition-colors flex items-center gap-1"><ChevronLeft size={14} strokeWidth={1.5} />{area!.name}</Link>
       </nav>
-      <h1 className="text-xl font-semibold text-ink">📝 文字录入 · {area!.name}</h1>
+      <h1 className="text-xl font-semibold text-ink flex items-center gap-2"><FileText size={20} strokeWidth={1.5} />文字录入 · {area!.name}</h1>
 
       {/* ── 模式切换 segmented control ─────────────────── */}
       <section>
@@ -185,15 +186,16 @@ export function TextInputPage() {
         </div>
         <p className="mt-2 text-xs text-ink-muted">
           {mode === 'merge'
-            ? '✏️ AI 将结合现有 ' + existingItems.length + ' 个物品，智能新增或更新'
-            : '⚠️ 将清空该区域所有 ' + existingItems.length + ' 个现有物品并全量替换'}
+            ? <><Pencil size={14} strokeWidth={1.5} className="inline-block mr-1" />{'AI 将结合现有 ' + existingItems.length + ' 个物品，智能新增或更新'}</>
+            : <><AlertTriangle size={14} strokeWidth={1.5} className="inline-block mr-1" />{'将清空该区域所有 ' + existingItems.length + ' 个现有物品并全量替换'}</>
+          }
         </p>
       </section>
 
       {/* Replace warning */}
       {mode === 'replace' && existingItems.length > 0 && (
         <div className="bg-warn-bg border border-warn/30 rounded-[12px] px-4 py-3 text-warn-text text-sm">
-          ⚠️ 覆盖模式：确认入库将删除该区域所有 {existingItems.length} 个现有物品
+          <span className="flex items-center gap-1.5"><AlertTriangle size={16} strokeWidth={1.5} />覆盖模式：确认入库将删除该区域所有 {existingItems.length} 个现有物品</span>
         </div>
       )}
 
@@ -206,7 +208,7 @@ export function TextInputPage() {
           rows={5}
           className="w-full bg-paper-card border border-[var(--border-default)] rounded-[12px] px-4 py-3 text-sm leading-relaxed resize-none outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-150 text-ink placeholder:text-ink-muted"
         />
-        <p className="text-xs text-ink-muted">💡 可使用输入法的语音转文字功能</p>
+        <p className="text-xs text-ink-muted flex items-center gap-1"><Lightbulb size={12} strokeWidth={1.5} />可使用输入法的语音转文字功能</p>
         <div className="flex gap-2">
           <button
             onClick={parse}
@@ -280,9 +282,9 @@ export function TextInputPage() {
                     )}
                     <button
                       onClick={() => removeDraft(i)}
-                      className="text-ink-muted hover:text-danger-text text-lg leading-none transition-colors"
+                      className="text-ink-muted hover:text-danger-text transition-colors flex items-center justify-center w-6 h-6"
                       aria-label="删除此行"
-                    >×</button>
+                    ><X size={16} strokeWidth={1.5} /></button>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <label className="text-xs text-ink-muted w-12">有效期</label>
@@ -328,7 +330,7 @@ export function TextInputPage() {
                   保存中…
                 </>
               ) : mode === 'replace'
-                ? `⚠️ 覆盖入库（${drafts.filter(d => d.name.trim()).length} 项）`
+                ? <><AlertTriangle size={16} strokeWidth={1.5} /><span>{'覆盖入库（' + drafts.filter(d => d.name.trim()).length + ' 项）'}</span></>
                 : `确认入库（${drafts.filter(d => d.name.trim()).length} 项）`}
             </button>
           )}

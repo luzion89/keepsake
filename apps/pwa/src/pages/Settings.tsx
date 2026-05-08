@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { AlertTriangle, Check, X } from 'lucide-react';
 import {
   getAiConfig, setAiConfig,
   DEFAULT_MODEL, DEFAULT_TRANSCRIBE_MODEL,
@@ -230,7 +231,6 @@ export function SettingsPage() {
                   </div>
                   <div>
                     <label className="block text-xs text-ink-muted mb-1.5">视觉模型（默认 {DEFAULT_MODEL}）</label>
-                    {/* 若 model 等于 DeepSeek 默认值，说明是 DeepSeek 侧写入的，OpenRouter 显示为空 */}
                     <input
                       value={cfg.model === DEFAULT_DEEPSEEK_MODEL ? '' : (cfg.model ?? '')}
                       onChange={(e) => setCfg({ ...cfg, model: e.target.value })}
@@ -257,10 +257,13 @@ export function SettingsPage() {
                   {aiPingState === 'pinging' ? '测试中…' : '测试连通性'}
                 </button>
                 {aiPingResult?.ok === true && (
-                  <span className="text-ok-text text-xs">✓ 连通（{aiPingResult.latencyMs} ms）</span>
+                  <span className="text-ok-text text-xs flex items-center gap-1">
+                    <Check size={12} strokeWidth={2} />
+                    连通（{aiPingResult.latencyMs} ms）
+                  </span>
                 )}
                 {aiPingResult?.ok === false && (
-                  <span className="text-danger-text text-xs">✗ 失败：{aiPingResult.error}</span>
+                  <span className="text-danger-text text-xs flex items-center gap-1"><X size={12} strokeWidth={2} />失败：{aiPingResult.error}</span>
                 )}
               </div>
             </SectionRow>
@@ -276,7 +279,12 @@ export function SettingsPage() {
         >
           保存设置
         </button>
-        {savedAt && !saveError && <span className="block text-center text-xs text-ok-text mt-1.5">✓ 已保存</span>}
+        {savedAt && !saveError && (
+          <span className="flex items-center justify-center gap-1 text-xs text-ok-text mt-1.5">
+            <Check size={12} strokeWidth={2} />
+            已保存
+          </span>
+        )}
         {savedAt && saveError && (
           <span className="block text-xs text-danger-text mt-1.5 text-center">
             已保存到本地，服务端推送失败：{saveError}
@@ -324,9 +332,15 @@ export function SettingsPage() {
         {quota !== 'unsupported' && quota !== null && (
           <SectionRow>
             <div className="space-y-1.5">
-              <p className={`text-xs ${quota.pct > 80 ? 'text-danger-text font-medium' : 'text-ink-muted'}`}>
+              <p className={`text-xs flex items-center gap-1 ${quota.pct > 80 ? 'text-danger-text font-medium' : 'text-ink-muted'}`}>
                 本地存储 {quota.usageMB.toFixed(1)} MB / {quota.quotaMB.toFixed(0)} MB（{quota.pct}%）
-                {quota.pct > 80 && ' ⚠️ 空间紧张'}
+                {quota.pct > 80 && (
+                  <>
+                    {' '}
+                    <AlertTriangle size={12} strokeWidth={1.5} className="shrink-0" />
+                    空间紧张
+                  </>
+                )}
               </p>
               <div className="h-1.5 rounded-full bg-paper-dark">
                 <div
