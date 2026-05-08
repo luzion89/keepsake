@@ -40,12 +40,12 @@ function ConflictBanner() {
   };
 
   return (
-    <div className="bg-rose-950 border-b border-rose-700 px-4 py-1.5 text-xs">
+    <div className="bg-danger-bg border-b border-danger/30 px-4 py-1.5 text-xs">
       <div className="flex items-center gap-2">
-        <span className="text-rose-300 font-medium">⚠️ 检测到 {count} 条冲突</span>
+        <span className="text-danger-text font-medium">⚠️ 检测到 {count} 条冲突</span>
         <button
           onClick={toggle}
-          className="text-rose-200 hover:text-white underline underline-offset-2"
+          className="text-danger-text/80 hover:text-danger-text underline underline-offset-2"
         >
           {expanded ? '收起' : '查看详情'}
         </button>
@@ -53,16 +53,16 @@ function ConflictBanner() {
       {expanded && (
         <div className="mt-2 space-y-1">
           {rows.map(r => (
-            <div key={r.id} className="text-rose-200 bg-rose-900/50 rounded px-2 py-1">
+            <div key={r.id} className="text-danger-text bg-danger-bg rounded px-2 py-1 border border-danger/20">
               <span className="font-mono">{r.table}/{r.row_id}</span> · 字段{' '}
               <span className="font-medium">{r.field}</span> · 本地{' '}
-              <span className="text-amber-300">{JSON.stringify(r.client)}</span> / 服务端{' '}
-              <span className="text-sky-300">{JSON.stringify(r.server)}</span>
+              <span className="text-warn-text">{JSON.stringify(r.client)}</span> / 服务端{' '}
+              <span className="text-ink-muted">{JSON.stringify(r.server)}</span>
             </div>
           ))}
           <button
             onClick={acknowledgeAll}
-            className="mt-1 px-3 py-1 rounded-xl bg-rose-700 hover:bg-rose-600 text-white font-medium transition-colors"
+            className="mt-1 px-3 py-1 rounded-[12px] bg-danger hover:opacity-90 text-paper font-medium transition-colors"
           >
             全部确认
           </button>
@@ -94,20 +94,20 @@ function NotificationBanner() {
   };
 
   return (
-    <div className="bg-amber-950 border-b border-amber-700 px-4 py-1.5 text-xs space-y-1">
-      <p className="text-amber-300 font-medium">🔔 {triggered.length} 条提醒待处理</p>
+    <div className="bg-warn-bg border-b border-warn/30 px-4 py-1.5 text-xs space-y-1">
+      <p className="text-warn-text font-medium">🔔 {triggered.length} 条提醒待处理</p>
       {triggered.map(t => (
-        <div key={t.rule.id} className="flex items-center gap-2 text-amber-200">
+        <div key={t.rule.id} className="flex items-center gap-2 text-warn-text">
           <span className="flex-1">{t.reason}</span>
           <button
             onClick={() => navigate(`/items/${t.item.id}`)}
-            className="underline underline-offset-2 hover:text-white transition-colors"
+            className="underline underline-offset-2 hover:text-ink transition-colors"
           >
             查看
           </button>
           <button
             onClick={() => dismiss(t)}
-            className="text-amber-400 hover:text-white transition-colors"
+            className="hover:text-ink transition-colors"
           >
             知道了
           </button>
@@ -144,22 +144,25 @@ export function Shell() {
   return (
     <div className="min-h-full flex flex-col">
       {/* ── Header ────────────────────────────────────── */}
-      <header className="sticky top-0 z-10 h-14 bg-slate-950/90 backdrop-blur-md border-b border-slate-800 px-4 flex items-center gap-3">
-        <Link to="/" className="flex items-center gap-1.5 text-base font-bold tracking-tight text-slate-100 hover:text-white transition-colors">
+      <header className="sticky top-0 z-10 h-14 bg-paper/95 backdrop-blur-md border-b border-ink-faint px-4 flex items-center gap-3">
+        <Link
+          to="/"
+          className="flex items-center gap-1.5 text-base font-bold font-serif tracking-tight text-ink hover:text-ink-hover transition-colors"
+        >
           🗂️ Keepsake
         </Link>
         <div className="flex-1" />
         <Link
           to="/search"
           aria-label="搜索"
-          className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-all duration-150"
+          className="w-9 h-9 flex items-center justify-center rounded-[12px] text-ink-muted hover:text-ink hover:bg-paper-dark transition-all duration-150"
         >
           🔍
         </Link>
         <Link
           to="/settings"
           aria-label="设置"
-          className="w-9 h-9 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-all duration-150"
+          className="w-9 h-9 flex items-center justify-center rounded-[12px] text-ink-muted hover:text-ink hover:bg-paper-dark transition-all duration-150"
         >
           ⚙️
         </Link>
@@ -167,12 +170,12 @@ export function Shell() {
 
       {/* ── Offline / Pending banner ───────────────────── */}
       {(pending > 0 || !online) && (
-        <div className="px-4 py-1.5 text-xs flex gap-3 items-center bg-slate-900/80 border-b border-slate-800">
-          {!online && <span className="text-amber-300">● 离线</span>}
-          {pending > 0 && <span className="text-sky-300">待同步 {pending}</span>}
+        <div className="px-4 py-1.5 text-xs flex gap-3 items-center bg-paper-dark border-b border-ink-faint">
+          {!online && <span className="text-warn-text">● 离线</span>}
+          {pending > 0 && <span className="text-ink-muted">待同步 {pending}</span>}
           <button
             onClick={() => syncOnce()}
-            className="ml-auto text-slate-400 hover:text-white underline-offset-2 hover:underline transition-colors"
+            className="ml-auto text-accent hover:text-accent-hover underline-offset-2 hover:underline transition-colors"
           >
             立即同步
           </button>
@@ -188,7 +191,7 @@ export function Shell() {
       </main>
 
       {/* ── Bottom nav ────────────────────────────────── */}
-      <nav className="sticky bottom-0 z-10 h-16 pb-safe bg-slate-950/95 backdrop-blur-sm border-t border-slate-800 grid grid-cols-3">
+      <nav className="sticky bottom-0 z-10 h-16 pb-safe bg-paper/95 backdrop-blur-sm border-t border-ink-faint grid grid-cols-3">
         {tabs.map(t => (
           <NavLink
             key={t.to}
@@ -196,14 +199,14 @@ export function Shell() {
             end={t.to === '/'}
             className={({ isActive }) =>
               `flex flex-col items-center justify-center gap-0.5 text-xs transition-all duration-150 ${
-                isActive ? 'text-sky-400' : 'text-slate-500 hover:text-slate-300'
+                isActive ? 'text-ink font-semibold' : 'text-ink-muted hover:text-ink'
               }`
             }
           >
             {({ isActive }) => (
               <>
-                {/* Active indicator bar */}
-                <span className={`w-6 h-0.5 rounded-full mb-0.5 transition-all duration-150 ${isActive ? 'bg-sky-400' : 'bg-transparent'}`} />
+                {/* Active indicator bar — accent color */}
+                <span className={`w-6 h-0.5 rounded-full mb-0.5 transition-all duration-150 ${isActive ? 'bg-accent' : 'bg-transparent'}`} />
                 <span className="text-base leading-none">{t.icon}</span>
                 <span>{t.label}</span>
               </>
