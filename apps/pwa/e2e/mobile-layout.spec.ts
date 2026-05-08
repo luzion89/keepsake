@@ -2,11 +2,21 @@
  * mobile-layout.spec.ts
  * 专门防 bug #76 复发：在 375px 移动端视口下，Room 页 + Area 页「手动添加」区的
  * 所有按钮都必须在容器边界内（button.right <= container.right，误差 ≤ 1px）。
+ *
+ * 注意：v3.1 重构后 Home/Room 页改用 FAB 添加表单。
  */
 import { test, expect } from '@playwright/test';
 
-// 所有测试在 375px 宽度下运行（playwright.config.ts 全局已设，此处强调）
+// 所有测试在 375px 宽度下运行
 test.use({ viewport: { width: 375, height: 667 } });
+
+async function addViaFab(page: import('@playwright/test').Page, ariaLabel: string, placeholder: string, value: string) {
+  await page.locator(`[aria-label="${ariaLabel}"]`).click();
+  await page.waitForTimeout(100);
+  await page.fill(`input[placeholder*="${placeholder}"]`, value);
+  await page.locator('button:has-text("添加")').last().click();
+  await page.waitForTimeout(200);
+}
 
 test.describe('移动端布局不溢出（#76 回归）', () => {
   /** 辅助：断言某容器内所有 button 的右边界都未超出容器 */
@@ -34,31 +44,32 @@ test.describe('移动端布局不溢出（#76 回归）', () => {
     }
   }
 
-  test('Room 页「添加区域」表单按钮不溢出', async ({ page }) => {
+  test('Room 页区域列表 section 按钮不溢出', async ({ page }) => {
     await page.goto('/');
 
     const roomName = `布局测试房_${Date.now()}`;
-    await page.fill('input[placeholder*="房间名"]', roomName);
-    await page.click('button:has-text("添加")');
+    await addViaFab(page, '添加房间', '房间名', roomName);
     await page.click(`text=${roomName}`);
     await expect(page).toHaveURL(/\/rooms\//);
 
-    // 检查「添加区域」section 内按钮不溢出
+    // 先添加一个区域以显示列表
+    const areaName = `布局测试区_${Date.now()}`;
+    await addViaFab(page, '添加区域', '区域名', areaName);
+
+    // 检查区域列表 section 内按钮不溢出
     await assertNoButtonOverflow(page, 'section');
   });
 
   test('Area 页入口按钮（录入物品 / 区域照片）不溢出', async ({ page }) => {
-    // 建区域前先建房
     await page.goto('/');
 
     const roomName = `布局测试房2_${Date.now()}`;
-    await page.fill('input[placeholder*="房间名"]', roomName);
-    await page.click('button:has-text("添加")');
+    await addViaFab(page, '添加房间', '房间名', roomName);
     await page.click(`text=${roomName}`);
+    await page.waitForURL(/\/rooms\//);
 
     const areaName = `布局测试区_${Date.now()}`;
-    await page.fill('input[placeholder*="区域名"]', areaName);
-    await page.click('button:has-text("添加")');
+    await addViaFab(page, '添加区域', '区域名', areaName);
     await page.click(`text=${areaName}`);
     await expect(page).toHaveURL(/\/areas\//);
 
@@ -70,13 +81,12 @@ test.describe('移动端布局不溢出（#76 回归）', () => {
     await page.goto('/');
 
     const roomName = `布局测试房3_${Date.now()}`;
-    await page.fill('input[placeholder*="房间名"]', roomName);
-    await page.click('button:has-text("添加")');
+    await addViaFab(page, '添加房间', '房间名', roomName);
     await page.click(`text=${roomName}`);
+    await page.waitForURL(/\/rooms\//);
 
     const areaName = `布局测试区2_${Date.now()}`;
-    await page.fill('input[placeholder*="区域名"]', areaName);
-    await page.click('button:has-text("添加")');
+    await addViaFab(page, '添加区域', '区域名', areaName);
     await page.click(`text=${areaName}`);
     await expect(page).toHaveURL(/\/areas\//);
 

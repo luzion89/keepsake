@@ -83,9 +83,9 @@ function ReminderSection({ itemId }: { itemId: string }) {
     k === 'expiry' ? '过期提醒' : k === 'low_stock' ? '库存不足' : '定期检查';
 
   return (
-    <section className="border-t border-[var(--border-subtle)] pt-5 space-y-3">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">提醒规则</h2>
+    <div className="space-y-3">
+      <div className="flex items-center justify-between px-4 py-3">
+        <span className="text-sm font-medium text-ink">提醒规则</span>
         <button
           onClick={() => setAdding(v => !v)}
           className="text-xs text-accent hover:text-accent-hover transition-colors"
@@ -95,11 +95,11 @@ function ReminderSection({ itemId }: { itemId: string }) {
       </div>
 
       {adding && (
-        <div className="bg-paper-card border border-[var(--border-default)] rounded-[12px] p-3 space-y-2 text-sm">
+        <div className="mx-4 mb-2 bg-paper-dark border border-[var(--border-default)] rounded-[12px] p-3 space-y-2 text-sm">
           <select
             value={kind}
             onChange={e => setKind(e.target.value as ReminderRule['kind'])}
-            className="w-full bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-2 outline-none focus:border-accent transition-all text-ink"
+            className="w-full bg-paper-card border border-[var(--border-default)] rounded-[12px] px-3 py-2 outline-none focus:border-accent transition-all text-ink"
           >
             <option value="expiry">过期提醒（有效期前 7 天）</option>
             <option value="low_stock">库存不足</option>
@@ -113,7 +113,7 @@ function ReminderSection({ itemId }: { itemId: string }) {
                 min={0}
                 value={thresholdQty}
                 onChange={e => setThresholdQty(Number(e.target.value))}
-                className="w-20 bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-1.5 outline-none focus:border-accent transition-all text-ink"
+                className="w-20 bg-paper-card border border-[var(--border-default)] rounded-[12px] px-3 py-1.5 outline-none focus:border-accent transition-all text-ink"
               />
             </div>
           )}
@@ -125,7 +125,7 @@ function ReminderSection({ itemId }: { itemId: string }) {
                 min={1}
                 value={recheckDays}
                 onChange={e => setRecheckDays(Number(e.target.value))}
-                className="w-20 bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-1.5 outline-none focus:border-accent transition-all text-ink"
+                className="w-20 bg-paper-card border border-[var(--border-default)] rounded-[12px] px-3 py-1.5 outline-none focus:border-accent transition-all text-ink"
               />
             </div>
           )}
@@ -133,7 +133,7 @@ function ReminderSection({ itemId }: { itemId: string }) {
             value={note}
             onChange={e => setNote(e.target.value)}
             placeholder="备注（可选）"
-            className="w-full bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-2 outline-none focus:border-accent transition-all text-ink placeholder:text-ink-muted"
+            className="w-full bg-paper-card border border-[var(--border-default)] rounded-[12px] px-3 py-2 outline-none focus:border-accent transition-all text-ink placeholder:text-ink-muted"
           />
           <div className="flex gap-2">
             <button onClick={save} className="flex-1 px-3 py-2 rounded-[12px] bg-accent hover:bg-accent-hover text-paper font-medium transition-all">保存</button>
@@ -143,9 +143,9 @@ function ReminderSection({ itemId }: { itemId: string }) {
       )}
 
       {rules.length > 0 && (
-        <ul className="space-y-1">
+        <ul className="divide-y divide-[var(--border-subtle)]">
           {rules.map(r => (
-            <li key={r.id} className="flex items-center gap-2 bg-paper-card border border-[var(--border-default)] rounded-[12px] px-3 py-2 text-xs">
+            <li key={r.id} className="flex items-center gap-2 px-4 py-2.5 text-xs">
               <span className="flex-1 text-ink">
                 {kindLabel(r.kind)}
                 {r.threshold_qty != null && ` (≤${r.threshold_qty})`}
@@ -162,7 +162,29 @@ function ReminderSection({ itemId }: { itemId: string }) {
           ))}
         </ul>
       )}
-    </section>
+    </div>
+  );
+}
+
+/** Reusable grouped section wrapper (iOS-style card) */
+function SectionCard({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted px-1">{label}</h2>
+      <div className="bg-paper-card rounded-[12px] border border-[var(--border-default)] overflow-hidden divide-y divide-[var(--border-subtle)]">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** A label-value row inside a SectionCard */
+function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3 px-4 min-h-[48px]">
+      <span className="text-sm text-ink-muted w-16 shrink-0">{label}</span>
+      <div className="flex-1 min-w-0">{children}</div>
+    </div>
   );
 }
 
@@ -171,14 +193,21 @@ export function ItemPage() {
   const [item, setItem] = useState<Item | undefined>();
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState({ name: '', qty: 0, notes: '', expiresDate: '' });
+  const [draft, setDraft] = useState({ name: '', qty: 0, unit: '', notes: '', tags: '', expiresDate: '' });
   const { confirm, dialog } = useConfirm();
 
   const reload = async () => {
     const it = await db.items.get(itemId);
     setItem(it);
     if (it) {
-      setDraft({ name: it.name, qty: it.qty, notes: it.notes ?? '', expiresDate: it.expires_at ? new Date(it.expires_at).toISOString().slice(0, 10) : '' });
+      setDraft({
+        name: it.name,
+        qty: it.qty,
+        unit: it.unit ?? '',
+        notes: it.notes ?? '',
+        tags: it.tags.join(', '),
+        expiresDate: it.expires_at ? new Date(it.expires_at).toISOString().slice(0, 10) : '',
+      });
       const ps = await PhotoRepo.listFor('area', it.area_id);
       setPhotos(ps);
     }
@@ -191,7 +220,15 @@ export function ItemPage() {
     const expires_at = draft.expiresDate
       ? new Date(draft.expiresDate + 'T00:00:00').getTime()
       : undefined;
-    await ItemRepo.update(item.id, { name: draft.name, qty: draft.qty, notes: draft.notes, expires_at });
+    const tags = draft.tags.split(',').map(t => t.trim()).filter(Boolean);
+    await ItemRepo.update(item.id, {
+      name: draft.name,
+      qty: draft.qty,
+      unit: draft.unit || undefined,
+      notes: draft.notes,
+      tags,
+      expires_at,
+    });
     setEditing(false);
     await reload();
   };
@@ -210,38 +247,81 @@ export function ItemPage() {
       </nav>
 
       {editing ? (
-        /* ── 编辑模式 ─────────────────────────────────── */
-        <div className="space-y-3">
-          <input
-            value={draft.name}
-            onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-            className="w-full bg-paper-card border border-[var(--border-default)] rounded-[12px] px-4 py-3 text-lg font-medium outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all text-ink"
-          />
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-ink-muted w-12">数量</span>
-            <input
-              type="number"
-              value={draft.qty}
-              onChange={(e) => setDraft({ ...draft, qty: Number(e.target.value) })}
-              className="w-24 bg-paper-card border border-[var(--border-default)] rounded-[12px] px-3 py-2 text-sm outline-none focus:border-accent transition-all text-ink"
-            />
-          </div>
-          <textarea
-            value={draft.notes}
-            onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
-            placeholder="备注"
-            rows={3}
-            className="w-full bg-paper-card border border-[var(--border-default)] rounded-[12px] px-4 py-3 text-sm resize-none outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all text-ink placeholder:text-ink-muted"
-          />
-          <div className="space-y-1.5">
-            <label className="block text-xs text-ink-muted">有效期（用于过期提醒，可选）</label>
-            <input
-              type="date"
-              value={draft.expiresDate}
-              onChange={(e) => setDraft({ ...draft, expiresDate: e.target.value })}
-              className="w-full bg-paper-card border border-[var(--border-default)] rounded-[12px] px-4 py-3 text-sm outline-none focus:border-accent transition-all text-ink"
-            />
-          </div>
+        /* ── 编辑模式（grouped sections）─────────────── */
+        <div className="space-y-4">
+          <SectionCard label="基本信息">
+            <FieldRow label="名称">
+              <input
+                value={draft.name}
+                onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                className="w-full bg-transparent text-sm text-ink outline-none py-1"
+              />
+            </FieldRow>
+            <FieldRow label="数量">
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  value={draft.qty}
+                  onChange={(e) => setDraft({ ...draft, qty: Number(e.target.value) })}
+                  className="w-20 bg-paper-dark border border-[var(--border-default)] rounded-[8px] px-3 py-1.5 text-sm outline-none focus:border-accent transition-all text-ink"
+                />
+                <input
+                  value={draft.unit}
+                  onChange={(e) => setDraft({ ...draft, unit: e.target.value })}
+                  placeholder="单位"
+                  className="w-20 bg-paper-dark border border-[var(--border-default)] rounded-[8px] px-3 py-1.5 text-sm outline-none focus:border-accent transition-all text-ink placeholder:text-ink-muted"
+                />
+              </div>
+            </FieldRow>
+          </SectionCard>
+
+          <SectionCard label="时间">
+            <FieldRow label="有效期">
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={draft.expiresDate}
+                  onChange={(e) => setDraft({ ...draft, expiresDate: e.target.value })}
+                  className="flex-1 bg-transparent text-sm text-ink outline-none py-1"
+                />
+                {draft.expiresDate && (
+                  <ExpiryBadge expiresAt={new Date(draft.expiresDate + 'T00:00:00').getTime()} />
+                )}
+              </div>
+            </FieldRow>
+            <FieldRow label="创建于">
+              <span className="text-sm text-ink-muted">
+                {new Date(item.updated_at).toLocaleDateString('zh-CN')}
+              </span>
+            </FieldRow>
+          </SectionCard>
+
+          <SectionCard label="描述">
+            <div className="px-4 py-3">
+              <label className="text-xs text-ink-muted block mb-1.5">备注</label>
+              <textarea
+                value={draft.notes}
+                onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
+                placeholder="备注"
+                rows={3}
+                className="w-full bg-paper-dark border border-[var(--border-default)] rounded-[8px] px-3 py-2 text-sm resize-none outline-none focus:border-accent transition-all text-ink placeholder:text-ink-muted"
+              />
+            </div>
+            <div className="px-4 py-3 border-t border-[var(--border-subtle)]">
+              <label className="text-xs text-ink-muted block mb-1.5">标签（逗号分隔）</label>
+              <input
+                value={draft.tags}
+                onChange={(e) => setDraft({ ...draft, tags: e.target.value })}
+                placeholder="如 清洁用品, 备用"
+                className="w-full bg-paper-dark border border-[var(--border-default)] rounded-[8px] px-3 py-2 text-sm outline-none focus:border-accent transition-all text-ink placeholder:text-ink-muted"
+              />
+            </div>
+          </SectionCard>
+
+          <SectionCard label="提醒">
+            <ReminderSection itemId={itemId} />
+          </SectionCard>
+
           <div className="flex gap-2">
             <button onClick={save} className="flex-1 py-2.5 rounded-[12px] bg-accent hover:bg-accent-hover text-paper font-medium shadow-card transition-all active:scale-[0.97]">保存</button>
             <button onClick={() => setEditing(false)} className="px-4 py-2.5 rounded-[12px] border border-[var(--border-default)] text-ink-muted hover:text-ink hover:border-ink/30 transition-all">取消</button>
@@ -276,6 +356,14 @@ export function ItemPage() {
             <p className="text-ink text-sm whitespace-pre-wrap bg-paper-card border border-[var(--border-default)] rounded-[12px] px-4 py-3">{item.notes}</p>
           )}
 
+          {item.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {item.tags.map(t => (
+                <span key={t} className="text-xs px-2.5 py-1 rounded-full bg-paper-card border border-[var(--border-default)] text-ink-muted">{t}</span>
+              ))}
+            </div>
+          )}
+
           {/* 操作按钮 */}
           <div className="flex gap-2">
             <button
@@ -291,10 +379,10 @@ export function ItemPage() {
               删除
             </button>
           </div>
+
+          <ReminderSection itemId={itemId} />
         </>
       )}
-
-      <ReminderSection itemId={itemId} />
 
       {photos.length > 0 && (
         <section className="border-t border-[var(--border-subtle)] pt-5">
