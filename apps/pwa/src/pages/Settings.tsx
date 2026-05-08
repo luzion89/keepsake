@@ -51,7 +51,7 @@ function SectionRow({ children }: { children: React.ReactNode }) {
 const inputCls = 'w-full bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all placeholder:text-ink-muted';
 
 export function SettingsPage() {
-  const [cfg, setCfg] = useState<AiConfig>({ mode: 'off' });
+  const [cfg, setCfg] = useState<AiConfig | null>(null);
   const [cfgLoaded, setCfgLoaded] = useState(false);
   const [deviceId, setDeviceId] = useState('');
   const [stats, setStats] = useState({ rooms: 0, areas: 0, items: 0, photos: 0, outbox: 0 });
@@ -88,9 +88,10 @@ export function SettingsPage() {
     })();
   }, []);
 
-  const effectiveProvider: AiProvider = cfg.provider ?? (cfg.apiKey ? 'openrouter' : 'deepseek');
+  const effectiveProvider: AiProvider = cfg?.provider ?? (cfg?.apiKey ? 'openrouter' : 'deepseek');
 
   const save = async () => {
+    if (!cfg) return;
     const result = await setAiConfig(cfg);
     setSavedAt(Date.now());
     if (result.ok) {
@@ -101,6 +102,7 @@ export function SettingsPage() {
   };
 
   const pingAi = async () => {
+    if (!cfg) return;
     const key = effectiveProvider === 'deepseek' ? cfg.deepseekApiKey?.trim() : cfg.apiKey?.trim();
     if (!key) { setAiPingResult({ ok: false, error: '请先填写 API Key' }); return; }
     setAiPingState('pinging');
@@ -158,11 +160,17 @@ export function SettingsPage() {
           <p className="text-xs text-ink-muted mb-3">
             Key 保存到本地 IndexedDB；保存时立即推送到本地服务器（需服务器在线），其它设备启动时拉取，更新时间最新者胜。
           </p>
-          {/* AI on/off */}
-          <div className="space-y-2 text-sm" style={{ visibility: cfgLoaded ? 'visible' : 'hidden' }}>
+          {/* AI on/off — skeleton until loaded to prevent flicker (#153) */}
+          {!cfgLoaded ? (
+            <div className="space-y-2">
+              <div className="h-10 rounded-[12px] bg-paper-dark animate-pulse" />
+              <div className="h-10 rounded-[12px] bg-paper-dark animate-pulse" />
+            </div>
+          ) : (
+          <div className="space-y-2 text-sm">
             {(['on','off'] as const).map(m => (
               <label key={m} className={`flex items-center justify-between px-3 py-2.5 rounded-[12px] border cursor-pointer transition-all ${
-                cfg.mode === m
+                cfg!.mode === m
                   ? 'border-accent/60 bg-accent-light text-accent'
                   : 'border-[var(--border-default)] hover:border-accent/30'
               }`}>
@@ -172,16 +180,17 @@ export function SettingsPage() {
                 </span>
                 <input
                   type="radio"
-                  checked={cfg.mode === m}
-                  onChange={() => setCfg({ ...cfg, mode: m })}
+                  checked={cfg!.mode === m}
+                  onChange={() => setCfg({ ...cfg!, mode: m })}
                   className="ml-2 accent-[var(--color-accent)]"
                 />
               </label>
             ))}
           </div>
+          )}
         </SectionRow>
 
-        {cfg.mode === 'on' && (
+        {cfg?.mode === 'on' && (
           <>
             {/* Provider selector */}
             <SectionRow>
@@ -196,7 +205,7 @@ export function SettingsPage() {
                         : 'border-[var(--border-default)] text-ink-muted hover:border-accent/30'
                     }`}
                   >
-                    <input type="radio" className="sr-only" checked={effectiveProvider === p} onChange={() => setCfg({ ...cfg, provider: p })} />
+                    <input type="radio" className="sr-only" checked={effectiveProvider === p} onChange={() => setCfg({ ...cfg!, provider: p })} />
                     {p === 'deepseek' ? 'DeepSeek（推荐）' : 'OpenRouter'}
                   </label>
                 ))}
@@ -212,12 +221,12 @@ export function SettingsPage() {
                       DeepSeek API Key{' '}
                       <a href="https://platform.deepseek.com" target="_blank" rel="noreferrer" className="text-accent underline hover:text-accent-hover">申请 →</a>
                     </label>
-                    <input type="password" value={cfg.deepseekApiKey ?? ''} onChange={(e) => setCfg({ ...cfg, deepseekApiKey: e.target.value })} placeholder="sk-..." className={`${inputCls} font-mono`} autoComplete="off" />
+                    <input type="password" value={cfg!.deepseekApiKey ?? ''} onChange={(e) => setCfg({ ...cfg!, deepseekApiKey: e.target.value })} placeholder="sk-..." className={`${inputCls} font-mono`} autoComplete="off" />
                     <p className="text-xs text-ink-muted mt-1.5">DeepSeek 不支持图像识别；如需 AI 拍照存档请切换到 OpenRouter。</p>
                   </div>
                   <div>
                     <label className="block text-xs text-ink-muted mb-1.5">模型（默认 {DEFAULT_DEEPSEEK_MODEL}）</label>
-                    <input value={cfg.model ?? ''} onChange={(e) => setCfg({ ...cfg, model: e.target.value })} placeholder={DEFAULT_DEEPSEEK_MODEL} className={inputCls} />
+                    <input value={cfg!.model ?? ''} onChange={(e) => setCfg({ ...cfg!, model: e.target.value })} placeholder={DEFAULT_DEEPSEEK_MODEL} className={inputCls} />
                   </div>
                 </div>
               </SectionRow>
@@ -229,20 +238,20 @@ export function SettingsPage() {
                 <div className="space-y-3">
                   <div>
                     <label className="block text-xs text-ink-muted mb-1.5">OpenRouter API Key</label>
-                    <input type="password" value={cfg.apiKey ?? ''} onChange={(e) => setCfg({ ...cfg, apiKey: e.target.value })} placeholder="sk-or-v1-..." className={`${inputCls} font-mono`} autoComplete="off" />
+                    <input type="password" value={cfg!.apiKey ?? ''} onChange={(e) => setCfg({ ...cfg!, apiKey: e.target.value })} placeholder="sk-or-v1-..." className={`${inputCls} font-mono`} autoComplete="off" />
                   </div>
                   <div>
                     <label className="block text-xs text-ink-muted mb-1.5">视觉模型（默认 {DEFAULT_MODEL}）</label>
                     <input
-                      value={cfg.model === DEFAULT_DEEPSEEK_MODEL ? '' : (cfg.model ?? '')}
-                      onChange={(e) => setCfg({ ...cfg, model: e.target.value })}
+                      value={cfg!.model === DEFAULT_DEEPSEEK_MODEL ? '' : (cfg!.model ?? '')}
+                      onChange={(e) => setCfg({ ...cfg!, model: e.target.value })}
                       placeholder={DEFAULT_MODEL}
                       className={inputCls}
                     />
                   </div>
                   <div>
                     <label className="block text-xs text-ink-muted mb-1.5">语音转写模型（需支持 audio 输入，默认同上）</label>
-                    <input value={cfg.transcribeModel ?? ''} onChange={(e) => setCfg({ ...cfg, transcribeModel: e.target.value })} placeholder={DEFAULT_TRANSCRIBE_MODEL} className={inputCls} />
+                    <input value={cfg!.transcribeModel ?? ''} onChange={(e) => setCfg({ ...cfg!, transcribeModel: e.target.value })} placeholder={DEFAULT_TRANSCRIBE_MODEL} className={inputCls} />
                   </div>
                 </div>
               </SectionRow>

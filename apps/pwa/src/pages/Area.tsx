@@ -232,9 +232,9 @@ export function AreaPage() {
             <p className="text-ink-muted/70 text-xs mt-1">点上面的「录入物品」开始</p>
           </div>
         ) : (
-          <ul className="space-y-2">
+          <ul className="space-y-1.5">
             {items.map(it => (
-              <li key={it.id} className="flex items-center gap-2 px-3 py-2.5 bg-paper-card border border-[var(--border-default)] rounded-[12px] shadow-card">
+              <li key={it.id} className="flex items-center gap-2 px-3 py-1.5 bg-paper-card border border-[var(--border-default)] rounded-[12px] shadow-card">
                 <Link to={`/items/${it.id}`} className="flex-1 min-w-0">
                   {editingItemId === it.id ? (
                     <input

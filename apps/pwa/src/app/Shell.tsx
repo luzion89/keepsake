@@ -23,9 +23,39 @@ function ConflictBanner() {
 
   if (count === 0) return null;
 
+  const [enriched, setEnriched] = useState<Array<ConflictRow & { label: string }>>([]);
+
   const loadRows = async () => {
     const r = await db.conflicts.where('acknowledged').equals(0).toArray();
     setRows(r);
+    // Enrich: join item/area/room info for human-readable display
+    const rich = await Promise.all(r.map(async row => {
+      let label = `${row.table}/${row.row_id}`;
+      try {
+        if (row.table === 'items') {
+          const item = await db.items.get(row.row_id);
+          if (item) {
+            const area = await db.areas.get(item.area_id);
+            const room = area ? await db.rooms.get(area.room_id) : null;
+            const createdStr = item.created_at
+              ? new Date(item.created_at).toLocaleDateString('zh-CN')
+              : '';
+            label = [room?.name, area?.name, item.name, createdStr].filter(Boolean).join(' > ');
+          }
+        } else if (row.table === 'areas') {
+          const area = await db.areas.get(row.row_id);
+          if (area) {
+            const room = await db.rooms.get(area.room_id);
+            label = [room?.name, area.name].filter(Boolean).join(' > ');
+          }
+        } else if (row.table === 'rooms') {
+          const room = await db.rooms.get(row.row_id);
+          if (room) label = room.name;
+        }
+      } catch { /* keep default label */ }
+      return { ...row, label };
+    }));
+    setEnriched(rich);
   };
 
   const toggle = () => {
@@ -73,12 +103,14 @@ function ConflictBanner() {
       </div>
       {expanded && (
         <div className="mt-2 space-y-1">
-          {rows.map(r => (
-            <div key={r.id} className="text-danger-text bg-danger-bg rounded px-2 py-1 border border-danger/20">
-              <span className="font-mono">{r.table}/{r.row_id}</span> · 字段{' '}
-              <span className="font-medium">{r.field}</span> · 本地{' '}
-              <span className="text-warn-text">{JSON.stringify(r.client)}</span> / 服务端{' '}
-              <span className="text-ink-muted">{JSON.stringify(r.server)}</span>
+          {enriched.map(r => (
+            <div key={r.id} className="text-danger-text bg-danger-bg rounded px-2 py-1 border border-danger/20 space-y-0.5">
+              <div className="font-medium">{r.label}</div>
+              <div className="text-danger-text/80">
+                字段 <span className="font-semibold">{r.field}</span>
+                {' · '}本地: <span className="text-warn-text">{r.client == null ? '（空）' : JSON.stringify(r.client)}</span>
+                {' / '}服务端: <span className="text-ink-muted">{r.server == null ? '（空）' : JSON.stringify(r.server)}</span>
+              </div>
             </div>
           ))}
           <div className="mt-1 flex gap-2">

@@ -121,7 +121,7 @@ export function TextInputPage() {
         for (const it of existingItems) await ItemRepo.remove(it.id);
         for (const d of drafts.filter(d => d.name.trim())) {
           const expires_at = d.expiresDate ? new Date(d.expiresDate + 'T00:00:00').getTime() : undefined;
-          await ItemRepo.create({ area_id: areaId, name: d.name.trim(), qty: d.qty || 1, source: 'manual', expires_at, notes: d.notes || undefined });
+          await ItemRepo.create({ area_id: areaId, name: d.name.trim(), qty: d.qty || 1, unit: d.unit || undefined, source: 'manual', expires_at, notes: d.notes || undefined });
         }
       } else {
         const existingByName = new Map(existingItems.map(it => [it.name.trim().toLowerCase(), it]));
@@ -129,9 +129,9 @@ export function TextInputPage() {
           const expires_at = d.expiresDate ? new Date(d.expiresDate + 'T00:00:00').getTime() : undefined;
           const matched = existingByName.get(d.name.trim().toLowerCase());
           if (matched) {
-            await ItemRepo.update(matched.id, { qty: d.qty || 1, expires_at, notes: d.notes || undefined });
+            await ItemRepo.update(matched.id, { qty: d.qty || 1, unit: d.unit || undefined, expires_at, notes: d.notes || undefined });
           } else {
-            await ItemRepo.create({ area_id: areaId, name: d.name.trim(), qty: d.qty || 1, source: 'manual', expires_at, notes: d.notes || undefined });
+            await ItemRepo.create({ area_id: areaId, name: d.name.trim(), qty: d.qty || 1, unit: d.unit || undefined, source: 'manual', expires_at, notes: d.notes || undefined });
           }
         }
       }
@@ -270,6 +270,13 @@ export function TextInputPage() {
                       onChange={e => updateDraft(i, { qty: Number(e.target.value) })}
                       className="w-16 bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-1.5 text-sm outline-none focus:border-accent transition-all text-ink"
                       aria-label="数量"
+                    />
+                    <input
+                      value={d.unit ?? ''}
+                      onChange={e => updateDraft(i, { unit: e.target.value })}
+                      placeholder="量词"
+                      className="w-16 bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-1.5 text-sm outline-none focus:border-accent transition-all text-ink placeholder:text-ink-muted"
+                      aria-label="量词"
                     />
                     {mode === 'merge' && (
                       <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${
