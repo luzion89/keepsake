@@ -94,18 +94,20 @@ export const ItemRepo = {
       i.tags.some(t => t.toLowerCase().includes(q))
     ));
   },
-  async create(input: { area_id: string; name: string; qty?: number; tags?: string[]; source?: Item['source']; notes?: string; photo_ids?: string[]; confidence?: number; }): Promise<Item> {
+  async create(input: { area_id: string; name: string; qty?: number; unit?: string; tags?: string[]; source?: Item['source']; notes?: string; photo_ids?: string[]; confidence?: number; }): Promise<Item> {
     const m = await meta();
     const row: Item = {
       id: uuid(),
       area_id: input.area_id,
       name: input.name,
       qty: input.qty ?? 1,
+      unit: input.unit ?? '个',
       tags: input.tags ?? [],
       photo_ids: input.photo_ids ?? [],
       source: input.source ?? 'manual',
       confidence: input.confidence,
       notes: input.notes,
+      created_at: Date.now(),
       ...m,
     };
     await db.items.put(row);
