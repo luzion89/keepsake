@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Home as HomeIcon, MoreHorizontal, Package, Pencil, Plus, Trash2, X } from 'lucide-react';
 import type { Area, Room } from '@keepsake/shared';
 import { AreaRepo, ItemRepo, RoomRepo } from '../db/repos.js';
 import { useConfirm } from '../components/ConfirmDialog.js';
@@ -39,7 +40,7 @@ function DotMenu({ children }: { children: React.ReactNode }) {
         className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-ink-muted hover:text-ink transition-colors"
         aria-label="更多操作"
       >
-        ⋯
+        <MoreHorizontal size={18} strokeWidth={1.5} />
       </button>
       {open && pos && (
         <div
@@ -132,7 +133,7 @@ export function HomePage() {
           </div>
         ) : metas.length === 0 ? (
           <div className="flex flex-col items-center py-12 text-center">
-            <span className="text-4xl mb-3">🏠</span>
+            <HomeIcon size={40} strokeWidth={1.5} className="text-ink-muted/40 mb-3" />
             <p className="text-ink-muted text-sm font-medium">还没有房间</p>
             <p className="text-ink-muted/70 text-xs mt-1">点右下角 + 添加第一个房间</p>
           </div>
@@ -140,7 +141,7 @@ export function HomePage() {
           <ul className="bg-paper-card border border-[var(--border-default)] rounded-[12px] overflow-hidden divide-y divide-[var(--border-subtle)]">
             {metas.map(({ room: r, areaCount }) => (
               <li key={r.id} className="flex items-center px-4 min-h-[52px]">
-                <span className="text-base mr-3">🏠</span>
+                <HomeIcon size={18} strokeWidth={1.5} className="text-ink-muted mr-3 shrink-0" />
                 {editingId === r.id ? (
                   <input
                     ref={editRef}
@@ -164,16 +165,18 @@ export function HomePage() {
                 <span className="text-xs text-ink-muted mr-1">{areaCount} 个区域</span>
                 <DotMenu>
                   <button
-                    className="w-full text-left px-4 py-2.5 text-sm text-ink hover:bg-paper-dark transition-colors"
+                    className="w-full text-left px-4 py-2.5 text-sm text-ink hover:bg-paper-dark transition-colors flex items-center gap-2"
                     onClick={() => startRename(r)}
                   >
-                    ✏️ 改名
+                    <Pencil size={14} strokeWidth={1.5} />
+                    改名
                   </button>
                   <button
-                    className="w-full text-left px-4 py-2.5 text-sm text-danger-text hover:bg-danger-bg transition-colors"
+                    className="w-full text-left px-4 py-2.5 text-sm text-danger-text hover:bg-danger-bg transition-colors flex items-center gap-2"
                     onClick={() => deleteRoom(r)}
                   >
-                    🗑 删除
+                    <Trash2 size={14} strokeWidth={1.5} />
+                    删除
                   </button>
                 </DotMenu>
               </li>
@@ -194,9 +197,11 @@ export function HomePage() {
               <button
                 type="button"
                 onClick={() => setFabOpen(false)}
-                className="min-w-[32px] min-h-[32px] flex items-center justify-center rounded-full text-ink-muted hover:text-ink hover:bg-paper-dark transition-colors leading-none"
+                className="min-w-[32px] min-h-[32px] flex items-center justify-center rounded-full text-ink-muted hover:text-ink hover:bg-paper-dark transition-colors"
                 aria-label="关闭"
-              >×</button>
+              >
+                <X size={16} strokeWidth={1.5} />
+              </button>
             </div>
             <form onSubmit={(e) => { e.preventDefault(); add(name); }} className="flex gap-2">
               <input
@@ -224,10 +229,14 @@ export function HomePage() {
         )}
         <button
           onClick={() => setFabOpen(v => !v)}
-          className="w-14 h-14 rounded-full bg-accent hover:bg-accent-hover text-paper text-2xl shadow-lg flex items-center justify-center transition-all active:scale-[0.95]"
+          className="w-14 h-14 rounded-full bg-accent hover:bg-accent-hover text-paper shadow-lg flex items-center justify-center transition-all active:scale-[0.95]"
           aria-label="添加房间"
         >
-          <span className={`inline-block transition-transform duration-300 ${fabOpen ? 'rotate-45' : ''}`}>+</span>
+          <Plus
+            size={24}
+            strokeWidth={1.5}
+            className={`transition-transform duration-300 ${fabOpen ? 'rotate-45' : ''}`}
+          />
         </button>
       </div>
     </div>

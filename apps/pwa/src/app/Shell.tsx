@@ -1,5 +1,6 @@
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { Bell, Home, Search, Settings, AlertTriangle } from 'lucide-react';
 import { db, type ConflictRow } from '../db/dexie.js';
 import { syncOnce } from '../sync/client.js';
 import { scanReminders, type TriggeredReminder } from '../notifications/scanner.js';
@@ -42,7 +43,8 @@ function ConflictBanner() {
   return (
     <div className="bg-danger-bg border-b border-danger/30 px-4 py-1.5 text-xs">
       <div className="flex items-center gap-2">
-        <span className="text-danger-text font-medium">⚠️ 检测到 {count} 条冲突</span>
+        <AlertTriangle size={14} strokeWidth={1.5} className="text-danger-text shrink-0" />
+        <span className="text-danger-text font-medium">检测到 {count} 条冲突</span>
         <button
           onClick={toggle}
           className="text-danger-text/80 hover:text-danger-text underline underline-offset-2"
@@ -95,7 +97,10 @@ function NotificationBanner() {
 
   return (
     <div className="bg-warn-bg border-b border-warn/30 px-4 py-1.5 text-xs space-y-1">
-      <p className="text-warn-text font-medium">🔔 {triggered.length} 条提醒待处理</p>
+      <p className="text-warn-text font-medium flex items-center gap-1.5">
+        <Bell size={14} strokeWidth={1.5} className="shrink-0" />
+        {triggered.length} 条提醒待处理
+      </p>
       {triggered.map(t => (
         <div key={t.rule.id} className="flex items-center gap-2 text-warn-text">
           <span className="flex-1">{t.reason}</span>
@@ -136,9 +141,9 @@ export function Shell() {
   }, [loc.pathname]);
 
   const tabs = [
-    { to: '/', label: '房间', icon: '🏠' },
-    { to: '/search', label: '搜索', icon: '🔍' },
-    { to: '/settings', label: '设置', icon: '⚙️' },
+    { to: '/', label: '房间', Icon: Home },
+    { to: '/search', label: '搜索', Icon: Search },
+    { to: '/settings', label: '设置', Icon: Settings },
   ];
 
   return (
@@ -149,7 +154,7 @@ export function Shell() {
           to="/"
           className="flex items-center gap-1.5 text-base font-bold font-serif tracking-tight text-ink hover:text-ink-hover transition-colors"
         >
-          🗂️ Keepsake
+          Keepsake
         </Link>
         <div className="flex-1" />
         <Link
@@ -157,14 +162,14 @@ export function Shell() {
           aria-label="搜索"
           className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-[12px] text-ink-muted hover:text-ink hover:bg-paper-dark transition-all duration-150"
         >
-          🔍
+          <Search size={18} strokeWidth={1.5} />
         </Link>
         <Link
           to="/settings"
           aria-label="设置"
           className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-[12px] text-ink-muted hover:text-ink hover:bg-paper-dark transition-all duration-150"
         >
-          ⚙️
+          <Settings size={18} strokeWidth={1.5} />
         </Link>
       </header>
 
@@ -192,11 +197,11 @@ export function Shell() {
 
       {/* ── Bottom nav ────────────────────────────────── */}
       <nav className="sticky bottom-0 z-10 h-16 pb-safe bg-paper/95 backdrop-blur-sm border-t border-ink-faint grid grid-cols-3">
-        {tabs.map(t => (
+        {tabs.map(({ to, label, Icon }) => (
           <NavLink
-            key={t.to}
-            to={t.to}
-            end={t.to === '/'}
+            key={to}
+            to={to}
+            end={to === '/'}
             className={({ isActive }) =>
               `flex flex-col items-center justify-center gap-0.5 text-xs transition-all duration-150 ${
                 isActive ? 'text-ink font-semibold' : 'text-ink-muted hover:text-ink'
@@ -205,10 +210,10 @@ export function Shell() {
           >
             {({ isActive }) => (
               <>
-                {/* Active indicator bar — accent color */}
+                {/* Active indicator bar */}
                 <span className={`w-6 h-0.5 rounded-full mb-0.5 transition-all duration-150 ${isActive ? 'bg-accent' : 'bg-transparent'}`} />
-                <span className="text-base leading-none">{t.icon}</span>
-                <span>{t.label}</span>
+                <Icon size={20} strokeWidth={1.5} />
+                <span>{label}</span>
               </>
             )}
           </NavLink>

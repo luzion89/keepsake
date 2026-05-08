@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import imageCompression from 'browser-image-compression';
+import { AlertTriangle, Camera, ChevronLeft, X } from 'lucide-react';
 import { AreaRepo, PhotoRepo } from '../db/repos.js';
 import type { Area } from '@keepsake/shared';
 
@@ -87,8 +88,14 @@ export function CapturePage() {
   if (areaState === 'not-found') {
     return (
       <div className="space-y-3">
-        <p className="text-danger-text">⚠️ 找不到该区域（可能已被删除）。</p>
-        <Link to="/" className="text-accent hover:text-accent-hover text-sm">← 返回首页</Link>
+        <p className="text-danger-text flex items-center gap-1.5">
+          <AlertTriangle size={14} strokeWidth={1.5} className="shrink-0" />
+          找不到该区域（可能已被删除）。
+        </p>
+        <Link to="/" className="text-accent hover:text-accent-hover text-sm flex items-center gap-1">
+          <ChevronLeft size={14} strokeWidth={1.5} />
+          返回首页
+        </Link>
       </div>
     );
   }
@@ -96,9 +103,15 @@ export function CapturePage() {
   return (
     <div className="space-y-4">
       <div className="text-sm text-ink-muted">
-        <Link to={`/areas/${areaId}`} className="hover:text-ink">← 返回 {area!.name}</Link>
+        <Link to={`/areas/${areaId}`} className="hover:text-ink flex items-center gap-1">
+          <ChevronLeft size={14} strokeWidth={1.5} />
+          返回 {area!.name}
+        </Link>
       </div>
-      <h1 className="text-xl font-semibold">📷 拍照存档 · {area!.name}</h1>
+      <h1 className="text-xl font-semibold flex items-center gap-2">
+        <Camera size={20} strokeWidth={1.5} className="text-ink-muted" />
+        拍照存档 · {area!.name}
+      </h1>
 
       <input
         ref={fileRef}
@@ -112,9 +125,10 @@ export function CapturePage() {
 
       <button
         onClick={() => fileRef.current?.click()}
-        className="w-full h-11 flex items-center justify-center rounded-[12px] bg-paper-card border border-[var(--border-default)] hover:border-accent/40 text-ink font-medium text-sm transition-all duration-150"
+        className="w-full h-11 flex items-center justify-center gap-2 rounded-[12px] bg-paper-card border border-[var(--border-default)] hover:border-accent/40 text-ink font-medium text-sm transition-all duration-150"
       >
-        📷 拍照（可多张）
+        <Camera size={18} strokeWidth={1.5} />
+        拍照（可多张）
       </button>
 
       {errMsg && <p className="text-danger-text text-sm">{errMsg}</p>}
@@ -128,10 +142,10 @@ export function CapturePage() {
                 <img src={b.url} className="w-full aspect-square object-cover rounded-lg" />
                 <button
                   onClick={() => removeBlob(i)}
-                  className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white text-xs flex items-center justify-center"
+                  className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center"
                   aria-label="删除"
                 >
-                  ×
+                  <X size={12} strokeWidth={2} />
                 </button>
               </div>
             ))}

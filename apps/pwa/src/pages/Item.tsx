@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { ChevronLeft, Plus, X } from 'lucide-react';
 import type { Item, Photo, ReminderRule } from '@keepsake/shared';
 import { ItemRepo, PhotoRepo, ReminderRepo } from '../db/repos.js';
 import { db } from '../db/dexie.js';
@@ -88,9 +89,10 @@ function ReminderSection({ itemId }: { itemId: string }) {
         <span className="text-sm font-medium text-ink">提醒规则</span>
         <button
           onClick={() => setAdding(v => !v)}
-          className="text-xs text-accent hover:text-accent-hover transition-colors"
+          className="text-xs text-accent hover:text-accent-hover transition-colors flex items-center gap-1"
         >
-          ➕ 添加提醒
+          <Plus size={12} strokeWidth={2} />
+          添加提醒
         </button>
       </div>
 
@@ -155,8 +157,9 @@ function ReminderSection({ itemId }: { itemId: string }) {
               <button
                 onClick={() => remove(r.id)}
                 className="min-w-[44px] min-h-[44px] text-ink-muted hover:text-danger-text transition-colors flex items-center justify-center"
+                aria-label="删除提醒"
               >
-                ×
+                <X size={16} strokeWidth={1.5} />
               </button>
             </li>
           ))}
@@ -243,7 +246,10 @@ export function ItemPage() {
     <div className="space-y-5">
       {dialog}
       <nav className="text-xs text-ink-muted">
-        <Link to={`/areas/${item.area_id}`} className="hover:text-ink transition-colors">← 返回区域</Link>
+        <Link to={`/areas/${item.area_id}`} className="hover:text-ink transition-colors flex items-center gap-1">
+          <ChevronLeft size={14} strokeWidth={1.5} />
+          返回区域
+        </Link>
       </nav>
 
       {editing ? (

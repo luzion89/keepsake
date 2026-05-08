@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Pin, Sparkles } from 'lucide-react';
 import type { Item, Area, Room } from '@keepsake/shared';
 import { db } from '../db/dexie.js';
 import { ItemRepo } from '../db/repos.js';
@@ -110,7 +111,7 @@ export function SearchPage() {
   // Highlight items cited by AI
   const citedSet = useMemo(() => new Set(aiResult?.citedIds ?? []), [aiResult]);
 
-  // Build cited items list for the 📌 section
+  // Build cited items list for the Pin section
   const citedItems = useMemo(() => {
     if (!aiResult?.citedIds?.length) return [];
     return aiResult.citedIds
@@ -144,13 +145,11 @@ export function SearchPage() {
             e.target.style.height = e.target.scrollHeight + 'px';
           }}
           onFocus={(e) => {
-            // 聚焦：展开多行
             e.target.style.overflow = 'hidden';
             e.target.style.height = 'auto';
             e.target.style.height = e.target.scrollHeight + 'px';
           }}
           onBlur={(e) => {
-            // 失焦：收缩回单行
             e.target.style.height = '48px';
             e.target.style.overflow = 'hidden';
           }}
@@ -169,7 +168,14 @@ export function SearchPage() {
               : 'border border-[var(--border-default)] text-ink-muted opacity-60'
           }`}
         >
-          {aiLoading ? '思考中…' : '✨ AI'}
+          {aiLoading ? (
+            '思考中…'
+          ) : (
+            <>
+              <Sparkles size={16} strokeWidth={1.5} />
+              AI
+            </>
+          )}
         </button>
       </div>
 
@@ -201,7 +207,10 @@ export function SearchPage() {
                     <span className="text-sm font-medium text-ink">{it.name}</span>
                     <span className="text-ink-muted text-xs ml-2">× {it.qty}</span>
                     {citedSet.has(it.id) && (
-                      <span className="ml-2 text-xs text-accent">✨ AI 引用</span>
+                      <span className="ml-2 text-xs text-accent inline-flex items-center gap-0.5">
+                        <Sparkles size={10} strokeWidth={1.5} />
+                        AI 引用
+                      </span>
                     )}
                   </Link>
                 </li>
@@ -215,7 +224,8 @@ export function SearchPage() {
       {(aiResult || aiError) && (
         <section className="mt-2 p-4 rounded-[12px] bg-paper-card border border-accent/30 space-y-2">
           <div className="flex items-center gap-2 text-sm font-semibold text-accent">
-            ✨ AI 回答
+            <Sparkles size={16} strokeWidth={1.5} />
+            AI 回答
           </div>
           {aiError && (
             <p className="text-danger-text text-sm">{aiError}</p>
@@ -226,10 +236,13 @@ export function SearchPage() {
         </section>
       )}
 
-      {/* ── 📌 AI 提到的物品 ──────────────────────────── */}
+      {/* ── AI 提到的物品 ──────────────────────────── */}
       {citedItems.length > 0 && (
         <section className="mt-2">
-          <p className="text-xs text-ink-muted font-medium mb-2">📌 AI 提到的物品</p>
+          <p className="text-xs text-ink-muted font-medium mb-2 flex items-center gap-1">
+            <Pin size={12} strokeWidth={1.5} />
+            AI 提到的物品
+          </p>
           <div className="flex flex-wrap gap-2">
             {citedItems.map(it => (
               <Link
