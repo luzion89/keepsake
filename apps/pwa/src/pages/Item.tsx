@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ChevronLeft, Plus, X } from 'lucide-react';
-import type { Item, Photo, ReminderRule } from '@keepsake/shared';
-import { ItemRepo, PhotoRepo, ReminderRepo } from '../db/repos.js';
+import type { Item, ReminderRule } from '@keepsake/shared';
+import { ItemRepo, ReminderRepo } from '../db/repos.js';
 import { db } from '../db/dexie.js';
 import { useConfirm } from '../components/ConfirmDialog.js';
 
@@ -27,23 +27,6 @@ function ExpiryBadge({ expiresAt }: { expiresAt: number }) {
     return <span className="ml-2 text-xs font-medium px-2 py-0.5 rounded-full bg-warn-bg text-warn-text">剩 {days} 天</span>;
   }
   return <span className="ml-2 text-xs font-medium px-2 py-0.5 rounded-full bg-ok-bg text-ok-text">剩 {days} 天</span>;
-}
-
-function PhotoThumb({ photo }: { photo: Photo }) {
-  const [url, setUrl] = useState<string | null>(null);
-  useEffect(() => {
-    let revoked: string | null = null;
-    (async () => {
-      if (photo.remote_url) { setUrl(photo.remote_url); return; }
-      if (photo.blob_ref) {
-        const b = await PhotoRepo.getBlob(photo.blob_ref);
-        if (b) { revoked = URL.createObjectURL(b); setUrl(revoked); }
-      }
-    })();
-    return () => { if (revoked) URL.revokeObjectURL(revoked); };
-  }, [photo.id]);
-  if (!url) return <div className="w-full aspect-square bg-paper-dark rounded-[12px]" />;
-  return <img src={url} alt="" className="w-full aspect-square object-cover rounded-[12px]" />;
 }
 
 function ReminderSection({ itemId }: { itemId: string }) {
@@ -198,7 +181,6 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
 export function ItemPage() {
   const { itemId = '' } = useParams();
   const [item, setItem] = useState<Item | undefined>();
-  const [photos, setPhotos] = useState<Photo[]>([]);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({ name: '', qty: 0, unit: '', notes: '', tags: '', expiresDate: '' });
   const { confirm, dialog } = useConfirm();
@@ -215,8 +197,6 @@ export function ItemPage() {
         tags: it.tags.join(', '),
         expiresDate: it.expires_at ? new Date(it.expires_at).toISOString().slice(0, 10) : '',
       });
-      const ps = await PhotoRepo.listFor('area', it.area_id);
-      setPhotos(ps);
     }
   };
   useEffect(() => { reload(); }, [itemId]);
@@ -354,6 +334,9 @@ export function ItemPage() {
 
           {/* 元信息行 */}
           <div className="space-y-1 text-xs text-ink-muted">
+            {item.created_at != null && (
+              <p>创建于：{new Date(item.created_at).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</p>
+            )}
             {item.expires_at != null && (
               <p>有效期：{new Date(item.expires_at).toLocaleDateString('zh-CN')}</p>
             )}
@@ -394,14 +377,7 @@ export function ItemPage() {
         </>
       )}
 
-      {photos.length > 0 && (
-        <section className="border-t border-[var(--border-subtle)] pt-5">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted mb-2">区域里的照片</h2>
-          <div className="grid grid-cols-3 gap-2">
-            {photos.map(p => <PhotoThumb key={p.id} photo={p} />)}
-          </div>
-        </section>
-      )}
+
     </div>
   );
 }

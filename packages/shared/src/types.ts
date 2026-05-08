@@ -46,6 +46,7 @@ export const ItemSchema = SyncMetaSchema.extend({
   source: z.enum(['ai', 'voice', 'manual']),
   confidence: z.number().min(0).max(1).optional(),
   bbox: BBoxSchema.optional(),
+  created_at: z.number().int().nonnegative().optional(),
   notes: z.string().max(4000).optional(),
 });
 export type Item = z.infer<typeof ItemSchema>;
