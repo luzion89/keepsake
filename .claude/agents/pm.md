@@ -43,3 +43,10 @@ model: sonnet
 2. 删除远端分支：`git push origin --delete <remote-branch>`（若仓库有 deletion 保护规则，走 GitHub 网页或 `gh pr merge --delete-branch`）
 3. 推荐合并时直接用：`gh pr merge --squash --delete-branch <PR号>`
 4. 清理过期远端追踪：`git fetch -p`
+
+## 本地同步（强制）
+每次 PM 任务结束前，必须确保 local main fast-forward 到 origin/main：
+```
+git checkout main && git pull --ff-only
+```
+并在任务汇总末尾明确写一行：**本地 main 已与 origin/main 同步**。
