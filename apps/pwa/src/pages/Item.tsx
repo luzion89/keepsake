@@ -68,7 +68,7 @@ function ReminderSection({ itemId }: { itemId: string }) {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between px-4 py-3">
+      <div className="flex items-center justify-between px-4 py-2">
         <span className="text-sm font-medium text-ink">提醒规则</span>
         <button
           onClick={() => setAdding(v => !v)}
@@ -81,6 +81,7 @@ function ReminderSection({ itemId }: { itemId: string }) {
 
       {adding && (
         <div className="mx-4 mb-2 bg-paper-dark border border-[var(--border-default)] rounded-[12px] p-3 space-y-2 text-sm">
+          <p className="text-xs text-ink-muted">提醒方式：打开 App 时页面横幅提示（暂不支持震动/音频/系统推送）</p>
           <select
             value={kind}
             onChange={e => setKind(e.target.value as ReminderRule['kind'])}
@@ -134,7 +135,7 @@ function ReminderSection({ itemId }: { itemId: string }) {
       {rules.length > 0 && (
         <ul className="divide-y divide-[var(--border-subtle)]">
           {rules.map(r => (
-            <li key={r.id} className="flex items-center gap-2 px-4 py-2.5 text-xs">
+            <li key={r.id} className="flex items-center gap-2 px-4 py-1.5 text-xs">
               <span className="flex-1 text-ink">
                 {kindLabel(r.kind)}
                 {r.threshold_qty != null && ` (≤${r.threshold_qty})`}
@@ -329,7 +330,7 @@ export function ItemPage() {
           {/* 数量大字展示 */}
           <div className="flex items-baseline gap-1.5">
             <span className="text-3xl font-bold font-serif text-ink">{item.qty}</span>
-            {item.unit && <span className="text-ink-muted text-sm">{item.unit}</span>}
+            <span className="text-ink-muted text-sm">{item.unit || '个'}</span>
           </div>
 
           {/* 元信息行 */}

@@ -185,35 +185,37 @@ export function HomePage() {
         )}
       </section>
 
-      {/* ── FAB 添加房间 三阶段动效 (#144) ─────────── */}
+      {/* ── FAB 添加房间 (#154 重做) ──────────────────
+           规格：圆形加号 → 点击后上移 + 输入框从下 slide-in
+                 按钮图标 Plus→X(rotate 45°)；backdrop 点击关闭  */}
+      {fabOpen && (
+        <div
+          className="fixed inset-0 z-20"
+          onClick={() => setFabOpen(false)}
+          aria-hidden="true"
+        />
+      )}
       <div
         className="fixed z-30 flex flex-col items-end"
         style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 72px)', right: '20px' }}
       >
-        {/* 输入面板：从下滑入 */}
+        {/* 输入面板：从下 slide-in */}
         <div
-          className={`overflow-hidden transition-all duration-300 ease-out ${
-            fabOpen ? 'max-h-80 opacity-100 mb-2' : 'max-h-0 opacity-0 mb-0'
-          }`}
+          className="overflow-hidden transition-all duration-300 ease-out"
+          style={{
+            maxHeight: fabOpen ? '320px' : '0px',
+            opacity: fabOpen ? 1 : 0,
+            marginBottom: fabOpen ? '12px' : '0px',
+          }}
         >
-          <div className="relative bg-paper-card border border-[var(--border-default)] rounded-[12px] shadow-lg p-3 space-y-2 w-64">
-            {/* 叉号按钮 — 右上角 */}
-            <button
-              type="button"
-              onClick={() => setFabOpen(false)}
-              className="absolute -top-2.5 -right-2.5 w-7 h-7 flex items-center justify-center rounded-full bg-accent text-paper shadow-md hover:bg-accent-hover transition-colors z-10"
-              aria-label="关闭"
-            >
-              <X size={14} strokeWidth={2} />
-            </button>
-            <p className="text-xs font-medium text-ink-muted pr-4">添加房间</p>
+          <div className="bg-paper-card border border-[var(--border-default)] rounded-[12px] shadow-lg p-3 space-y-2 w-64">
+            <p className="text-xs font-medium text-ink-muted">添加房间</p>
             <form onSubmit={(e) => { e.preventDefault(); add(name); }} className="flex gap-2">
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="房间名（如 厨房）"
                 className="flex-1 min-w-0 bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-2 text-sm outline-none focus:border-accent text-ink placeholder:text-ink-muted"
-                autoFocus={fabOpen}
               />
               <button className="shrink-0 px-3 py-2 rounded-[12px] bg-accent hover:bg-accent-hover text-paper text-sm font-medium transition-all">
                 添加
@@ -232,15 +234,19 @@ export function HomePage() {
             </div>
           </div>
         </div>
-        {/* FAB 按钮：fabOpen 时淡出/缩小 */}
+        {/* FAB 圆形按钮：fabOpen 时上移 + 图标旋转成叉号 */}
         <button
           onClick={() => setFabOpen(v => !v)}
-          className={`w-14 h-14 rounded-full bg-accent hover:bg-accent-hover text-paper shadow-lg flex items-center justify-center transition-all duration-300 active:scale-[0.95] ${
-            fabOpen ? 'scale-90 opacity-0 pointer-events-none' : 'scale-100 opacity-100'
-          }`}
-          aria-label="添加房间"
+          className="w-14 h-14 rounded-full bg-accent hover:bg-accent-hover text-paper shadow-lg flex items-center justify-center transition-all duration-300 active:scale-[0.95]"
+          style={{ transform: fabOpen ? 'translateY(-8px)' : 'translateY(0)' }}
+          aria-label={fabOpen ? '关闭' : '添加房间'}
         >
-          <Plus size={24} strokeWidth={1.5} />
+          <span
+            className="transition-transform duration-300"
+            style={{ transform: fabOpen ? 'rotate(45deg)' : 'rotate(0deg)' }}
+          >
+            <Plus size={24} strokeWidth={1.5} />
+          </span>
         </button>
       </div>
     </div>

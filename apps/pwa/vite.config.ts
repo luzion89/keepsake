@@ -40,6 +40,13 @@ export default defineConfig({
             form_factor: 'narrow',
             label: '物品管理首页',
           },
+          {
+            src: 'screenshots/home-1280.png',
+            sizes: '1280x800',
+            type: 'image/png',
+            form_factor: 'wide',
+            label: '物品管理首页（宽屏）',
+          },
         ],
       },
       workbox: {

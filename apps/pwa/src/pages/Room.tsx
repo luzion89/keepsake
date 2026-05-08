@@ -68,6 +68,7 @@ export function RoomPage() {
   const { roomId = '' } = useParams();
   const [room, setRoom] = useState<Room | undefined>();
   const [areas, setAreas] = useState<Area[]>([]);
+  const [itemCounts, setItemCounts] = useState<Record<string, number>>({});
   const [fabOpen, setFabOpen] = useState(false);
   const [name, setName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -77,7 +78,14 @@ export function RoomPage() {
 
   const reload = async () => {
     setRoom(await RoomRepo.get(roomId));
-    setAreas(await AreaRepo.listByRoom(roomId));
+    const areaList = await AreaRepo.listByRoom(roomId);
+    setAreas(areaList);
+    const counts: Record<string, number> = {};
+    await Promise.all(areaList.map(async a => {
+      const its = await ItemRepo.listByArea(a.id);
+      counts[a.id] = its.length;
+    }));
+    setItemCounts(counts);
   };
   useEffect(() => { reload(); }, [roomId]);
 
@@ -159,9 +167,14 @@ export function RoomPage() {
                 ) : (
                   <Link
                     to={`/areas/${a.id}`}
-                    className="flex-1 text-sm font-medium font-serif text-ink hover:text-ink-hover transition-colors"
+                    className="flex-1 min-w-0 hover:text-ink-hover transition-colors"
                   >
-                    {a.name}
+                    <div className="text-sm font-medium font-serif text-ink">{a.name}</div>
+                    <div className="text-xs text-ink-muted">
+                      {itemCounts[a.id] != null
+                        ? itemCounts[a.id] === 0 ? '暂无物品' : `${itemCounts[a.id]} 种物品`
+                        : ''}
+                    </div>
                   </Link>
                 )}
                 <DotMenu>
@@ -186,35 +199,38 @@ export function RoomPage() {
         )}
       </section>
 
-      {/* ── FAB 添加区域 三阶段动效 (#144) ─────────── */}
+      {/* ── FAB 添加区域 (#154 重做) ─────────────────
+           规格：圆形加号 → 点击后按钮上移 + 输入框从下 slide-in
+                 按钮图标 Plus→X；点击 X 或 backdrop 反向收回  */}
+      {/* Backdrop */}
+      {fabOpen && (
+        <div
+          className="fixed inset-0 z-20"
+          onClick={() => setFabOpen(false)}
+          aria-hidden="true"
+        />
+      )}
       <div
         className="fixed z-30 flex flex-col items-end"
         style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 72px)', right: '20px' }}
       >
-        {/* 输入面板：从下滑入 */}
+        {/* 输入面板：从下 slide-in，按钮上移后出现在按钮下方 */}
         <div
-          className={`overflow-hidden transition-all duration-300 ease-out ${
-            fabOpen ? 'max-h-80 opacity-100 mb-2' : 'max-h-0 opacity-0 mb-0'
-          }`}
+          className="overflow-hidden transition-all duration-300 ease-out"
+          style={{
+            maxHeight: fabOpen ? '320px' : '0px',
+            opacity: fabOpen ? 1 : 0,
+            marginBottom: fabOpen ? '12px' : '0px',
+          }}
         >
-          <div className="relative bg-paper-card border border-[var(--border-default)] rounded-[12px] shadow-lg p-3 space-y-2 w-64">
-            {/* 叉号按钮 — 右上角 */}
-            <button
-              type="button"
-              onClick={() => setFabOpen(false)}
-              className="absolute -top-2.5 -right-2.5 w-7 h-7 flex items-center justify-center rounded-full bg-accent text-paper shadow-md hover:bg-accent-hover transition-colors z-10"
-              aria-label="关闭"
-            >
-              <X size={14} strokeWidth={2} />
-            </button>
-            <p className="text-xs font-medium text-ink-muted pr-4">添加区域</p>
+          <div className="bg-paper-card border border-[var(--border-default)] rounded-[12px] shadow-lg p-3 space-y-2 w-64">
+            <p className="text-xs font-medium text-ink-muted">添加区域</p>
             <form onSubmit={(e) => { e.preventDefault(); add(name); }} className="flex gap-2">
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="区域名（如 洗手台柜子）"
                 className="flex-1 min-w-0 bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-2 text-sm outline-none focus:border-accent text-ink placeholder:text-ink-muted"
-                autoFocus={fabOpen}
               />
               <button className="shrink-0 px-3 py-2 rounded-[12px] bg-accent hover:bg-accent-hover text-paper text-sm font-medium transition-all">
                 添加
@@ -233,15 +249,19 @@ export function RoomPage() {
             </div>
           </div>
         </div>
-        {/* FAB 按钮：fabOpen 时上移让位给输入框（已由 mb-2 拉开间距） */}
+        {/* FAB 圆形按钮：fabOpen 时上移 + 图标变叉号 */}
         <button
           onClick={() => setFabOpen(v => !v)}
-          className={`w-14 h-14 rounded-full bg-accent hover:bg-accent-hover text-paper shadow-lg flex items-center justify-center transition-all duration-300 active:scale-[0.95] ${
-            fabOpen ? 'scale-90 opacity-0 pointer-events-none' : 'scale-100 opacity-100'
-          }`}
-          aria-label="添加区域"
+          className="w-14 h-14 rounded-full bg-accent hover:bg-accent-hover text-paper shadow-lg flex items-center justify-center transition-all duration-300 active:scale-[0.95]"
+          style={{ transform: fabOpen ? 'translateY(-8px)' : 'translateY(0)' }}
+          aria-label={fabOpen ? '关闭' : '添加区域'}
         >
-          <Plus size={24} strokeWidth={1.5} />
+          <span
+            className="transition-transform duration-300"
+            style={{ transform: fabOpen ? 'rotate(45deg)' : 'rotate(0deg)' }}
+          >
+            <Plus size={24} strokeWidth={1.5} />
+          </span>
         </button>
       </div>
     </div>
