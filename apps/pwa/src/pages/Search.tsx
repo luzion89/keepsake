@@ -121,24 +121,24 @@ export function SearchPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold text-slate-100">搜索物品</h1>
+      <h1 className="text-2xl font-bold text-ink">搜索物品</h1>
 
       {/* ── 搜索栏（sticky）──────────────────────────── */}
-      <div className="flex gap-2 sticky top-14 z-10 bg-slate-950/90 backdrop-blur pb-3 pt-1 -mx-4 px-4">
+      <div className="flex gap-2 sticky top-14 z-10 bg-paper/95 backdrop-blur pb-3 pt-1 -mx-4 px-4 border-b border-ink-faint">
         <input
           autoFocus
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="如 消毒水、电池、备用灯泡…"
-          className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20 transition-all duration-150"
+          className="flex-1 bg-paper-card border border-[var(--border-default)] rounded-[12px] px-4 py-2.5 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-150 text-ink placeholder:text-ink-muted"
         />
         <button
           onClick={startVoice}
           aria-label="语音输入"
-          className={`w-11 h-11 flex items-center justify-center rounded-xl border text-base transition-all ${
+          className={`w-11 h-11 flex items-center justify-center rounded-[12px] border text-base transition-all ${
             listening
-              ? 'bg-rose-600 border-rose-600 animate-pulse text-white'
-              : 'border-slate-800 text-slate-400 hover:border-sky-500/60 hover:text-slate-200'
+              ? 'bg-danger border-danger animate-pulse text-paper'
+              : 'border-[var(--border-default)] text-ink-muted hover:border-accent/60 hover:text-ink'
           }`}
         >
           🎙
@@ -147,7 +147,7 @@ export function SearchPage() {
           <button
             onClick={askAi}
             disabled={aiLoading}
-            className="px-4 h-11 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-medium text-sm disabled:opacity-50 transition-all duration-150 active:scale-[0.97]"
+            className="px-4 h-11 rounded-[12px] bg-accent hover:bg-accent-hover text-paper font-medium text-sm disabled:opacity-50 transition-all duration-150 active:scale-[0.97]"
           >
             {aiLoading ? '思考中…' : '✨ AI 回答'}
           </button>
@@ -155,7 +155,7 @@ export function SearchPage() {
       </div>
 
       {q.trim() && items.length === 0 && (
-        <p className="text-slate-400 text-sm">没有找到 "{q}"。</p>
+        <p className="text-ink-muted text-sm">没有找到 "{q}"。</p>
       )}
 
       {/* ── 搜索结果列表 ─────────────────────────────── */}
@@ -166,7 +166,7 @@ export function SearchPage() {
           <section key={areaId}>
             <Link
               to={`/areas/${areaId}`}
-              className="block text-xs text-slate-500 font-medium uppercase tracking-wide hover:text-slate-300 mb-1.5 transition-colors"
+              className="block text-xs text-ink-muted font-medium uppercase tracking-wide hover:text-ink mb-1.5 transition-colors"
             >
               {r?.name ?? '?'} / {a?.name ?? '?'}
             </Link>
@@ -175,14 +175,14 @@ export function SearchPage() {
                 <li key={it.id}>
                   <Link
                     to={`/items/${it.id}`}
-                    className={`block px-4 py-2.5 rounded-xl bg-slate-900 border hover:border-sky-500/40 transition-all duration-150 ${
-                      citedSet.has(it.id) ? 'border-violet-600/60 ring-1 ring-violet-600/20' : 'border-slate-800'
+                    className={`block px-4 py-2.5 rounded-[12px] bg-paper-card border hover:border-accent/40 transition-all duration-150 ${
+                      citedSet.has(it.id) ? 'border-accent/60 ring-1 ring-accent/20' : 'border-[var(--border-default)]'
                     }`}
                   >
-                    <span className="text-sm font-medium text-slate-100">{it.name}</span>
-                    <span className="text-slate-500 text-xs ml-2">× {it.qty}</span>
+                    <span className="text-sm font-medium text-ink">{it.name}</span>
+                    <span className="text-ink-muted text-xs ml-2">× {it.qty}</span>
                     {citedSet.has(it.id) && (
-                      <span className="ml-2 text-xs text-violet-400">✨ AI 引用</span>
+                      <span className="ml-2 text-xs text-accent">✨ AI 引用</span>
                     )}
                   </Link>
                 </li>
@@ -194,15 +194,15 @@ export function SearchPage() {
 
       {/* ── AI Answer 卡片 ────────────────────────────── */}
       {(aiResult || aiError) && (
-        <section className="mt-2 p-4 rounded-2xl bg-slate-900 border border-violet-800/60 space-y-2">
-          <div className="flex items-center gap-2 text-sm font-semibold text-violet-300">
+        <section className="mt-2 p-4 rounded-[12px] bg-paper-card border border-accent/30 space-y-2">
+          <div className="flex items-center gap-2 text-sm font-semibold text-accent">
             ✨ AI 回答
           </div>
           {aiError && (
-            <p className="text-rose-400 text-sm">{aiError}</p>
+            <p className="text-danger-text text-sm">{aiError}</p>
           )}
           {aiResult && (
-            <p className="text-slate-100 text-sm leading-relaxed whitespace-pre-wrap">{aiResult.answer}</p>
+            <p className="text-ink text-sm leading-relaxed whitespace-pre-wrap">{aiResult.answer}</p>
           )}
         </section>
       )}
@@ -210,16 +210,16 @@ export function SearchPage() {
       {/* ── 📌 AI 提到的物品 ──────────────────────────── */}
       {citedItems.length > 0 && (
         <section className="mt-2">
-          <p className="text-xs text-slate-500 font-medium mb-2">📌 AI 提到的物品</p>
+          <p className="text-xs text-ink-muted font-medium mb-2">📌 AI 提到的物品</p>
           <div className="flex flex-wrap gap-2">
             {citedItems.map(it => (
               <Link
                 key={it.id}
                 to={`/items/${it.id}`}
-                className="bg-violet-900/40 border border-violet-700/60 text-violet-200 rounded-full px-3 py-1 text-xs hover:bg-violet-800/60 transition-colors"
+                className="bg-accent-light border border-accent/40 text-ink rounded-full px-3 py-1 text-xs hover:bg-accent/20 transition-colors"
               >
                 {it.name}
-                <span className="text-violet-400 ml-1">{it.locationLabel}</span>
+                <span className="text-accent ml-1">{it.locationLabel}</span>
               </Link>
             ))}
           </div>
