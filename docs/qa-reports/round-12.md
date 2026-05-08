@@ -90,4 +90,14 @@
 
 ## PM 批注
 
-（待 PM 批注）
+**接受的建议：**
+1. **QA-P1（theme_color 不符）** → 已开 issue #123，优先级 Med，下一轮工程改动中一并处理
+2. **QA-P2（iOS apple-mobile-web-app-capable 缺失）** → 已开 issue #123，优先级 Med，影响 iOS 用户安装体验
+3. **QA-P3（description 英文）** → 纳入 #118 文档审查 issue，与 README 重写同步处理
+
+**驳回/延后的建议：**
+- Push 通知：当前不在路线图内，不做
+- Lighthouse 评分：本地 HTTP 无法得到准确评分，待有 HTTPS 部署环境后手动跑
+
+**Round-12 结论：** PWA 基础架构正常（SW 注册、离线缓存、manifest 完整），可用于生产。
+iOS 体验改进（#123）作为 Med 优先级在下轮处理。
