@@ -181,13 +181,13 @@ export function AreaPage() {
                 </Link>
                 <button
                   onClick={() => ItemRepo.qtyDelta(it.id, -1).then(reload)}
-                  className="w-7 h-7 rounded-full bg-paper-dark border border-[var(--border-default)] text-ink hover:border-accent text-sm flex items-center justify-center transition-all"
+                  className="min-w-[44px] min-h-[44px] rounded-full bg-paper-dark border border-[var(--border-default)] text-ink hover:border-accent text-sm flex items-center justify-center transition-all"
                   aria-label="减少数量"
                 >−</button>
                 <span className="text-sm font-medium w-5 text-center text-ink">{it.qty}</span>
                 <button
                   onClick={() => ItemRepo.qtyDelta(it.id, +1).then(reload)}
-                  className="w-7 h-7 rounded-full bg-paper-dark border border-[var(--border-default)] text-ink hover:border-accent text-sm flex items-center justify-center transition-all"
+                  className="min-w-[44px] min-h-[44px] rounded-full bg-paper-dark border border-[var(--border-default)] text-ink hover:border-accent text-sm flex items-center justify-center transition-all"
                   aria-label="增加数量"
                 >+</button>
                 <button
@@ -197,7 +197,7 @@ export function AreaPage() {
                     await ItemRepo.remove(it.id);
                     await reload();
                   }}
-                  className="text-ink-muted hover:text-danger-text text-lg leading-none transition-colors"
+                  className="min-w-[44px] min-h-[44px] text-ink-muted hover:text-danger-text text-lg leading-none transition-colors flex items-center justify-center"
                   aria-label={`删除 ${it.name}`}
                 >×</button>
               </li>

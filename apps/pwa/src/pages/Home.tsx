@@ -45,7 +45,7 @@ export function HomePage() {
             <button
               key={p}
               onClick={() => add(p)}
-              className="text-xs px-3 py-1.5 rounded-full bg-paper-card border border-[var(--border-default)] hover:border-accent/50 hover:bg-paper-dark text-ink-muted transition-all duration-150"
+              className="text-xs px-3 py-2 min-h-[44px] rounded-full bg-paper-card border border-[var(--border-default)] hover:border-accent/50 hover:bg-paper-dark text-ink-muted transition-all duration-150"
             >
               + {p}
             </button>
@@ -93,7 +93,7 @@ export function HomePage() {
                     await RoomRepo.remove(r.id);
                     await reload();
                   }}
-                  className="absolute top-2 right-2 w-6 h-6 rounded-full bg-paper-dark text-ink-muted text-xs opacity-0 group-hover:opacity-100 hover:bg-danger-bg hover:text-danger-text transition-all duration-150 flex items-center justify-center"
+                  className="absolute top-2 right-2 min-w-[44px] min-h-[44px] rounded-full bg-paper-dark text-ink-muted text-xs opacity-0 group-hover:opacity-100 hover:bg-danger-bg hover:text-danger-text transition-all duration-150 flex items-center justify-center"
                   aria-label={`删除房间 ${r.name}`}
                   title="删除房间"
                 >

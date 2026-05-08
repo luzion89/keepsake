@@ -155,14 +155,14 @@ export function Shell() {
         <Link
           to="/search"
           aria-label="搜索"
-          className="w-9 h-9 flex items-center justify-center rounded-[12px] text-ink-muted hover:text-ink hover:bg-paper-dark transition-all duration-150"
+          className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-[12px] text-ink-muted hover:text-ink hover:bg-paper-dark transition-all duration-150"
         >
           🔍
         </Link>
         <Link
           to="/settings"
           aria-label="设置"
-          className="w-9 h-9 flex items-center justify-center rounded-[12px] text-ink-muted hover:text-ink hover:bg-paper-dark transition-all duration-150"
+          className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-[12px] text-ink-muted hover:text-ink hover:bg-paper-dark transition-all duration-150"
         >
           ⚙️
         </Link>

@@ -5,16 +5,16 @@
 /* ──────────────────────────────────────────────
    Design tokens — PR-A v3 (#97)
    Editorial + Muji minimal  亮色暖调
-   背景：米色 #F1EDE6  主色：深绿灰 #2F3E2E  强调：玫瑰木 #B76E79
+   背景：米色 #F1EDE6  主色：深绿灰 #2F3E2E  强调：玫瑰木 #9F4E5A
    ────────────────────────────────────────────── */
 :root {
   --color-ink:        #2F3E2E;
   --color-paper:      #F1EDE6;
-  --color-accent:     #B76E79;
+  --color-accent:     #9F4E5A;
   --color-card:       #FAFAF8;
   --border-subtle:    rgba(47, 62, 46, 0.08);
   --border-default:   rgba(47, 62, 46, 0.18);
-  --border-focus:     #B76E79;
+  --border-focus:     #9F4E5A;
   --shadow-card:      0 8px 24px rgba(0,0,0,0.12);
   --radius:           12px;
   --noise-opacity:    0.025;

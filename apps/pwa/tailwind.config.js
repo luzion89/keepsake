@@ -16,9 +16,9 @@ export default {
           card:    '#FAFAF8',
         },
         accent: {
-          DEFAULT: '#B76E79',
-          hover:   '#A55E69',
-          light:   'rgba(183,110,121,0.12)',
+          DEFAULT: '#9F4E5A',
+          hover:   '#8C3D49',
+          light:   'rgba(159,78,90,0.12)',
         },
         danger: {
           DEFAULT: '#C0392B',

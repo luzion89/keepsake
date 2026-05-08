@@ -154,7 +154,7 @@ function ReminderSection({ itemId }: { itemId: string }) {
               </span>
               <button
                 onClick={() => remove(r.id)}
-                className="text-ink-muted hover:text-danger-text transition-colors"
+                className="min-w-[44px] min-h-[44px] text-ink-muted hover:text-danger-text transition-colors flex items-center justify-center"
               >
                 ×
               </button>

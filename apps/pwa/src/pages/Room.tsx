@@ -61,7 +61,7 @@ export function RoomPage() {
             <button
               key={p}
               onClick={() => add(p)}
-              className="text-xs px-3 py-1.5 rounded-full bg-paper-card border border-[var(--border-default)] hover:border-accent/50 hover:bg-paper-dark text-ink-muted transition-all duration-150"
+              className="text-xs px-3 py-2 min-h-[44px] rounded-full bg-paper-card border border-[var(--border-default)] hover:border-accent/50 hover:bg-paper-dark text-ink-muted transition-all duration-150"
             >
               + {p}
             </button>
@@ -102,7 +102,7 @@ export function RoomPage() {
                     await AreaRepo.remove(a.id);
                     await reload();
                   }}
-                  className="text-ink-muted hover:text-danger-text text-lg leading-none transition-colors ml-2"
+                  className="min-w-[44px] min-h-[44px] text-ink-muted hover:text-danger-text text-lg leading-none transition-colors ml-2 flex items-center justify-center"
                   aria-label={`删除区域 ${a.name}`}
                 >
                   ×
