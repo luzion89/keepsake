@@ -161,10 +161,18 @@ export function RoomPage() {
         style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 72px)', right: '20px' }}
       >
         {fabOpen && (
-          <div className="mb-3 bg-paper-card border border-[var(--border-default)] rounded-[12px] shadow-lg p-3 space-y-2 w-64">
+          <div className="mb-3 bg-paper-card border border-[var(--border-default)] rounded-[12px] shadow-lg p-3 space-y-2 w-64 relative">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-medium text-ink-muted">添加区域</span>
+              <button
+                type="button"
+                onClick={() => setFabOpen(false)}
+                className="min-w-[32px] min-h-[32px] flex items-center justify-center rounded-full text-ink-muted hover:text-ink hover:bg-paper-dark transition-colors leading-none"
+                aria-label="关闭"
+              >×</button>
+            </div>
             <form onSubmit={(e) => { e.preventDefault(); add(name); }} className="flex gap-2">
               <input
-                autoFocus
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="区域名（如 洗手台柜子）"
@@ -192,7 +200,7 @@ export function RoomPage() {
           className="w-14 h-14 rounded-full bg-accent hover:bg-accent-hover text-paper text-2xl shadow-lg flex items-center justify-center transition-all active:scale-[0.95]"
           aria-label="添加区域"
         >
-          {fabOpen ? '×' : '+'}
+          <span className={`inline-block transition-transform duration-300 ${fabOpen ? 'rotate-45' : ''}`}>+</span>
         </button>
       </div>
     </div>
