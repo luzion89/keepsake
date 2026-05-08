@@ -82,6 +82,8 @@ export function AreaPage() {
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editItemName, setEditItemName] = useState('');
   const [lightbox, setLightbox] = useState<{ src: string; photoId: string; index: number } | null>(null);
+  const [slideDir, setSlideDir] = useState<'left' | 'right' | 'none'>('none');
+  const [slideKey, setSlideKey] = useState(0);
   const touchStartX = useRef<number | null>(null);
   const editItemRef = useRef<HTMLInputElement>(null);
   const { confirm, dialog } = useConfirm();
@@ -370,14 +372,14 @@ export function AreaPage() {
           const np = sortedPhotos[nextIdx];
           if (!np) return;
           const src = photoBlobUrls[np.id];
-          if (src) setLightbox({ src, photoId: np.id, index: nextIdx });
+          if (src) { setSlideDir('left'); setSlideKey(k => k + 1); setLightbox({ src, photoId: np.id, index: nextIdx }); }
         };
         const goPrev = () => {
           const prevIdx = (currentIdx - 1 + total) % total;
           const pp = sortedPhotos[prevIdx];
           if (!pp) return;
           const src = photoBlobUrls[pp.id];
-          if (src) setLightbox({ src, photoId: pp.id, index: prevIdx });
+          if (src) { setSlideDir('right'); setSlideKey(k => k + 1); setLightbox({ src, photoId: pp.id, index: prevIdx }); }
         };
 
         return (
@@ -390,6 +392,7 @@ export function AreaPage() {
               if (e.key === 'Escape') setLightbox(null);
             }}
             tabIndex={-1}
+            ref={(el) => el?.focus()}
           >
             {/* 顶部工具栏 */}
             <div className="flex items-center justify-between px-4 py-3 shrink-0">
@@ -451,9 +454,16 @@ export function AreaPage() {
               }}
             >
               <img
+                key={slideKey}
                 src={lightbox.src}
                 alt="照片预览"
-                className="max-w-full max-h-full object-contain rounded-[8px]"
+                className={`max-w-full max-h-full object-contain rounded-[8px] ${
+                  slideDir === 'left'
+                    ? 'animate-slide-in-left'
+                    : slideDir === 'right'
+                    ? 'animate-slide-in-right'
+                    : ''
+                }`}
               />
               {/* 左右箭头 (仅多张时显示) */}
               {total > 1 && (
