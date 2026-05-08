@@ -55,12 +55,12 @@ export function AreaPage() {
     await reload();
   };
 
-  if (areaState === 'loading') return <p className="text-slate-400">加载中…</p>;
+  if (areaState === 'loading') return <p className="text-ink-muted">加载中…</p>;
   if (areaState === 'not-found') {
     return (
       <div className="space-y-3">
-        <p className="text-rose-300">⚠️ 找不到该区域（可能已被删除）。</p>
-        <Link to="/" className="text-sky-400 hover:text-sky-300 text-sm">← 返回首页</Link>
+        <p className="text-danger-text">⚠️ 找不到该区域（可能已被删除）。</p>
+        <Link to="/" className="text-accent hover:text-accent-hover text-sm">← 返回首页</Link>
       </div>
     );
   }
@@ -70,31 +70,31 @@ export function AreaPage() {
       {dialog}
 
       {/* ── 面包屑 ────────────────────────────────────── */}
-      <nav className="flex items-center gap-1 text-xs text-slate-500">
-        <Link to="/" className="hover:text-slate-300 transition-colors">房间</Link>
-        <span className="text-slate-700">›</span>
+      <nav className="flex items-center gap-1 text-xs text-ink-muted">
+        <Link to="/" className="hover:text-ink transition-colors">房间</Link>
+        <span className="text-ink-faint">›</span>
         {room && (
           <>
-            <Link to={`/rooms/${room.id}`} className="hover:text-slate-300 transition-colors">{room.name}</Link>
-            <span className="text-slate-700">›</span>
+            <Link to={`/rooms/${room.id}`} className="hover:text-ink transition-colors">{room.name}</Link>
+            <span className="text-ink-faint">›</span>
           </>
         )}
-        <span className="text-slate-300">{area.name}</span>
+        <span className="text-ink">{area!.name}</span>
       </nav>
 
-      <h1 className="text-2xl font-bold text-slate-100">{area.name}</h1>
+      <h1 className="text-2xl font-bold font-serif text-ink">{area!.name}</h1>
 
       {/* ── 主 CTA 按钮区 ─────────────────────────────── */}
       <section className="flex flex-col gap-3">
         <Link
-          to={`/areas/${area.id}/text`}
-          className="w-full py-4 rounded-2xl bg-sky-500 hover:bg-sky-400 active:scale-[0.98] text-white font-semibold text-base text-center shadow-lg shadow-sky-500/20 transition-all duration-150"
+          to={`/areas/${area!.id}/text`}
+          className="w-full py-4 rounded-[12px] bg-accent hover:bg-accent-hover active:scale-[0.98] text-paper font-semibold text-base text-center shadow-card transition-all duration-150"
         >
           📝 录入物品
         </Link>
         <Link
-          to={`/areas/${area.id}/capture`}
-          className="w-full py-3 rounded-2xl bg-slate-900 border border-slate-800 hover:border-sky-500/40 text-slate-100 font-medium text-center transition-all duration-150"
+          to={`/areas/${area!.id}/capture`}
+          className="w-full py-3 rounded-[12px] bg-paper-card border border-[var(--border-default)] hover:border-accent/40 text-ink font-medium text-center transition-all duration-150"
         >
           📷 区域照片
         </Link>
@@ -103,7 +103,7 @@ export function AreaPage() {
       {/* ── 区域照片缩略图 ────────────────────────────── */}
       {photos.length > 0 && (
         <section>
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">已拍照片 ({photos.length})</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted mb-2">已拍照片 ({photos.length})</h2>
           <div className="flex gap-2 overflow-x-auto pb-1">
             {photos.map(p => {
               const src = photoBlobUrls[p.id];
@@ -112,10 +112,10 @@ export function AreaPage() {
                   key={p.id}
                   src={src}
                   alt="区域照片"
-                  className="h-20 w-20 object-cover rounded-xl flex-shrink-0 border border-slate-800"
+                  className="h-20 w-20 object-cover rounded-[12px] flex-shrink-0 border border-[var(--border-default)]"
                 />
               ) : (
-                <div key={p.id} className="h-20 w-20 rounded-xl flex-shrink-0 bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-500 text-xs">
+                <div key={p.id} className="h-20 w-20 rounded-[12px] flex-shrink-0 bg-paper-dark border border-[var(--border-default)] flex items-center justify-center text-ink-muted text-xs">
                   📷
                 </div>
               );
@@ -128,28 +128,28 @@ export function AreaPage() {
       <section>
         <button
           onClick={() => setShowManual(s => !s)}
-          className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+          className="flex items-center gap-1 text-xs text-ink-muted hover:text-ink transition-colors"
         >
           <span className={`inline-block transition-transform duration-150 ${showManual ? 'rotate-90' : ''}`}>›</span>
           手动添加单个物品
         </button>
         {showManual && (
-          <div className="mt-2 bg-slate-900 border border-slate-800 rounded-xl p-3">
+          <div className="mt-2 bg-paper-card border border-[var(--border-default)] rounded-[12px] p-3">
             <div className="flex flex-wrap gap-2">
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="物品名"
-                className="flex-1 min-w-0 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20 transition-all"
+                className="flex-1 min-w-0 bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all text-ink placeholder:text-ink-muted"
               />
               <input
                 type="number"
                 value={qty}
                 min={0}
                 onChange={(e) => setQty(Number(e.target.value))}
-                className="w-20 shrink-0 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm outline-none focus:border-sky-400 transition-all"
+                className="w-20 shrink-0 bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-2 text-sm outline-none focus:border-accent transition-all text-ink"
               />
-              <button onClick={add} className="shrink-0 px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-100 font-medium text-sm transition-all">
+              <button onClick={add} className="shrink-0 px-4 py-2 rounded-[12px] bg-paper-dark border border-[var(--border-default)] hover:border-accent text-ink font-medium text-sm transition-all">
                 添加
               </button>
             </div>
@@ -159,35 +159,35 @@ export function AreaPage() {
 
       {/* ── 物品列表 ──────────────────────────────────── */}
       <section>
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted mb-3">
           物品 {items.length > 0 && `(${items.length})`}
         </h2>
         {items.length === 0 ? (
           <div className="flex flex-col items-center py-10 text-center">
             <span className="text-4xl mb-3">📦</span>
-            <p className="text-slate-400 text-sm">这个区域还没有物品</p>
-            <p className="text-slate-500 text-xs mt-1">点上面的「📝 录入物品」开始</p>
+            <p className="text-ink-muted text-sm">这个区域还没有物品</p>
+            <p className="text-ink-muted/70 text-xs mt-1">点上面的「📝 录入物品」开始</p>
           </div>
         ) : (
           <ul className="space-y-2">
             {items.map(it => (
-              <li key={it.id} className="flex items-center gap-3 px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl shadow-[0_1px_0_0_rgba(255,255,255,0.04)_inset]">
+              <li key={it.id} className="flex items-center gap-3 px-4 py-3 bg-paper-card border border-[var(--border-default)] rounded-[12px] shadow-card">
                 <Link to={`/items/${it.id}`} className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-slate-100 truncate">{it.name}</div>
-                  <div className="text-xs text-slate-500">
+                  <div className="text-sm font-medium text-ink truncate">{it.name}</div>
+                  <div className="text-xs text-ink-muted">
                     {it.source !== 'manual' && <span className="mr-1">{it.source}</span>}
                     {it.confidence != null && <span>{(it.confidence * 100).toFixed(0)}%</span>}
                   </div>
                 </Link>
                 <button
                   onClick={() => ItemRepo.qtyDelta(it.id, -1).then(reload)}
-                  className="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 text-slate-300 hover:border-sky-500 text-sm flex items-center justify-center transition-all"
+                  className="w-7 h-7 rounded-full bg-paper-dark border border-[var(--border-default)] text-ink hover:border-accent text-sm flex items-center justify-center transition-all"
                   aria-label="减少数量"
                 >−</button>
-                <span className="text-sm font-medium w-5 text-center text-slate-100">{it.qty}</span>
+                <span className="text-sm font-medium w-5 text-center text-ink">{it.qty}</span>
                 <button
                   onClick={() => ItemRepo.qtyDelta(it.id, +1).then(reload)}
-                  className="w-7 h-7 rounded-full bg-slate-800 border border-slate-700 text-slate-300 hover:border-sky-500 text-sm flex items-center justify-center transition-all"
+                  className="w-7 h-7 rounded-full bg-paper-dark border border-[var(--border-default)] text-ink hover:border-accent text-sm flex items-center justify-center transition-all"
                   aria-label="增加数量"
                 >+</button>
                 <button
@@ -197,7 +197,7 @@ export function AreaPage() {
                     await ItemRepo.remove(it.id);
                     await reload();
                   }}
-                  className="text-slate-600 hover:text-rose-400 text-lg leading-none transition-colors"
+                  className="text-ink-muted hover:text-danger-text text-lg leading-none transition-colors"
                   aria-label={`删除 ${it.name}`}
                 >×</button>
               </li>
