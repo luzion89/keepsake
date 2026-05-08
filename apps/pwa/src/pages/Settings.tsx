@@ -61,7 +61,6 @@ export function SettingsPage() {
   const [gcResult, setGcResult] = useState<number | null>(null);
   const [gcRunning, setGcRunning] = useState(false);
   const [quota, setQuota] = useState<StorageQuota | null | 'unsupported'>('unsupported');
-  const [noiseEnabled, setNoiseEnabled] = useState(true);
 
   const reloadStats = async () => setStats({
     rooms: await db.rooms.count(),
@@ -83,8 +82,6 @@ export function SettingsPage() {
       reloadStats();
       const q = await getStorageQuota();
       setQuota(q);
-      // 读取纸张颗粒偏好
-      setNoiseEnabled(localStorage.getItem('noise_disabled') !== '1');
     })();
   }, []);
 
@@ -143,18 +140,6 @@ export function SettingsPage() {
       reloadStats();
     } finally {
       setGcRunning(false);
-    }
-  };
-
-  const toggleNoise = () => {
-    const next = !noiseEnabled;
-    setNoiseEnabled(next);
-    if (next) {
-      localStorage.removeItem('noise_disabled');
-      document.documentElement.style.setProperty('--noise-opacity', '0.025');
-    } else {
-      localStorage.setItem('noise_disabled', '1');
-      document.documentElement.style.setProperty('--noise-opacity', '0');
     }
   };
 
@@ -296,26 +281,6 @@ export function SettingsPage() {
         )}
       </div>
 
-      {/* ── 外观 ──────────────────────────────────── */}
-      <Section title="外观">
-        <SectionRow>
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-sm text-ink">纸张颗粒纹理</span>
-              <p className="text-xs text-ink-muted mt-0.5">极淡纹理模拟纸张质感</p>
-            </div>
-            <button
-              onClick={toggleNoise}
-              className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${noiseEnabled ? 'bg-accent' : 'bg-ink-faint'}`}
-              role="switch"
-              aria-checked={noiseEnabled}
-              aria-label="切换纸张颗粒纹理"
-            >
-              <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-paper shadow-sm transition-transform duration-200 ${noiseEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
-            </button>
-          </div>
-        </SectionRow>
-      </Section>
 
       {/* ── 本地服务器 ─────────────────────────────── */}
       <Section title="本地服务器">

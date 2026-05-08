@@ -26,7 +26,6 @@ export function SearchPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [areas, setAreas] = useState<Map<string, Area>>(new Map());
   const [rooms, setRooms] = useState<Map<string, Room>>(new Map());
-  const [listening, setListening] = useState(false);
 
   // AI answer state
   const [aiEnabled, setAiEnabled] = useState(false);
@@ -75,22 +74,6 @@ export function SearchPage() {
     return Array.from(g.entries());
   }, [items]);
 
-  const startVoice = () => {
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) { alert('当前浏览器不支持语音识别，请手动输入。'); return; }
-    const rec = new SR();
-    rec.lang = 'zh-CN';
-    rec.continuous = false;
-    rec.interimResults = false;
-    rec.onstart = () => setListening(true);
-    rec.onend = () => setListening(false);
-    rec.onerror = () => setListening(false);
-    rec.onresult = (e: any) => {
-      const text = Array.from(e.results).map((r: any) => r[0].transcript).join('');
-      setQ(text);
-    };
-    rec.start();
-  };
 
   const askAi = async () => {
     if (!aiEnabled) {
@@ -151,48 +134,36 @@ export function SearchPage() {
         直接搜索关键词，也可以用语音输入一段模糊的描述，让 AI 帮忙查找符合描述的物品
       </div>
 
-      {/* ── 搜索输入框 ────────────────────────────────── */}
-      <input
-        autoFocus
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        placeholder="输入关键词…"
-        className="w-full h-12 bg-paper-card border border-[var(--border-default)] rounded-[12px] px-4 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-150 text-ink placeholder:text-ink-muted"
-      />
-
-      {/* ── 三按钮 grid ───────────────────────────────── */}
-      <div className="grid grid-cols-3 gap-2 mt-3">
-        {/* 搜索按钮 */}
-        <button
-          onClick={() => { /* search is live via useEffect */ }}
-          disabled={!q.trim()}
-          className="h-11 flex items-center justify-center gap-1.5 rounded-[12px] bg-accent hover:bg-accent-hover text-paper font-medium text-sm disabled:opacity-50 transition-all duration-150 active:scale-[0.97]"
-        >
-          🔍 搜索
-        </button>
-
-        {/* 语音按钮 */}
-        <button
-          onClick={startVoice}
-          aria-label="语音输入"
-          className={`h-11 flex items-center justify-center gap-1.5 rounded-[12px] border font-medium text-sm transition-all duration-150 ${
-            listening
-              ? 'bg-danger border-danger animate-pulse text-paper'
-              : 'border-[var(--border-default)] text-ink hover:border-accent/60'
-          }`}
-        >
-          🎙 语音
-        </button>
-
+      {/* ── 搜索输入框 + AI 按钮 ─────────────────────── */}
+      <div className="flex gap-2">
+        <textarea
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value);
+            e.target.style.height = 'auto';
+            e.target.style.height = e.target.scrollHeight + 'px';
+          }}
+          onFocus={(e) => {
+            e.target.style.height = 'auto';
+            e.target.style.height = e.target.scrollHeight + 'px';
+          }}
+          onBlur={(e) => {
+            e.target.style.height = '';
+          }}
+          placeholder="输入关键词…"
+          rows={1}
+          className="flex-1 bg-paper-card border border-[var(--border-default)] rounded-[12px] px-4 py-3 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-150 text-ink placeholder:text-ink-muted resize-none overflow-hidden leading-[1.5]"
+          style={{ minHeight: '48px' }}
+        />
         {/* AI 按钮 — 始终渲染 */}
         <button
           onClick={askAi}
-          disabled={aiLoading || (aiEnabled && !q.trim())}
-          className={`h-11 flex items-center justify-center gap-1.5 rounded-[12px] border font-medium text-sm transition-all duration-150 active:scale-[0.97] ${
+          disabled={aiLoading}
+          className={`self-start h-12 px-4 flex items-center justify-center gap-1.5 rounded-[12px] font-medium text-sm transition-all duration-150 active:scale-[0.97] ${
             aiEnabled && q.trim()
-              ? 'border-accent bg-accent text-paper hover:bg-accent-hover'
-              : 'border-[var(--border-default)] text-ink-muted'
-          } ${(!aiEnabled) ? 'opacity-60 cursor-not-allowed' : ''}`}
+              ? 'bg-accent hover:bg-accent-hover text-paper'
+              : 'border border-[var(--border-default)] text-ink-muted opacity-60'
+          }`}
         >
           {aiLoading ? '思考中…' : '✨ AI'}
         </button>
