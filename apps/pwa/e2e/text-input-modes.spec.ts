@@ -2,21 +2,30 @@
  * text-input-modes.spec.ts
  * 测试 TextInput 页的 mode toggle（增改/覆盖）、replace 模式的 confirm 弹窗行为。
  * AI 调用通过拦截网络请求 mock 掉，避免真实 API 调用。
+ *
+ * 注意：v3.1 重构后 Home/Room 页改用 FAB 添加表单。
  */
 import { test, expect, type Page } from '@playwright/test';
+
+async function addViaFab(page: Page, ariaLabel: string, placeholder: string, value: string) {
+  await page.locator(`[aria-label="${ariaLabel}"]`).click();
+  await page.waitForTimeout(100);
+  await page.fill(`input[placeholder*="${placeholder}"]`, value);
+  await page.locator('button:has-text("添加")').last().click();
+  await page.waitForTimeout(200);
+}
 
 /** 快速建房间 + 区域，进入 /areas/:id/text 页，返回 areaId */
 async function goToTextInput(page: Page): Promise<string> {
   await page.goto('/');
 
   const roomName = `TextModes房_${Date.now()}`;
-  await page.fill('input[placeholder*="房间名"]', roomName);
-  await page.click('button:has-text("添加")');
+  await addViaFab(page, '添加房间', '房间名', roomName);
   await page.click(`text=${roomName}`);
+  await page.waitForURL(/\/rooms\//);
 
   const areaName = `TextModes区_${Date.now()}`;
-  await page.fill('input[placeholder*="区域名"]', areaName);
-  await page.click('button:has-text("添加")');
+  await addViaFab(page, '添加区域', '区域名', areaName);
   await page.click(`text=${areaName}`);
   await page.waitForURL(/\/areas\//);
 
@@ -119,16 +128,14 @@ test.describe('TextInput 模式切换 (#78)', () => {
   });
 
   test('覆盖模式拒绝 confirm → 停留 text 页不跳转', async ({ page }) => {
-    // 建房间+区域
     await page.goto('/');
     const roomName = `覆盖拒绝房_${Date.now()}`;
-    await page.fill('input[placeholder*="房间名"]', roomName);
-    await page.click('button:has-text("添加")');
+    await addViaFab(page, '添加房间', '房间名', roomName);
     await page.click(`text=${roomName}`);
+    await page.waitForURL(/\/rooms\//);
 
     const areaName = `覆盖拒绝区_${Date.now()}`;
-    await page.fill('input[placeholder*="区域名"]', areaName);
-    await page.click('button:has-text("添加")');
+    await addViaFab(page, '添加区域', '区域名', areaName);
     await page.click(`text=${areaName}`);
     await page.waitForURL(/\/areas\//);
 
@@ -156,13 +163,12 @@ test.describe('TextInput 模式切换 (#78)', () => {
   test('覆盖模式接受 confirm → 跳转回 area 页', async ({ page }) => {
     await page.goto('/');
     const roomName = `覆盖接受房_${Date.now()}`;
-    await page.fill('input[placeholder*="房间名"]', roomName);
-    await page.click('button:has-text("添加")');
+    await addViaFab(page, '添加房间', '房间名', roomName);
     await page.click(`text=${roomName}`);
+    await page.waitForURL(/\/rooms\//);
 
     const areaName = `覆盖接受区_${Date.now()}`;
-    await page.fill('input[placeholder*="区域名"]', areaName);
-    await page.click('button:has-text("添加")');
+    await addViaFab(page, '添加区域', '区域名', areaName);
     await page.click(`text=${areaName}`);
     await page.waitForURL(/\/areas\//);
     const areaId = page.url().split('/areas/')[1].replace(/\/.*$/, '');
@@ -180,16 +186,14 @@ test.describe('TextInput 模式切换 (#78)', () => {
   });
 
   test('增改模式 badge：新增显示「新增」、已有显示「更新」', async ({ page }) => {
-    // 建区域 + 先有物品
     await page.goto('/');
     const roomName = `Badge测试房_${Date.now()}`;
-    await page.fill('input[placeholder*="房间名"]', roomName);
-    await page.click('button:has-text("添加")');
+    await addViaFab(page, '添加房间', '房间名', roomName);
     await page.click(`text=${roomName}`);
+    await page.waitForURL(/\/rooms\//);
 
     const areaName = `Badge测试区_${Date.now()}`;
-    await page.fill('input[placeholder*="区域名"]', areaName);
-    await page.click('button:has-text("添加")');
+    await addViaFab(page, '添加区域', '区域名', areaName);
     await page.click(`text=${areaName}`);
     await page.waitForURL(/\/areas\//);
 

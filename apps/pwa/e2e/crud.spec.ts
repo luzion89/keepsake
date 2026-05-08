@@ -1,37 +1,49 @@
 /**
  * crud.spec.ts
  * 端到端 CRUD 流程：新建房间 → 进入 → 新建区域 → 进入 → 手动添加物品 → 详情页改 expires_at + notes → 删除
+ *
+ * 注意：v3.1 重构后 Home/Room 页改用 FAB 添加表单，不再有常驻 input。
+ * 操作流程：点 FAB → 展开 form → 填写 → 提交。
  */
 import { test, expect } from '@playwright/test';
+
+/** 打开 FAB 并添加条目 */
+async function addViaFab(page: import('@playwright/test').Page, placeholder: string, value: string) {
+  // 点开 FAB
+  await page.locator('[aria-label="添加房间"], [aria-label="添加区域"]').last().click();
+  await page.waitForTimeout(100);
+  await page.fill(`input[placeholder*="${placeholder}"]`, value);
+  await page.locator('button:has-text("添加")').last().click();
+  await page.waitForTimeout(200);
+}
 
 test.describe('CRUD 全流程', () => {
   test('新建房间 → 区域 → 物品 → 编辑 → 删除', async ({ page }) => {
     await page.goto('/');
 
-    // ── 1. 新建房间 ──────────────────────────────────────────
+    // ── 1. 新建房间（via FAB）──────────────────────────────────
     const roomName = `测试房间_${Date.now()}`;
-    await page.fill('input[placeholder*="房间名"]', roomName);
-    await page.click('button:has-text("添加")');
+    await addViaFab(page, '房间名', roomName);
 
-    // 房间卡出现在列表
+    // 房间出现在列表
     await expect(page.locator(`text=${roomName}`).first()).toBeVisible();
 
     // ── 2. 进入房间页 ─────────────────────────────────────────
     await page.click(`text=${roomName}`);
     await expect(page).toHaveURL(/\/rooms\//);
-    await expect(page.locator('h1')).toContainText(roomName);
+    // 新版本用 nav breadcrumb 显示房间名（不是 h1）
+    await expect(page.locator(`text=${roomName}`).first()).toBeVisible();
 
-    // ── 3. 新建区域 ──────────────────────────────────────────
+    // ── 3. 新建区域（via FAB）──────────────────────────────────
     const areaName = `测试区域_${Date.now()}`;
-    await page.fill('input[placeholder*="区域名"]', areaName);
-    await page.click('button:has-text("添加")');
+    await addViaFab(page, '区域名', areaName);
 
     await expect(page.locator(`text=${areaName}`).first()).toBeVisible();
 
     // ── 4. 进入区域页 ─────────────────────────────────────────
     await page.click(`text=${areaName}`);
     await expect(page).toHaveURL(/\/areas\//);
-    await expect(page.locator('h1')).toContainText(areaName);
+    await expect(page.locator(`text=${areaName}`).first()).toBeVisible();
 
     // ── 5. 展开「手动添加」并添加物品 ─────────────────────────
     await page.click('button:has-text("手动添加")');
