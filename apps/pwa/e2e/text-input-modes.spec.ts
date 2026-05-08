@@ -81,7 +81,7 @@ async function setupAiAndParse(
   // 如需 replace 模式，先切换
   if (mode === 'replace') {
     await page.click('button:has-text("覆盖模式")');
-    await expect(page.locator('button:has-text("覆盖模式")')).toHaveClass(/bg-amber-600/);
+    await expect(page.locator('button:has-text("覆盖模式")')).toHaveClass(/bg-warn/);
   }
 
   // 填入文字并触发解析
@@ -96,17 +96,17 @@ test.describe('TextInput 模式切换 (#78)', () => {
     await goToTextInput(page);
     const mergeBtn = page.locator('button:has-text("增改模式")');
     await expect(mergeBtn).toBeVisible();
-    // PR-C 重构后：增改模式 active 使用 bg-slate-700（neutral dark），覆盖模式 active 使用 bg-amber-600/80
-    await expect(mergeBtn).toHaveClass(/bg-slate-700/);
-    await expect(page.locator('button:has-text("覆盖模式")')).not.toHaveClass(/bg-amber-600/);
+    // v3 重构后：增改模式 active 使用 bg-ink，覆盖模式 active 使用 bg-warn
+    await expect(mergeBtn).toHaveClass(/bg-ink/);
+    await expect(page.locator('button:has-text("覆盖模式")')).not.toHaveClass(/bg-warn/);
   });
 
   test('点「覆盖模式」→ amber 背景激活，hint 含"将清空"', async ({ page }) => {
     await goToTextInput(page);
     await page.click('button:has-text("覆盖模式")');
 
-    await expect(page.locator('button:has-text("覆盖模式")')).toHaveClass(/bg-amber-600/);
-    await expect(page.locator('button:has-text("增改模式")')).not.toHaveClass(/bg-slate-700/);
+    await expect(page.locator('button:has-text("覆盖模式")')).toHaveClass(/bg-warn/);
+    await expect(page.locator('button:has-text("增改模式")')).not.toHaveClass(/bg-ink/);
     await expect(page.locator('text=/将清空该区域所有/')).toBeVisible();
   });
 
@@ -114,8 +114,8 @@ test.describe('TextInput 模式切换 (#78)', () => {
     await goToTextInput(page);
     await page.click('button:has-text("覆盖模式")');
     await page.click('button:has-text("增改模式")');
-    // PR-C 重构后：增改模式 active = bg-slate-700
-    await expect(page.locator('button:has-text("增改模式")')).toHaveClass(/bg-slate-700/);
+    // v3 重构后：增改模式 active = bg-ink
+    await expect(page.locator('button:has-text("增改模式")')).toHaveClass(/bg-ink/);
   });
 
   test('覆盖模式拒绝 confirm → 停留 text 页不跳转', async ({ page }) => {
