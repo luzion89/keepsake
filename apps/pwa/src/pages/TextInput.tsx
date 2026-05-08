@@ -1,6 +1,6 @@
 /**
  * TextInput.tsx — 文字录入页 (#65, #78)
- * 视觉重构 PR-C (#88)
+ * 视觉重构 PR-D (#97)
  */
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -142,48 +142,48 @@ export function TextInputPage() {
     }
   };
 
-  if (areaState === 'loading') return <p className="text-slate-400">加载中…</p>;
+  if (areaState === 'loading') return <p className="text-ink-muted">加载中…</p>;
   if (areaState === 'not-found') {
     return (
       <div className="space-y-3">
-        <p className="text-rose-300">⚠️ 找不到该区域（可能已被删除）。</p>
-        <Link to="/" className="text-sky-400 hover:text-sky-300 text-sm">← 返回首页</Link>
+        <p className="text-danger-text">⚠️ 找不到该区域（可能已被删除）。</p>
+        <Link to="/" className="text-accent hover:text-accent-hover text-sm">← 返回首页</Link>
       </div>
     );
   }
 
   return (
     <div className="space-y-5">
-      <nav className="flex items-center gap-1 text-xs text-slate-500">
-        <Link to={`/areas/${areaId}`} className="hover:text-slate-300 transition-colors">← {area!.name}</Link>
+      <nav className="flex items-center gap-1 text-xs text-ink-muted">
+        <Link to={`/areas/${areaId}`} className="hover:text-ink transition-colors">← {area!.name}</Link>
       </nav>
-      <h1 className="text-xl font-semibold">📝 文字录入 · {area!.name}</h1>
+      <h1 className="text-xl font-semibold text-ink">📝 文字录入 · {area!.name}</h1>
 
       {/* ── 模式切换 segmented control ─────────────────── */}
       <section>
-        <div className="bg-slate-900 rounded-xl p-1 flex gap-1 border border-slate-800">
+        <div className="bg-paper-card rounded-[12px] p-1 flex gap-1 border border-[var(--border-default)]">
           <button
             onClick={() => switchMode('merge')}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${
+            className={`flex-1 py-2 rounded-[10px] text-sm font-medium transition-all duration-150 ${
               mode === 'merge'
-                ? 'bg-slate-700 text-slate-100'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-ink text-paper'
+                : 'text-ink-muted hover:text-ink'
             }`}
           >
             增改模式（默认）
           </button>
           <button
             onClick={() => switchMode('replace')}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${
+            className={`flex-1 py-2 rounded-[10px] text-sm font-medium transition-all duration-150 ${
               mode === 'replace'
-                ? 'bg-amber-600/80 text-amber-100'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-warn text-paper'
+                : 'text-ink-muted hover:text-ink'
             }`}
           >
             覆盖模式
           </button>
         </div>
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-xs text-ink-muted">
           {mode === 'merge'
             ? '✏️ AI 将结合现有 ' + existingItems.length + ' 个物品，智能新增或更新'
             : '⚠️ 将清空该区域所有 ' + existingItems.length + ' 个现有物品并全量替换'}
@@ -192,7 +192,7 @@ export function TextInputPage() {
 
       {/* Replace warning */}
       {mode === 'replace' && existingItems.length > 0 && (
-        <div className="bg-amber-900/40 border border-amber-700 rounded-xl px-4 py-3 text-amber-300 text-sm">
+        <div className="bg-warn-bg border border-warn/30 rounded-[12px] px-4 py-3 text-warn-text text-sm">
           ⚠️ 覆盖模式：确认入库将删除该区域所有 {existingItems.length} 个现有物品
         </div>
       )}
@@ -204,18 +204,18 @@ export function TextInputPage() {
           onChange={e => setText(e.target.value)}
           placeholder="例如：两瓶消毒水、一盒抽纸、洗发水三瓶…"
           rows={5}
-          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm leading-relaxed resize-none outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20 transition-all duration-150"
+          className="w-full bg-paper-card border border-[var(--border-default)] rounded-[12px] px-4 py-3 text-sm leading-relaxed resize-none outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-150 text-ink placeholder:text-ink-muted"
         />
-        <p className="text-xs text-slate-500">💡 可使用输入法的语音转文字功能</p>
+        <p className="text-xs text-ink-muted">💡 可使用输入法的语音转文字功能</p>
         <div className="flex gap-2">
           <button
             onClick={parse}
             disabled={busy || !text.trim()}
-            className="flex-1 px-4 py-2.5 rounded-xl bg-sky-500 hover:bg-sky-400 active:scale-[0.97] text-white font-medium text-sm shadow-lg shadow-sky-500/20 disabled:opacity-50 flex items-center justify-center gap-2 transition-all duration-150"
+            className="flex-1 px-4 py-2.5 rounded-[12px] bg-accent hover:bg-accent-hover active:scale-[0.97] text-paper font-medium text-sm shadow-card disabled:opacity-50 flex items-center justify-center gap-2 transition-all duration-150"
           >
             {busy ? (
               <>
-                <span className="inline-block w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                <span className="inline-block w-4 h-4 border-2 border-paper/40 border-t-paper rounded-full animate-spin" />
                 解析中…
               </>
             ) : '解析'}
@@ -223,7 +223,7 @@ export function TextInputPage() {
           <button
             onClick={clear}
             disabled={busy}
-            className="px-4 py-2.5 rounded-xl border border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700 disabled:opacity-50 text-sm transition-all"
+            className="px-4 py-2.5 rounded-[12px] border border-[var(--border-default)] text-ink-muted hover:text-ink hover:border-ink/30 disabled:opacity-50 text-sm transition-all"
           >
             清空
           </button>
@@ -231,7 +231,7 @@ export function TextInputPage() {
       </section>
 
       {errMsg && (
-        <div className="bg-rose-900/40 border border-rose-700 rounded-xl px-4 py-3 text-rose-300 text-sm">
+        <div className="bg-danger-bg border border-danger/30 rounded-[12px] px-4 py-3 text-danger-text text-sm">
           {errMsg}
         </div>
       )}
@@ -239,12 +239,12 @@ export function TextInputPage() {
       {/* ── 草稿列表 ──────────────────────────────────── */}
       {parsed && (
         <section className="space-y-3">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
             草稿（共 {drafts.length} 项，请核对）
           </h2>
 
           {drafts.length === 0 && (
-            <p className="text-slate-500 text-sm">未识别到任何物品，请修改文本后重新解析。</p>
+            <p className="text-ink-muted text-sm">未识别到任何物品，请修改文本后重新解析。</p>
           )}
 
           <ul className="space-y-2">
@@ -253,44 +253,44 @@ export function TextInputPage() {
                 it => it.name.trim().toLowerCase() === d.name.trim().toLowerCase()
               );
               return (
-                <li key={i} className="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-2">
+                <li key={i} className="bg-paper-card border border-[var(--border-default)] rounded-[12px] p-3 space-y-2">
                   <div className="flex items-center gap-2">
                     <input
                       value={d.name}
                       onChange={e => updateDraft(i, { name: e.target.value })}
                       placeholder="物品名称"
-                      className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-sky-400 transition-all"
+                      className="flex-1 bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-1.5 text-sm outline-none focus:border-accent transition-all text-ink placeholder:text-ink-muted"
                     />
                     <input
                       type="number"
                       value={d.qty}
                       min={0}
                       onChange={e => updateDraft(i, { qty: Number(e.target.value) })}
-                      className="w-16 bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-sky-400 transition-all"
+                      className="w-16 bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-1.5 text-sm outline-none focus:border-accent transition-all text-ink"
                       aria-label="数量"
                     />
                     {mode === 'merge' && (
                       <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${
                         isExisting
-                          ? 'bg-amber-900/60 text-amber-300'
-                          : 'bg-emerald-900/60 text-emerald-300'
+                          ? 'bg-warn-bg text-warn-text'
+                          : 'bg-ok-bg text-ok-text'
                       }`}>
                         {isExisting ? '更新' : '新增'}
                       </span>
                     )}
                     <button
                       onClick={() => removeDraft(i)}
-                      className="text-slate-600 hover:text-rose-400 text-lg leading-none transition-colors"
+                      className="text-ink-muted hover:text-danger-text text-lg leading-none transition-colors"
                       aria-label="删除此行"
                     >×</button>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <label className="text-xs text-slate-500 w-12">有效期</label>
+                    <label className="text-xs text-ink-muted w-12">有效期</label>
                     <input
                       type="date"
                       value={d.expiresDate}
                       onChange={e => updateDraft(i, { expiresDate: e.target.value })}
-                      className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-sky-400 transition-all"
+                      className="bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-1.5 text-sm outline-none focus:border-accent transition-all text-ink"
                     />
                   </div>
                   <textarea
@@ -298,7 +298,7 @@ export function TextInputPage() {
                     onChange={e => updateDraft(i, { notes: e.target.value })}
                     placeholder="备注（可选）"
                     rows={1}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5 text-sm resize-none outline-none focus:border-sky-400 transition-all"
+                    className="w-full bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-1.5 text-sm resize-none outline-none focus:border-accent transition-all text-ink placeholder:text-ink-muted"
                   />
                 </li>
               );
@@ -307,7 +307,7 @@ export function TextInputPage() {
 
           <button
             onClick={() => setDrafts(arr => [...arr, { name: '', qty: 1, expiresDate: '', notes: '' }])}
-            className="text-sm text-sky-400 hover:text-sky-300 transition-colors"
+            className="text-sm text-accent hover:text-accent-hover transition-colors"
           >
             + 手动追加一项
           </button>
@@ -316,15 +316,15 @@ export function TextInputPage() {
             <button
               onClick={commit}
               disabled={busy}
-              className={`w-full py-3.5 rounded-xl font-semibold text-base shadow-lg disabled:opacity-50 flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98] ${
+              className={`w-full py-3.5 rounded-[12px] font-semibold text-base shadow-card disabled:opacity-50 flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98] ${
                 mode === 'replace'
-                  ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-amber-500/20'
-                  : 'bg-sky-500 hover:bg-sky-400 text-white shadow-sky-500/20'
+                  ? 'bg-warn hover:opacity-90 text-paper'
+                  : 'bg-accent hover:bg-accent-hover text-paper'
               }`}
             >
               {busy ? (
                 <>
-                  <span className="inline-block w-4 h-4 border-2 border-current/40 border-t-current rounded-full animate-spin" />
+                  <span className="inline-block w-4 h-4 border-2 border-paper/40 border-t-paper rounded-full animate-spin" />
                   保存中…
                 </>
               ) : mode === 'replace'
