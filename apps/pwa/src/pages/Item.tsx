@@ -87,7 +87,7 @@ function ReminderSection({ itemId }: { itemId: string }) {
             onChange={e => setKind(e.target.value as ReminderRule['kind'])}
             className="w-full bg-paper-card border border-[var(--border-default)] rounded-[12px] px-3 py-2 outline-none focus:border-accent transition-all text-ink"
           >
-            <option value="expiry">过期提醒（有效期前 7 天）</option>
+            <option value="expiry">过期提醒（过期时间前 7 天）</option>
             <option value="low_stock">库存不足</option>
             <option value="recheck">定期检查</option>
           </select>
@@ -267,7 +267,7 @@ export function ItemPage() {
           </SectionCard>
 
           <SectionCard label="时间">
-            <FieldRow label="有效期">
+            <FieldRow label="过期时间">
               <div className="flex items-center gap-2">
                 <input
                   type="date"
@@ -339,7 +339,7 @@ export function ItemPage() {
               <p>创建于：{new Date(item.created_at).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</p>
             )}
             {item.expires_at != null && (
-              <p>有效期：{new Date(item.expires_at).toLocaleDateString('zh-CN')}</p>
+              <p>过期时间：{new Date(item.expires_at).toLocaleDateString('zh-CN')}</p>
             )}
             {item.source !== 'manual' && (
               <p>来源：{item.source}{item.confidence != null && ` · 置信度 ${(item.confidence * 100).toFixed(0)}%`}</p>
