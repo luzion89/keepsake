@@ -8,38 +8,56 @@ const PRESETS = ['厨房', '客厅', '阳台', '主卧', '次卧', '卫生间', 
 
 interface RoomMeta { room: Room; areaCount: number }
 
-/** Three-dot dropdown menu */
+/** Three-dot dropdown menu — fixed 定位，自动向上/下翻转，避免被 overflow 裁剪 */
 function DotMenu({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!open) return;
-    const close = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', close);
+    const close = (e: MouseEvent) => { setOpen(false); };
+    document.addEventListener('mousedown', close, { once: true });
     return () => document.removeEventListener('mousedown', close);
   }, [open]);
+  const toggle = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      const menuH = 92;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const top = spaceBelow >= menuH ? rect.bottom + 4 : rect.top - menuH - 4;
+      setPos({ top, right: window.innerWidth - rect.right });
+    }
+    setOpen(v => !v);
+  };
   return (
-    <div ref={ref} className="relative">
+    <>
       <button
-        onClick={(e) => { e.preventDefault(); setOpen(v => !v); }}
+        ref={btnRef}
+        onClick={toggle}
         className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-ink-muted hover:text-ink transition-colors"
         aria-label="更多操作"
       >
         ⋯
       </button>
-      {open && (
-        <div className="absolute right-0 top-full mt-1 z-20 bg-paper-card border border-[var(--border-default)] rounded-[12px] shadow-lg overflow-hidden min-w-[120px]" onClick={() => setOpen(false)}>
+      {open && pos && (
+        <div
+          className="fixed z-50 bg-paper-card border border-[var(--border-default)] rounded-[12px] shadow-lg overflow-hidden min-w-[120px]"
+          style={{ top: pos.top, right: pos.right }}
+          onMouseDown={e => e.stopPropagation()}
+          onClick={() => setOpen(false)}
+        >
           {children}
         </div>
       )}
-    </div>
+    </>
   );
 }
 
 export function HomePage() {
   const [metas, setMetas] = useState<RoomMeta[]>([]);
+  const [loading, setLoading] = useState(true);
   const [fabOpen, setFabOpen] = useState(false);
   const [name, setName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -56,6 +74,7 @@ export function HomePage() {
       })
     );
     setMetas(result);
+    setLoading(false);
   };
   useEffect(() => { reload(); }, []);
 
@@ -107,7 +126,11 @@ export function HomePage() {
         <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted mb-3">
           我的房间 {metas.length > 0 && `(${metas.length})`}
         </h2>
-        {metas.length === 0 ? (
+        {loading ? (
+          <div className="flex flex-col items-center py-12 text-center">
+            <p className="text-ink-muted text-sm">加载中…</p>
+          </div>
+        ) : metas.length === 0 ? (
           <div className="flex flex-col items-center py-12 text-center">
             <span className="text-4xl mb-3">🏠</span>
             <p className="text-ink-muted text-sm font-medium">还没有房间</p>

@@ -122,6 +122,7 @@ export async function pullAiConfigFromServer(): Promise<void> {
 export interface RecognitionItem {
   name: string;
   qty: number;
+  unit?: string;
   confidence?: number;
   expires_at?: string | null;
   notes?: string;
@@ -341,11 +342,13 @@ ${contextBlock || '（无匹配物品）'}
   }
 }
 
-const PARSE_ITEMS_SYSTEM_PROMPT = `从用户的中文描述中抽取家庭物品清单。每个物品输出 { name, qty, expires_at, notes }：
-- qty: 用户没说默认 1
+const PARSE_ITEMS_SYSTEM_PROMPT = `从用户的中文描述中抽取家庭物品清单。每个物品输出 { name, qty, unit, expires_at, notes }：
+- qty: 纯数字，用户没说默认 1；中文数字转阿拉伯数字（一→1，两/二→2，三→3，半→0.5，以此类推）
+- unit: 量词单位（如 盒、瓶、包、个、根、张、套、组、卷、袋、罐、块……），从描述中单独提取；无法识别则输出 null
+- 示例："一盒创可贴" → qty:1, unit:"盒", name:"创可贴"；"三瓶洗发水" → qty:3, unit:"瓶", name:"洗发水"
 - expires_at: 如果用户提到"过期"、"保质期到"、"X 月前买的可以放 X 个月"等可推断的，输出 ISO 日期字符串（YYYY-MM-DD）；不确定就 null
-- notes: 用户对这个物品的额外描述，比如品牌、型号、用途、放置原因等
-仅返回 JSON：{"items":[{"name":string,"qty":number,"expires_at":string|null,"notes":string?}]}`;
+- notes: 用户对这个物品的额外描述（品牌、型号、用途等）；qty/unit 已结构化的数量词不要放入 notes
+仅返回 JSON：{"items":[{"name":string,"qty":number,"unit":string|null,"expires_at":string|null,"notes":string?}]}`;
 
 function buildMergeSystemPrompt(existingItems: ExistingItem[]): string {
   const existingJson = JSON.stringify(existingItems, null, 2);
@@ -354,18 +357,20 @@ ${existingJson}
 
 请结合用户新输入，输出**最终完整物品列表**（含已有未变动项 + 新增项 + 修改项）。
 合并规则：
-- 用户提到的物品，若与现有物品名称相同（忽略空格大小写），则更新其 qty（累加或以用户指定为准）、expires_at、notes
+- 用户提到的物品，若与现有物品名称相同（忽略空格大小写），则更新其 qty（累加或以用户指定为准）、unit、expires_at、notes
 - 用户提到的新物品直接加入列表
 - 未被用户提及的现有物品保留原样（qty/expires_at/notes 不变）
-- qty: 用户没说数量默认 1，若是追加说明则累加到现有数量
+- qty: 纯数字，用户没说数量默认 1，中文数字转阿拉伯数字，若是追加说明则累加到现有数量
+- unit: 量词单位（盒、瓶、包、个……）；无法识别则 null
 - expires_at: ISO 日期字符串（YYYY-MM-DD）或 null
 - notes: 合并有意义的备注，重复的去掉
-仅返回 JSON：{"items":[{"name":string,"qty":number,"expires_at":string|null,"notes":string?}]}`;
+仅返回 JSON：{"items":[{"name":string,"qty":number,"unit":string|null,"expires_at":string|null,"notes":string?}]}`;
 }
 
 export interface ExistingItem {
   name: string;
   qty: number;
+  unit?: string;
   expires_at?: string | null;
   notes?: string;
 }
