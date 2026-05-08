@@ -27,32 +27,32 @@ export function RoomPage() {
     await reload();
   };
 
-  if (!room) return <p className="text-slate-400">加载中…</p>;
+  if (!room) return <p className="text-ink-muted">加载中…</p>;
 
   return (
     <div className="space-y-6">
       {dialog}
 
       {/* ── 面包屑 ────────────────────────────────────── */}
-      <nav className="flex items-center gap-1 text-xs text-slate-500">
-        <Link to="/" className="hover:text-slate-300 transition-colors">房间</Link>
-        <span className="text-slate-700">›</span>
-        <span className="text-slate-300">{room.name}</span>
+      <nav className="flex items-center gap-1 text-xs text-ink-muted">
+        <Link to="/" className="hover:text-ink transition-colors">房间</Link>
+        <span className="text-ink-faint">›</span>
+        <span className="text-ink">{room.name}</span>
       </nav>
 
-      <h1 className="text-2xl font-bold text-slate-100">{room.name}</h1>
+      <h1 className="text-2xl font-bold font-serif text-ink">{room.name}</h1>
 
       {/* ── 添加区域表单 ──────────────────────────────── */}
       <section>
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">添加区域</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted mb-3">添加区域</h2>
         <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); add(name); }}>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="区域名（如 洗手台柜子）"
-            className="flex-1 min-w-0 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20 transition-all duration-150"
+            className="flex-1 min-w-0 bg-paper-card border border-[var(--border-default)] rounded-[12px] px-4 py-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-150 text-ink placeholder:text-ink-muted"
           />
-          <button className="shrink-0 px-4 py-3 rounded-xl bg-sky-500 hover:bg-sky-400 active:scale-[0.97] text-white font-medium text-sm shadow-lg shadow-sky-500/20 transition-all duration-150">
+          <button className="shrink-0 px-4 py-3 rounded-[12px] bg-accent hover:bg-accent-hover active:scale-[0.97] text-paper font-medium text-sm shadow-card transition-all duration-150">
             添加
           </button>
         </form>
@@ -61,7 +61,7 @@ export function RoomPage() {
             <button
               key={p}
               onClick={() => add(p)}
-              className="text-xs px-3 py-1.5 rounded-full bg-slate-800 border border-slate-800 hover:border-sky-500/60 hover:bg-slate-700 text-slate-300 transition-all duration-150"
+              className="text-xs px-3 py-2 min-h-[44px] rounded-full bg-paper-card border border-[var(--border-default)] hover:border-accent/50 hover:bg-paper-dark text-ink-muted transition-all duration-150"
             >
               + {p}
             </button>
@@ -71,22 +71,22 @@ export function RoomPage() {
 
       {/* ── 区域列表 ──────────────────────────────────── */}
       <section>
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted mb-3">
           区域 {areas.length > 0 && `(${areas.length})`}
         </h2>
         {areas.length === 0 ? (
           <div className="flex flex-col items-center py-10 text-center">
             <span className="text-4xl mb-3">📦</span>
-            <p className="text-slate-400 text-sm">这个房间还没有区域</p>
+            <p className="text-ink-muted text-sm">这个房间还没有区域</p>
           </div>
         ) : (
           <ul className="grid grid-cols-1 gap-2">
             {areas.map(a => (
-              <li key={a.id} className="flex items-center px-4 py-3.5 bg-slate-900 border border-slate-800 rounded-2xl hover:border-sky-500/40 shadow-[0_1px_0_0_rgba(255,255,255,0.04)_inset] transition-all duration-150">
+              <li key={a.id} className="flex items-center px-4 py-3.5 bg-paper-card border border-[var(--border-default)] rounded-[12px] hover:border-accent/40 shadow-card transition-all duration-150">
                 <span className="text-base mr-3">📦</span>
                 <Link
                   to={`/areas/${a.id}`}
-                  className="flex-1 text-sm font-medium text-slate-100 hover:text-white"
+                  className="flex-1 text-sm font-medium font-serif text-ink hover:text-ink-hover"
                 >
                   {a.name}
                 </Link>
@@ -102,7 +102,7 @@ export function RoomPage() {
                     await AreaRepo.remove(a.id);
                     await reload();
                   }}
-                  className="text-slate-600 hover:text-rose-400 text-lg leading-none transition-colors ml-2"
+                  className="min-w-[44px] min-h-[44px] text-ink-muted hover:text-danger-text text-lg leading-none transition-colors ml-2 flex items-center justify-center"
                   aria-label={`删除区域 ${a.name}`}
                 >
                   ×

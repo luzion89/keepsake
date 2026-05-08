@@ -30,12 +30,12 @@ async function getStorageQuota(): Promise<StorageQuota | null> {
   }
 }
 
-/** Section wrapper with iOS-style grouped list */
+/** Section wrapper — paper card + dividers */
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="space-y-1">
-      <h2 className="px-1 text-xs font-semibold uppercase tracking-wider text-slate-500">{title}</h2>
-      <div className="bg-slate-900 rounded-2xl border border-slate-800 divide-y divide-slate-800 overflow-hidden">
+      <h2 className="px-1 text-xs font-semibold uppercase tracking-wide text-ink-muted">{title}</h2>
+      <div className="bg-paper-card rounded-[12px] border border-[var(--border-default)] divide-y divide-[var(--border-subtle)] overflow-hidden">
         {children}
       </div>
     </section>
@@ -47,7 +47,7 @@ function SectionRow({ children }: { children: React.ReactNode }) {
   return <div className="px-4 py-3">{children}</div>;
 }
 
-const inputCls = 'w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20 transition-all';
+const inputCls = 'w-full bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all placeholder:text-ink-muted';
 
 export function SettingsPage() {
   const [cfg, setCfg] = useState<AiConfig>({ mode: 'off' });
@@ -61,6 +61,7 @@ export function SettingsPage() {
   const [gcResult, setGcResult] = useState<number | null>(null);
   const [gcRunning, setGcRunning] = useState(false);
   const [quota, setQuota] = useState<StorageQuota | null | 'unsupported'>('unsupported');
+  const [noiseEnabled, setNoiseEnabled] = useState(true);
 
   const reloadStats = async () => setStats({
     rooms: await db.rooms.count(),
@@ -82,6 +83,8 @@ export function SettingsPage() {
       reloadStats();
       const q = await getStorageQuota();
       setQuota(q);
+      // 读取纸张颗粒偏好
+      setNoiseEnabled(localStorage.getItem('noise_disabled') !== '1');
     })();
   }, []);
 
@@ -143,25 +146,39 @@ export function SettingsPage() {
     }
   };
 
+  const toggleNoise = () => {
+    const next = !noiseEnabled;
+    setNoiseEnabled(next);
+    if (next) {
+      localStorage.removeItem('noise_disabled');
+      document.documentElement.style.setProperty('--noise-opacity', '0.025');
+    } else {
+      localStorage.setItem('noise_disabled', '1');
+      document.documentElement.style.setProperty('--noise-opacity', '0');
+    }
+  };
+
+  const btnCls = 'px-3 py-2 rounded-[12px] border border-[var(--border-default)] text-sm text-ink hover:border-accent/60 hover:text-ink-hover transition-all';
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-slate-100">设置</h1>
+      <h1 className="text-2xl font-bold text-ink">设置</h1>
 
       {/* ── AI 助手 ─────────────────────────────────── */}
       <Section title="AI 助手">
         <SectionRow>
-          <p className="text-xs text-slate-500 mb-3">
+          <p className="text-xs text-ink-muted mb-3">
             Key 保存到本地 IndexedDB；保存时立即推送到本地服务器（需服务器在线），其它设备启动时拉取，更新时间最新者胜。
           </p>
           {/* AI on/off */}
           <div className="space-y-2 text-sm">
             {(['on','off'] as const).map(m => (
-              <label key={m} className={`flex items-center justify-between px-3 py-2.5 rounded-xl border cursor-pointer transition-all ${
+              <label key={m} className={`flex items-center justify-between px-3 py-2.5 rounded-[12px] border cursor-pointer transition-all ${
                 cfg.mode === m
-                  ? 'border-sky-500/60 bg-sky-900/20'
-                  : 'border-slate-800 hover:border-slate-700'
+                  ? 'border-accent/60 bg-accent-light text-accent'
+                  : 'border-[var(--border-default)] hover:border-accent/30'
               }`}>
-                <span className="text-sm text-slate-200">
+                <span className="text-sm text-ink">
                   {m === 'on' && '启用 AI（语音输入 / 自然语言搜索）'}
                   {m === 'off' && '关闭 AI（仅手动管理）'}
                 </span>
@@ -169,7 +186,7 @@ export function SettingsPage() {
                   type="radio"
                   checked={cfg.mode === m}
                   onChange={() => setCfg({ ...cfg, mode: m })}
-                  className="ml-2 accent-sky-400"
+                  className="ml-2 accent-[var(--color-accent)]"
                 />
               </label>
             ))}
@@ -180,15 +197,15 @@ export function SettingsPage() {
           <>
             {/* Provider selector */}
             <SectionRow>
-              <p className="text-xs text-slate-500 mb-2">AI 服务商</p>
+              <p className="text-xs text-ink-muted mb-2">AI 服务商</p>
               <div className="flex gap-2">
                 {(['deepseek', 'openrouter'] as const).map(p => (
                   <label
                     key={p}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border cursor-pointer text-sm transition-all ${
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-[12px] border cursor-pointer text-sm transition-all ${
                       effectiveProvider === p
-                        ? 'border-sky-500/60 bg-sky-900/20 text-sky-300'
-                        : 'border-slate-800 text-slate-400 hover:border-slate-700'
+                        ? 'border-accent/60 bg-accent-light text-accent'
+                        : 'border-[var(--border-default)] text-ink-muted hover:border-accent/30'
                     }`}
                   >
                     <input type="radio" className="sr-only" checked={effectiveProvider === p} onChange={() => setCfg({ ...cfg, provider: p })} />
@@ -203,15 +220,15 @@ export function SettingsPage() {
               <SectionRow>
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs text-slate-500 mb-1.5">
+                    <label className="block text-xs text-ink-muted mb-1.5">
                       DeepSeek API Key{' '}
-                      <a href="https://platform.deepseek.com" target="_blank" rel="noreferrer" className="text-sky-400 underline">申请 →</a>
+                      <a href="https://platform.deepseek.com" target="_blank" rel="noreferrer" className="text-accent underline hover:text-accent-hover">申请 →</a>
                     </label>
                     <input type="password" value={cfg.deepseekApiKey ?? ''} onChange={(e) => setCfg({ ...cfg, deepseekApiKey: e.target.value })} placeholder="sk-..." className={`${inputCls} font-mono`} autoComplete="off" />
-                    <p className="text-xs text-slate-500 mt-1.5">DeepSeek 不支持图像识别；如需 AI 拍照存档请切换到 OpenRouter。</p>
+                    <p className="text-xs text-ink-muted mt-1.5">DeepSeek 不支持图像识别；如需 AI 拍照存档请切换到 OpenRouter。</p>
                   </div>
                   <div>
-                    <label className="block text-xs text-slate-500 mb-1.5">模型（默认 {DEFAULT_DEEPSEEK_MODEL}）</label>
+                    <label className="block text-xs text-ink-muted mb-1.5">模型（默认 {DEFAULT_DEEPSEEK_MODEL}）</label>
                     <input value={cfg.model ?? ''} onChange={(e) => setCfg({ ...cfg, model: e.target.value })} placeholder={DEFAULT_DEEPSEEK_MODEL} className={inputCls} />
                   </div>
                 </div>
@@ -223,15 +240,15 @@ export function SettingsPage() {
               <SectionRow>
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs text-slate-500 mb-1.5">OpenRouter API Key</label>
+                    <label className="block text-xs text-ink-muted mb-1.5">OpenRouter API Key</label>
                     <input type="password" value={cfg.apiKey ?? ''} onChange={(e) => setCfg({ ...cfg, apiKey: e.target.value })} placeholder="sk-or-v1-..." className={`${inputCls} font-mono`} autoComplete="off" />
                   </div>
                   <div>
-                    <label className="block text-xs text-slate-500 mb-1.5">视觉模型（默认 {DEFAULT_MODEL}）</label>
+                    <label className="block text-xs text-ink-muted mb-1.5">视觉模型（默认 {DEFAULT_MODEL}）</label>
                     <input value={cfg.model ?? ''} onChange={(e) => setCfg({ ...cfg, model: e.target.value })} placeholder={DEFAULT_MODEL} className={inputCls} />
                   </div>
                   <div>
-                    <label className="block text-xs text-slate-500 mb-1.5">语音转写模型（需支持 audio 输入，默认同上）</label>
+                    <label className="block text-xs text-ink-muted mb-1.5">语音转写模型（需支持 audio 输入，默认同上）</label>
                     <input value={cfg.transcribeModel ?? ''} onChange={(e) => setCfg({ ...cfg, transcribeModel: e.target.value })} placeholder={DEFAULT_TRANSCRIBE_MODEL} className={inputCls} />
                   </div>
                 </div>
@@ -244,15 +261,15 @@ export function SettingsPage() {
                 <button
                   onClick={pingAi}
                   disabled={aiPingState === 'pinging'}
-                  className="px-3 py-2 rounded-xl border border-slate-800 text-sm text-slate-300 hover:border-sky-500/60 hover:text-slate-100 disabled:opacity-50 transition-all"
+                  className={btnCls + ' disabled:opacity-50'}
                 >
                   {aiPingState === 'pinging' ? '测试中…' : '测试连通性'}
                 </button>
                 {aiPingResult?.ok === true && (
-                  <span className="text-emerald-300 text-xs">✓ 连通（{aiPingResult.latencyMs} ms）</span>
+                  <span className="text-ok-text text-xs">✓ 连通（{aiPingResult.latencyMs} ms）</span>
                 )}
                 {aiPingResult?.ok === false && (
-                  <span className="text-rose-400 text-xs">✗ 失败：{aiPingResult.error}</span>
+                  <span className="text-danger-text text-xs">✗ 失败：{aiPingResult.error}</span>
                 )}
               </div>
             </SectionRow>
@@ -261,36 +278,57 @@ export function SettingsPage() {
       </Section>
 
       {/* ── 保存按钮（sticky bottom）────────────────── */}
-      <div className="sticky bottom-0 pb-safe pt-3 bg-slate-950/95 backdrop-blur-sm border-t border-slate-800 -mx-4 px-4">
+      <div className="sticky bottom-0 pb-safe pt-3 bg-paper/95 backdrop-blur-sm border-t border-ink-faint -mx-4 px-4">
         <button
           onClick={save}
-          className="w-full py-3.5 rounded-xl bg-sky-500 hover:bg-sky-400 active:scale-[0.98] text-white font-semibold text-base shadow-lg shadow-sky-500/20 transition-all"
+          className="w-full py-3.5 rounded-[12px] bg-accent hover:bg-accent-hover active:scale-[0.98] text-paper font-semibold text-base shadow-card transition-all"
         >
           保存设置
         </button>
-        {savedAt && !saveError && <span className="block text-center text-xs text-emerald-400 mt-1.5">✓ 已保存</span>}
+        {savedAt && !saveError && <span className="block text-center text-xs text-ok-text mt-1.5">✓ 已保存</span>}
         {savedAt && saveError && (
-          <span className="block text-xs text-rose-400 mt-1.5 text-center">
+          <span className="block text-xs text-danger-text mt-1.5 text-center">
             已保存到本地，服务端推送失败：{saveError}
             {!saveError.includes('混合内容') && !saveError.includes('TLS') && (
-              <span className="block mt-0.5 text-slate-500">（重新打开应用会重试；若持续失败请检查服务端是否在线）</span>
+              <span className="block mt-0.5 text-ink-muted">（重新打开应用会重试；若持续失败请检查服务端是否在线）</span>
             )}
           </span>
         )}
       </div>
 
+      {/* ── 外观 ──────────────────────────────────── */}
+      <Section title="外观">
+        <SectionRow>
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-sm text-ink">纸张颗粒纹理</span>
+              <p className="text-xs text-ink-muted mt-0.5">极淡纹理模拟纸张质感</p>
+            </div>
+            <button
+              onClick={toggleNoise}
+              className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${noiseEnabled ? 'bg-accent' : 'bg-ink-faint'}`}
+              role="switch"
+              aria-checked={noiseEnabled}
+              aria-label="切换纸张颗粒纹理"
+            >
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-paper shadow-sm transition-transform duration-200 ${noiseEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+            </button>
+          </div>
+        </SectionRow>
+      </Section>
+
       {/* ── 本地服务器 ─────────────────────────────── */}
       <Section title="本地服务器">
         <SectionRow>
           <div className="flex items-center gap-2 flex-wrap">
-            <button onClick={ping} className="px-3 py-2 rounded-xl border border-slate-800 text-sm text-slate-300 hover:border-sky-500/60 hover:text-slate-100 transition-all">
+            <button onClick={ping} className={btnCls}>
               检测连通性
             </button>
-            {serverOk === true && <span className="text-emerald-300 text-sm">● 在线</span>}
-            {serverOk === false && <span className="text-rose-400 text-sm">● 离线</span>}
+            {serverOk === true && <span className="text-ok-text text-sm">● 在线</span>}
+            {serverOk === false && <span className="text-danger-text text-sm">● 离线</span>}
             <button
               onClick={() => syncOnce().then(r => alert(r ? `已同步 推 ${r.pushed} / 拉 ${r.pulled} / 冲突 ${r.conflicts}` : '服务器不可达'))}
-              className="px-3 py-2 rounded-xl border border-slate-800 text-sm text-slate-300 hover:border-sky-500/60 hover:text-slate-100 transition-all"
+              className={btnCls}
             >
               立即同步
             </button>
@@ -301,12 +339,12 @@ export function SettingsPage() {
       {/* ── 本机数据 ──────────────────────────────── */}
       <Section title="本机数据">
         <SectionRow>
-          <p className="text-xs text-slate-500 mb-1">设备 ID</p>
-          <p className="font-mono text-xs text-slate-300">{deviceId}</p>
+          <p className="text-xs text-ink-muted mb-1">设备 ID</p>
+          <p className="font-mono text-xs text-ink">{deviceId}</p>
         </SectionRow>
         <SectionRow>
-          <p className="text-xs text-slate-500 mb-1">统计</p>
-          <p className="text-xs text-slate-300">
+          <p className="text-xs text-ink-muted mb-1">统计</p>
+          <p className="text-xs text-ink">
             房间 {stats.rooms} · 区域 {stats.areas} · 物品 {stats.items} · 照片 {stats.photos} · 待同步 {stats.outbox}
           </p>
         </SectionRow>
@@ -315,13 +353,13 @@ export function SettingsPage() {
         {quota !== 'unsupported' && quota !== null && (
           <SectionRow>
             <div className="space-y-1.5">
-              <p className={`text-xs ${quota.pct > 80 ? 'text-rose-400 font-medium' : 'text-slate-400'}`}>
+              <p className={`text-xs ${quota.pct > 80 ? 'text-danger-text font-medium' : 'text-ink-muted'}`}>
                 本地存储 {quota.usageMB.toFixed(1)} MB / {quota.quotaMB.toFixed(0)} MB（{quota.pct}%）
                 {quota.pct > 80 && ' ⚠️ 空间紧张'}
               </p>
-              <div className="h-1.5 rounded-full bg-slate-800">
+              <div className="h-1.5 rounded-full bg-paper-dark">
                 <div
-                  className={`h-full rounded-full transition-all ${quota.pct > 80 ? 'bg-rose-500' : quota.pct > 50 ? 'bg-amber-500' : 'bg-sky-500'}`}
+                  className={`h-full rounded-full transition-all ${quota.pct > 80 ? 'bg-danger' : quota.pct > 50 ? 'bg-warn' : 'bg-ok'}`}
                   style={{ width: `${Math.min(quota.pct, 100)}%` }}
                 />
               </div>
@@ -331,18 +369,18 @@ export function SettingsPage() {
 
         <SectionRow>
           <div className="flex items-center gap-2 flex-wrap">
-            <button onClick={exportJson} className="px-3 py-2 rounded-xl border border-slate-800 text-sm text-slate-300 hover:border-sky-500/60 hover:text-slate-100 transition-all">
+            <button onClick={exportJson} className={btnCls}>
               导出 JSON 备份
             </button>
             <button
               onClick={runGc}
               disabled={gcRunning}
-              className="px-3 py-2 rounded-xl border border-slate-800 text-sm text-slate-300 hover:border-sky-500/60 hover:text-slate-100 disabled:opacity-50 transition-all"
+              className={btnCls + ' disabled:opacity-50'}
             >
               {gcRunning ? '清理中…' : '清理本地缓存'}
             </button>
             {gcResult !== null && (
-              <span className="text-xs text-emerald-300">
+              <span className="text-xs text-ok-text">
                 {gcResult > 0 ? `已释放 ${gcResult} 个已同步 blob` : '无可清理项'}
               </span>
             )}

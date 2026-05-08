@@ -28,15 +28,15 @@ export function HomePage() {
 
       {/* ── 添加房间表单 ──────────────────────────────── */}
       <section>
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">添加房间</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted mb-3">添加房间</h2>
         <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); add(name); }}>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="房间名（如 厨房）"
-            className="flex-1 min-w-0 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20 transition-all duration-150"
+            className="flex-1 min-w-0 bg-paper-card border border-[var(--border-default)] rounded-[12px] px-4 py-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-150 text-ink placeholder:text-ink-muted"
           />
-          <button className="shrink-0 px-4 py-3 rounded-xl bg-sky-500 hover:bg-sky-400 active:scale-[0.97] text-white font-medium text-sm shadow-lg shadow-sky-500/20 transition-all duration-150">
+          <button className="shrink-0 px-4 py-3 rounded-[12px] bg-accent hover:bg-accent-hover active:scale-[0.97] text-paper font-medium text-sm shadow-card transition-all duration-150">
             添加
           </button>
         </form>
@@ -45,7 +45,7 @@ export function HomePage() {
             <button
               key={p}
               onClick={() => add(p)}
-              className="text-xs px-3 py-1.5 rounded-full bg-slate-800 border border-slate-800 hover:border-sky-500/60 hover:bg-slate-700 text-slate-300 transition-all duration-150"
+              className="text-xs px-3 py-2 min-h-[44px] rounded-full bg-paper-card border border-[var(--border-default)] hover:border-accent/50 hover:bg-paper-dark text-ink-muted transition-all duration-150"
             >
               + {p}
             </button>
@@ -55,14 +55,14 @@ export function HomePage() {
 
       {/* ── 房间列表 ──────────────────────────────────── */}
       <section>
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted mb-3">
           我的房间 {rooms.length > 0 && `(${rooms.length})`}
         </h2>
         {rooms.length === 0 ? (
           <div className="flex flex-col items-center py-12 text-center">
             <span className="text-4xl mb-3">🏠</span>
-            <p className="text-slate-400 text-sm font-medium">还没有房间</p>
-            <p className="text-slate-500 text-xs mt-1">点上面的预设或输入自定义名称添加</p>
+            <p className="text-ink-muted text-sm font-medium">还没有房间</p>
+            <p className="text-ink-muted/70 text-xs mt-1">点上面的预设或输入自定义名称添加</p>
           </div>
         ) : (
           <ul className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -70,10 +70,10 @@ export function HomePage() {
               <li key={r.id} className="relative group">
                 <Link
                   to={`/rooms/${r.id}`}
-                  className="block aspect-square rounded-2xl bg-slate-900 border border-slate-800 hover:border-sky-500/40 hover:bg-slate-800/80 shadow-[0_1px_0_0_rgba(255,255,255,0.04)_inset] p-4 flex flex-col transition-all duration-150"
+                  className="block aspect-square rounded-[12px] bg-paper-card border border-[var(--border-default)] hover:border-accent/40 hover:shadow-card p-4 flex flex-col transition-all duration-150"
                 >
-                  <span className="text-base font-semibold text-slate-100 pr-8">{r.name}</span>
-                  <span className="mt-auto text-xs text-slate-600">→</span>
+                  <span className="text-base font-semibold font-serif text-ink pr-8">{r.name}</span>
+                  <span className="mt-auto text-xs text-ink-muted">→</span>
                 </Link>
                 <button
                   onClick={async (e) => {
@@ -93,7 +93,7 @@ export function HomePage() {
                     await RoomRepo.remove(r.id);
                     await reload();
                   }}
-                  className="absolute top-2 right-2 w-6 h-6 rounded-full bg-slate-800 text-rose-400 text-xs opacity-0 group-hover:opacity-100 hover:bg-rose-950 transition-all duration-150 flex items-center justify-center"
+                  className="absolute top-2 right-2 min-w-[44px] min-h-[44px] rounded-full bg-paper-dark text-ink-muted text-xs opacity-0 group-hover:opacity-100 hover:bg-danger-bg hover:text-danger-text transition-all duration-150 flex items-center justify-center"
                   aria-label={`删除房间 ${r.name}`}
                   title="删除房间"
                 >
