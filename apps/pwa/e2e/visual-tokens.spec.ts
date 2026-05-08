@@ -14,10 +14,12 @@ test.describe('Visual token 验证（#88 视觉重构 v2）', () => {
   test('Home 页：房间卡片可见', async ({ page }) => {
     await page.goto('/');
 
-    // 先建一个房间，确保有卡片可以检查
+    // 先建一个房间，确保有卡片可以检查（v3.1 FAB 方式）
     const roomName = `token测试房_${Date.now()}`;
+    await page.locator('[aria-label="添加房间"]').click();
+    await page.waitForTimeout(100);
     await page.fill('input[placeholder*="房间名"]', roomName);
-    await page.click('button:has-text("添加")');
+    await page.locator('button:has-text("添加")').last().click();
     await expect(page.locator(`text=${roomName}`).first()).toBeVisible();
 
     // 检查卡片元素可见（v3 使用 rounded-[12px]，不依赖特定 class 名检查）
@@ -47,7 +49,7 @@ test.describe('Visual token 验证（#88 视觉重构 v2）', () => {
 
   test('搜索页：输入框可见', async ({ page }) => {
     await page.goto('/search');
-    const input = page.locator('input[placeholder*="搜索"], input[placeholder*="消毒"], input[type="text"]').first();
+    const input = page.locator('input[placeholder*="搜索"], input[placeholder*="消毒"], input[placeholder*="关键词"], input[type="text"]').first();
     await expect(input).toBeVisible();
   });
 
