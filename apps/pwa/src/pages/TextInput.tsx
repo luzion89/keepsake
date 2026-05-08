@@ -256,13 +256,22 @@ export function TextInputPage() {
               );
               return (
                 <li key={i} className="bg-paper-card border border-[var(--border-default)] rounded-[12px] p-3 space-y-2">
+                  {/* 第一行：名称（flex-1 min-w-0 截断）+ 删除按钮（始终在行末） */}
                   <div className="flex items-center gap-2">
                     <input
                       value={d.name}
                       onChange={e => updateDraft(i, { name: e.target.value })}
                       placeholder="物品名称"
-                      className="flex-1 bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-1.5 text-sm outline-none focus:border-accent transition-all text-ink placeholder:text-ink-muted"
+                      className="flex-1 min-w-0 bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-1.5 text-sm outline-none focus:border-accent transition-all text-ink placeholder:text-ink-muted"
                     />
+                    <button
+                      onClick={() => removeDraft(i)}
+                      className="shrink-0 text-ink-muted hover:text-danger-text transition-colors flex items-center justify-center w-7 h-7"
+                      aria-label="删除此行"
+                    ><X size={16} strokeWidth={1.5} /></button>
+                  </div>
+                  {/* 第二行：数量 + 量词 + 状态 tag */}
+                  <div className="flex items-center gap-2 flex-wrap">
                     <input
                       type="number"
                       value={d.qty}
@@ -284,17 +293,12 @@ export function TextInputPage() {
                           ? 'bg-warn-bg text-warn-text'
                           : 'bg-ok-bg text-ok-text'
                       }`}>
-                        {isExisting ? '更新' : '新增'}
+                        {isExisting ? '已有' : '新增'}
                       </span>
                     )}
-                    <button
-                      onClick={() => removeDraft(i)}
-                      className="text-ink-muted hover:text-danger-text transition-colors flex items-center justify-center w-6 h-6"
-                      aria-label="删除此行"
-                    ><X size={16} strokeWidth={1.5} /></button>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <label className="text-xs text-ink-muted w-12">有效期</label>
+                    <label className="text-xs text-ink-muted w-16">过期时间</label>
                     <input
                       type="date"
                       value={d.expiresDate}

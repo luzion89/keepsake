@@ -10,6 +10,7 @@ function ConflictBanner() {
   const [count, setCount] = useState(0);
   const [expanded, setExpanded] = useState(false);
   const [rows, setRows] = useState<ConflictRow[]>([]);
+  const [enriched, setEnriched] = useState<Array<ConflictRow & { label: string }>>([]);
 
   useEffect(() => {
     const tick = async () => {
@@ -22,8 +23,6 @@ function ConflictBanner() {
   }, []);
 
   if (count === 0) return null;
-
-  const [enriched, setEnriched] = useState<Array<ConflictRow & { label: string }>>([]);
 
   const loadRows = async () => {
     const r = await db.conflicts.where('acknowledged').equals(0).toArray();

@@ -199,13 +199,27 @@ export function HomePage() {
         className="fixed z-30 flex flex-col items-end"
         style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 72px)', right: '20px' }}
       >
-        {/* 输入面板：从下 slide-in */}
+        {/* FAB 圆形按钮：始终在容器顶部；容器底部固定，开启时面板从下方展开，
+            容器整体向上增长，按钮自然上移至输入框右上角 (#168) */}
+        <button
+          onClick={() => setFabOpen(v => !v)}
+          className="w-14 h-14 rounded-full bg-accent hover:bg-accent-hover text-paper shadow-lg flex items-center justify-center transition-all duration-300 active:scale-[0.95]"
+          aria-label={fabOpen ? '关闭' : '添加房间'}
+        >
+          <span
+            className="transition-transform duration-300"
+            style={{ transform: fabOpen ? 'rotate(45deg)' : 'rotate(0deg)' }}
+          >
+            <Plus size={24} strokeWidth={1.5} />
+          </span>
+        </button>
+        {/* 输入面板：在按钮下方 slide-in，容器底部固定故整体上移 */}
         <div
           className="overflow-hidden transition-all duration-300 ease-out"
           style={{
             maxHeight: fabOpen ? '320px' : '0px',
             opacity: fabOpen ? 1 : 0,
-            marginBottom: fabOpen ? '12px' : '0px',
+            marginTop: fabOpen ? '12px' : '0px',
           }}
         >
           <div className="bg-paper-card border border-[var(--border-default)] rounded-[12px] shadow-lg p-3 space-y-2 w-64">
@@ -234,20 +248,6 @@ export function HomePage() {
             </div>
           </div>
         </div>
-        {/* FAB 圆形按钮：fabOpen 时上移 + 图标旋转成叉号 */}
-        <button
-          onClick={() => setFabOpen(v => !v)}
-          className="w-14 h-14 rounded-full bg-accent hover:bg-accent-hover text-paper shadow-lg flex items-center justify-center transition-all duration-300 active:scale-[0.95]"
-          style={{ transform: fabOpen ? 'translateY(-8px)' : 'translateY(0)' }}
-          aria-label={fabOpen ? '关闭' : '添加房间'}
-        >
-          <span
-            className="transition-transform duration-300"
-            style={{ transform: fabOpen ? 'rotate(45deg)' : 'rotate(0deg)' }}
-          >
-            <Plus size={24} strokeWidth={1.5} />
-          </span>
-        </button>
       </div>
     </div>
   );
