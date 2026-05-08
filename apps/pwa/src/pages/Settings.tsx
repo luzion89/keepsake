@@ -52,6 +52,7 @@ const inputCls = 'w-full bg-paper-dark border border-[var(--border-default)] rou
 
 export function SettingsPage() {
   const [cfg, setCfg] = useState<AiConfig>({ mode: 'off' });
+  const [cfgLoaded, setCfgLoaded] = useState(false);
   const [deviceId, setDeviceId] = useState('');
   const [stats, setStats] = useState({ rooms: 0, areas: 0, items: 0, photos: 0, outbox: 0 });
   const [serverOk, setServerOk] = useState<boolean | null>(null);
@@ -79,6 +80,7 @@ export function SettingsPage() {
       } else {
         setCfg(loaded);
       }
+      setCfgLoaded(true);
       setDeviceId(await getDeviceId());
       reloadStats();
       const q = await getStorageQuota();
@@ -157,7 +159,7 @@ export function SettingsPage() {
             Key 保存到本地 IndexedDB；保存时立即推送到本地服务器（需服务器在线），其它设备启动时拉取，更新时间最新者胜。
           </p>
           {/* AI on/off */}
-          <div className="space-y-2 text-sm">
+          <div className="space-y-2 text-sm" style={{ visibility: cfgLoaded ? 'visible' : 'hidden' }}>
             {(['on','off'] as const).map(m => (
               <label key={m} className={`flex items-center justify-between px-3 py-2.5 rounded-[12px] border cursor-pointer transition-all ${
                 cfg.mode === m

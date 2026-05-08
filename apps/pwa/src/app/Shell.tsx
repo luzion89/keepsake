@@ -40,6 +40,25 @@ function ConflictBanner() {
     setRows([]);
   };
 
+  const acceptAllServer = async () => {
+    const pending = await db.conflicts.where('acknowledged').equals(0).toArray();
+    for (const r of pending) {
+      try {
+        const table = (db as any)[r.table];
+        if (table) {
+          const row = await table.get(r.row_id);
+          if (row) {
+            await table.put({ ...row, [r.field]: r.server });
+          }
+        }
+      } catch { /* skip */ }
+    }
+    await db.conflicts.where('acknowledged').equals(0).modify({ acknowledged: 1 });
+    setCount(0);
+    setExpanded(false);
+    setRows([]);
+  };
+
   return (
     <div className="bg-danger-bg border-b border-danger/30 px-4 py-1.5 text-xs">
       <div className="flex items-center gap-2">
@@ -62,12 +81,22 @@ function ConflictBanner() {
               <span className="text-ink-muted">{JSON.stringify(r.server)}</span>
             </div>
           ))}
-          <button
-            onClick={acknowledgeAll}
-            className="mt-1 px-3 py-1 rounded-[12px] bg-danger hover:opacity-90 text-paper font-medium transition-colors"
-          >
-            全部确认
-          </button>
+          <div className="mt-1 flex gap-2">
+            <button
+              onClick={acknowledgeAll}
+              className="flex-1 px-3 py-1 rounded-[12px] border border-danger/40 text-danger-text font-medium transition-colors hover:bg-danger-bg/60 text-xs"
+              title="保留本地数据，忽略云端差异"
+            >
+              全部保留本地
+            </button>
+            <button
+              onClick={acceptAllServer}
+              className="flex-1 px-3 py-1 rounded-[12px] bg-danger hover:opacity-90 text-paper font-medium transition-colors text-xs"
+              title="用云端数据覆盖本地对应字段"
+            >
+              全部采用云端
+            </button>
+          </div>
         </div>
       )}
     </div>
