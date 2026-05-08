@@ -252,7 +252,7 @@ export function ItemPage() {
         <>
           {/* 物品名 + 过期 badge */}
           <div className="flex items-center flex-wrap gap-1">
-            <h1 className="text-2xl font-bold text-ink">{item.name}</h1>
+            <h1 className="text-2xl font-bold font-serif text-ink">{item.name}</h1>
             {item.expires_at != null && <ExpiryBadge expiresAt={item.expires_at} />}
           </div>
 
