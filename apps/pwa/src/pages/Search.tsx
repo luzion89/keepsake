@@ -11,13 +11,13 @@ export function SearchPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [areas, setAreas] = useState<Map<string, Area>>(new Map());
   const [rooms, setRooms] = useState<Map<string, Room>>(new Map());
-  const [listening, setListening] = useState(false);
 
   // AI answer state
   const [aiEnabled, setAiEnabled] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState<SearchAnswerResult | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
+  const [inputFocused, setInputFocused] = useState(false);
 
   // Check if AI is available
   useEffect(() => {
@@ -57,23 +57,6 @@ export function SearchPage() {
     }
     return Array.from(g.entries());
   }, [items]);
-
-  const startVoice = () => {
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) { alert('当前浏览器不支持语音识别，请手动输入。'); return; }
-    const rec = new SR();
-    rec.lang = 'zh-CN';
-    rec.continuous = false;
-    rec.interimResults = false;
-    rec.onstart = () => setListening(true);
-    rec.onend = () => setListening(false);
-    rec.onerror = () => setListening(false);
-    rec.onresult = (e: any) => {
-      const text = Array.from(e.results).map((r: any) => r[0].transcript).join('');
-      setQ(text);
-    };
-    rec.start();
-  };
 
   const askAi = async () => {
     if (!q.trim()) return;
@@ -125,31 +108,36 @@ export function SearchPage() {
 
       {/* ── 搜索栏（sticky）──────────────────────────── */}
       <div className="flex gap-2 sticky top-14 z-10 bg-paper/95 backdrop-blur pb-3 pt-1 -mx-4 px-4 border-b border-ink-faint">
-        <input
-          autoFocus
+        <textarea
           value={q}
-          onChange={(e) => setQ(e.target.value)}
+          onChange={(e) => {
+            setQ(e.target.value);
+            // 自适应高度
+            e.target.style.height = 'auto';
+            e.target.style.height = e.target.scrollHeight + 'px';
+          }}
+          onFocus={(e) => {
+            setInputFocused(true);
+            e.target.style.height = 'auto';
+            e.target.style.height = e.target.scrollHeight + 'px';
+          }}
+          onBlur={(e) => {
+            setInputFocused(false);
+            // 失焦后恢复单行高度
+            e.target.style.height = '';
+          }}
           placeholder="如 消毒水、电池、备用灯泡…"
-          className="flex-1 bg-paper-card border border-[var(--border-default)] rounded-[12px] px-4 py-2.5 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-150 text-ink placeholder:text-ink-muted"
+          rows={1}
+          className="flex-1 bg-paper-card border border-[var(--border-default)] rounded-[12px] px-4 py-2.5 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-150 text-ink placeholder:text-ink-muted resize-none overflow-hidden leading-[1.5]"
+          style={{ minHeight: '44px' }}
         />
-        <button
-          onClick={startVoice}
-          aria-label="语音输入"
-          className={`w-11 h-11 flex items-center justify-center rounded-[12px] border text-base transition-all ${
-            listening
-              ? 'bg-danger border-danger animate-pulse text-paper'
-              : 'border-[var(--border-default)] text-ink-muted hover:border-accent/60 hover:text-ink'
-          }`}
-        >
-          🎙
-        </button>
-        {aiEnabled && q.trim() && (
+        {(aiEnabled || q.trim()) && (
           <button
             onClick={askAi}
-            disabled={aiLoading}
-            className="px-4 h-11 rounded-[12px] bg-accent hover:bg-accent-hover text-paper font-medium text-sm disabled:opacity-50 transition-all duration-150 active:scale-[0.97]"
+            disabled={aiLoading || !q.trim()}
+            className="px-4 self-start h-11 rounded-[12px] bg-accent hover:bg-accent-hover text-paper font-medium text-sm disabled:opacity-50 transition-all duration-150 active:scale-[0.97]"
           >
-            {aiLoading ? '思考中…' : '✨ AI 回答'}
+            {aiLoading ? '思考中…' : '✨ AI'}
           </button>
         )}
       </div>
