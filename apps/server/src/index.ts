@@ -18,6 +18,7 @@ import { getLocalIp } from './auth/localip.js';
 import { buildPairPayload } from './auth/qrcode.js';
 import { authState } from './auth/state.js';
 import type Database from 'better-sqlite3';
+import qrTerminal from 'qrcode-terminal';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -92,13 +93,15 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const port = Number(process.env.PORT ?? 8443);
   buildServer().then(async (app) => {
     // Start CF Tunnel if requested (before listen so URL is in QR)
-    if (process.env.KEEPSAKE_TUNNEL === '1') {
+    // Supports: KEEPSAKE_TUNNEL=quick | named | 1 (legacy)
+    const tunnelMode = process.env.KEEPSAKE_TUNNEL ?? '';
+    if (['quick', 'named', '1'].includes(tunnelMode)) {
       try {
         const tunnelUrl = await startTunnel(port);
         app.tunnelUrl = tunnelUrl;
         console.log(`\n[CF Tunnel] ✅ Public URL: ${tunnelUrl}\n`);
       } catch (e) {
-        console.error('[CF Tunnel] Failed to start:', e);
+        console.error('[CF Tunnel] ❌ Failed to start tunnel — continuing in LAN-only mode:', (e as Error).message);
       }
     }
 
@@ -107,19 +110,29 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     const localIp = getLocalIp();
     app.log.info(`Keepsake server on ${proto}://0.0.0.0:${port}`);
 
-    // Print pair QR info
+    // === Pair Info ===
     const payload = buildPairPayload({
       host: localIp,
       port,
       rootSecret: authState.rootSecret,
       tunnelUrl: app.tunnelUrl,
     });
-    console.log('\n──────────────────────────────────────────────────────');
-    console.log('  📱 Pair your device — scan QR or visit:');
-    console.log(`  Local:  http://${localIp}:${port}/auth/qrcode`);
+
+    console.log('\n╔══════════════════════════════════════════════════════╗');
+    console.log('║                  === Pair Info ===                  ║');
+    console.log('╚══════════════════════════════════════════════════════╝');
+    console.log(`  🏠 Local:   ${proto}://${localIp}:${port}`);
+    console.log(`  🔐 QR SVG:  ${proto}://${localIp}:${port}/auth/qrcode`);
     if (app.tunnelUrl) {
-      console.log(`  Public: ${app.tunnelUrl}/auth/qrcode`);
+      console.log(`  🌐 Public:  ${app.tunnelUrl}`);
+      console.log(`  🌐 QR SVG:  ${app.tunnelUrl}/auth/qrcode`);
     }
-    console.log('──────────────────────────────────────────────────────\n');
+    console.log('\n  📱 Scan to pair (point camera at QR below):');
+    console.log('');
+    // Print ASCII QR to stdout
+    qrTerminal.generate(payload, { small: true }, (qr: string) => {
+      qr.split('\n').forEach((line: string) => console.log('  ' + line));
+    });
+    console.log('\n══════════════════════════════════════════════════════\n');
   });
 }
