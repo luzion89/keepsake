@@ -1,13 +1,15 @@
+/**
+ * Capture.tsx — 区域照片存档（#66）
+ *
+ * 简化流程：拍照 / 选图 → 压缩 → 存入 IndexedDB photos 表（parent_type='area'）。
+ * 不再调用 AI 识别（AI 识别入口移至文本输入流程）。
+ */
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import imageCompression from 'browser-image-compression';
-import { AreaRepo, ItemRepo, PhotoRepo, SnapshotRepo } from '../db/repos.js';
+import { AlertTriangle, Camera, ChevronLeft, X } from 'lucide-react';
+import { AreaRepo, PhotoRepo } from '../db/repos.js';
 import type { Area } from '@keepsake/shared';
-import { recognize, type RecognitionItem, getAiConfig } from '../ai/router.js';
-
-interface Draft extends RecognitionItem {
-  selected: boolean;
-}
 
 /** Area 加载三态 */
 type AreaState = 'loading' | 'not-found' | 'ok';
@@ -19,9 +21,7 @@ export function CapturePage() {
   const [areaState, setAreaState] = useState<AreaState>('loading');
   const [area, setArea] = useState<Area | undefined>();
   const [blobs, setBlobs] = useState<{ blob: Blob; url: string }[]>([]);
-  const [drafts, setDrafts] = useState<Draft[]>([]);
   const [busy, setBusy] = useState(false);
-  const [aiState, setAiState] = useState<'idle' | 'running' | 'pending' | 'done' | 'error'>('idle');
   const [errMsg, setErrMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -33,6 +33,7 @@ export function CapturePage() {
     })();
   }, [areaId]);
 
+  // 清理 object URLs
   useEffect(() => () => blobs.forEach(b => URL.revokeObjectURL(b.url)), []);
 
   const onPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -40,103 +41,77 @@ export function CapturePage() {
     if (!files.length) return;
     const out: { blob: Blob; url: string }[] = [];
     for (const f of files) {
-      const compressed = await imageCompression(f, { maxSizeMB: 0.8, maxWidthOrHeight: 1600, useWebWorker: true });
+      const compressed = await imageCompression(f, {
+        maxSizeMB: 0.8,
+        maxWidthOrHeight: 1600,
+        useWebWorker: true,
+      });
       out.push({ blob: compressed, url: URL.createObjectURL(compressed) });
     }
     setBlobs(prev => [...prev, ...out]);
     e.target.value = '';
   };
 
-  const runAi = async () => {
-    if (blobs.length === 0) return;
-    const cfg = await getAiConfig();
-    if (cfg.mode === 'off') {
-      setErrMsg('AI 未启用。请到「设置」配置 OpenRouter Key。');
-      return;
-    }
-    setAiState('running'); setErrMsg(null);
-    try {
-      const res = await recognize(blobs.map(b => b.blob));
-      if (res.status === 'pending') {
-        setAiState('pending');
-        setErrMsg('当前无法识别（无 key 或服务器离线），照片已保存为待识别。');
-      } else {
-        setAiState('done');
-        setDrafts(res.items.map(it => ({ ...it, selected: true })));
-      }
-    } catch (e: any) {
-      setAiState('error'); setErrMsg(e?.message ?? String(e));
-    }
+  const removeBlob = (i: number) => {
+    setBlobs(prev => {
+      const item = prev[i]; if (item) URL.revokeObjectURL(item.url);
+      return prev.filter((_, j) => j !== i);
+    });
   };
 
   const save = async () => {
-    // 保存前再次校验 area 仍存在，防止孤儿物品
-    if (!areaId) {
-      setErrMsg('区域 ID 为空，无法保存。');
-      return;
-    }
+    if (!areaId) { setErrMsg('区域 ID 为空，无法保存。'); return; }
+    if (blobs.length === 0) { setErrMsg('请先选择至少一张照片。'); return; }
+
     const current = await AreaRepo.get(areaId);
     if (!current) {
-      setErrMsg('该区域已不存在，无法保存物品。请返回首页重新选择区域。');
+      setErrMsg('该区域已不存在，无法保存。请返回首页重新选择区域。');
       setAreaState('not-found');
       return;
     }
+
     setBusy(true);
+    setErrMsg(null);
     try {
-      // 1) save photos
-      const photoIds: string[] = [];
       for (const b of blobs) {
-        const p = await PhotoRepo.create({ type: 'area', id: areaId }, b.blob);
-        photoIds.push(p.id);
-        if (aiState === 'pending') {
-          // mark as pending — already default
-        } else if (aiState === 'done') {
-          await PhotoRepo.setRecognition(p.id, 'done', drafts);
-        }
-      }
-      // 2) save selected items
-      const itemIds: string[] = [];
-      for (const d of drafts.filter(d => d.selected && d.name.trim())) {
-        const item = await ItemRepo.create({
-          area_id: areaId,
-          name: d.name.trim(),
-          qty: d.qty || 1,
-          source: 'ai',
-          confidence: d.confidence,
-          photo_ids: photoIds,
-        });
-        itemIds.push(item.id);
-      }
-      // 3) 生成快照，记录本次新建的所有物品 id
-      if (itemIds.length > 0) {
-        await SnapshotRepo.create({
-          area_id: areaId,
-          taken_at: Date.now(),
-          item_ids: itemIds,
-        });
+        await PhotoRepo.create({ type: 'area', id: areaId }, b.blob);
       }
       nav(`/areas/${areaId}`);
+    } catch (e: unknown) {
+      setErrMsg(e instanceof Error ? e.message : '保存失败，请重试。');
     } finally {
       setBusy(false);
     }
   };
 
-  if (areaState === 'loading') return <p className="text-slate-400">加载中…</p>;
+  if (areaState === 'loading') return <p className="text-ink-muted">加载中…</p>;
   if (areaState === 'not-found') {
     return (
       <div className="space-y-3">
-        <p className="text-rose-300">⚠️ 找不到该区域（可能已被删除）。</p>
-        <Link to="/" className="text-sky-400 hover:text-sky-300 text-sm">← 返回首页</Link>
+        <p className="text-danger-text flex items-center gap-1.5">
+          <AlertTriangle size={14} strokeWidth={1.5} className="shrink-0" />
+          找不到该区域（可能已被删除）。
+        </p>
+        <Link to="/" className="text-accent hover:text-accent-hover text-sm flex items-center gap-1">
+          <ChevronLeft size={14} strokeWidth={1.5} />
+          返回首页
+        </Link>
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      <div className="text-sm text-slate-400">
-        <Link to={`/areas/${areaId}`} className="hover:text-white">← 返回 {area!.name}</Link>
+      <div className="text-sm text-ink-muted">
+        <Link to={`/areas/${areaId}`} className="hover:text-ink flex items-center gap-1">
+          <ChevronLeft size={14} strokeWidth={1.5} />
+          返回 {area!.name}
+        </Link>
       </div>
-      <h1 className="text-xl font-semibold">📷 盘点 · {area!.name}</h1>
+      <h1 className="text-xl font-semibold flex items-center gap-2">
+        <Camera size={20} strokeWidth={1.5} className="text-ink-muted" />
+        拍照存档 · {area!.name}
+      </h1>
 
       <input
         ref={fileRef}
@@ -148,84 +123,43 @@ export function CapturePage() {
         className="hidden"
       />
 
-      <div className="flex gap-2">
-        <button
-          onClick={() => fileRef.current?.click()}
-          className="flex-1 px-4 py-3 rounded-xl bg-emerald-500 text-slate-950 font-medium"
-        >
-          + 拍照 / 选图（可多张）
-        </button>
-        {blobs.length > 0 && (
-          <button
-            onClick={runAi}
-            disabled={aiState === 'running'}
-            className="px-4 py-3 rounded-xl bg-sky-500 text-slate-950 font-medium disabled:opacity-50"
-          >
-            {aiState === 'running' ? '识别中…' : 'AI 识别'}
-          </button>
-        )}
-      </div>
+      <button
+        onClick={() => fileRef.current?.click()}
+        className="w-full h-11 flex items-center justify-center gap-2 rounded-[12px] bg-paper-card border border-[var(--border-default)] hover:border-accent/40 text-ink font-medium text-sm transition-all duration-150"
+      >
+        <Camera size={18} strokeWidth={1.5} />
+        拍照（可多张）
+      </button>
 
-      {errMsg && <p className="text-rose-300 text-sm">{errMsg}</p>}
+      {errMsg && <p className="text-danger-text text-sm">{errMsg}</p>}
 
       {blobs.length > 0 && (
         <section>
-          <h2 className="text-sm font-semibold text-slate-300 mb-2">已选 {blobs.length} 张</h2>
+          <h2 className="text-sm font-semibold text-ink-muted mb-2">已选 {blobs.length} 张</h2>
           <div className="grid grid-cols-3 gap-2">
             {blobs.map((b, i) => (
-              <img key={i} src={b.url} className="w-full aspect-square object-cover rounded-lg" />
+              <div key={i} className="relative">
+                <img src={b.url} className="w-full aspect-square object-cover rounded-lg" />
+                <button
+                  onClick={() => removeBlob(i)}
+                  className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center"
+                  aria-label="删除"
+                >
+                  <X size={12} strokeWidth={2} />
+                </button>
+              </div>
             ))}
           </div>
         </section>
       )}
 
-      {drafts.length > 0 && (
-        <section className="space-y-2">
-          <h2 className="text-sm font-semibold text-slate-300">AI 草稿（请核对）</h2>
-          <ul className="space-y-2">
-            {drafts.map((d, i) => (
-              <li key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-800 border border-slate-700">
-                <input
-                  type="checkbox"
-                  checked={d.selected}
-                  onChange={(e) => setDrafts(arr => arr.map((x, j) => j === i ? { ...x, selected: e.target.checked } : x))}
-                />
-                <input
-                  value={d.name}
-                  onChange={(e) => setDrafts(arr => arr.map((x, j) => j === i ? { ...x, name: e.target.value } : x))}
-                  className="flex-1 bg-transparent outline-none"
-                />
-                <input
-                  type="number"
-                  value={d.qty}
-                  min={0}
-                  onChange={(e) => setDrafts(arr => arr.map((x, j) => j === i ? { ...x, qty: Number(e.target.value) } : x))}
-                  className="w-16 bg-slate-900 border border-slate-700 rounded px-2 py-1"
-                />
-                {d.confidence != null && (
-                  <span className={`text-xs ${d.confidence < 0.6 ? 'text-amber-300' : 'text-slate-400'}`}>
-                    {(d.confidence * 100).toFixed(0)}%
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
-          <button
-            onClick={() => setDrafts(d => [...d, { name: '', qty: 1, selected: true }])}
-            className="text-sm text-sky-300 hover:text-sky-200"
-          >
-            + 手动追加一项
-          </button>
-        </section>
-      )}
-
-      {(blobs.length > 0 || drafts.length > 0) && (
+      {blobs.length > 0 && (
         <button
           onClick={save}
           disabled={busy}
-          className="w-full px-4 py-3 rounded-xl bg-amber-400 text-slate-950 font-medium disabled:opacity-50"
+          className="w-full h-11 flex items-center justify-center rounded-[12px] bg-accent hover:bg-accent-hover active:scale-[0.98] text-paper font-medium text-sm shadow-card transition-all duration-150 disabled:opacity-50"
         >
-          {busy ? '保存中…' : '锁定存档'}
+          {busy ? '保存中…' : `存档 ${blobs.length} 张照片`}
         </button>
       )}
     </div>

@@ -94,18 +94,21 @@ export const ItemRepo = {
       i.tags.some(t => t.toLowerCase().includes(q))
     ));
   },
-  async create(input: { area_id: string; name: string; qty?: number; tags?: string[]; source?: Item['source']; notes?: string; photo_ids?: string[]; confidence?: number; }): Promise<Item> {
+  async create(input: { area_id: string; name: string; qty?: number; unit?: string; tags?: string[]; source?: Item['source']; notes?: string; photo_ids?: string[]; confidence?: number; expires_at?: number; }): Promise<Item> {
     const m = await meta();
     const row: Item = {
       id: uuid(),
       area_id: input.area_id,
       name: input.name,
       qty: input.qty ?? 1,
+      unit: input.unit ?? '个',
       tags: input.tags ?? [],
       photo_ids: input.photo_ids ?? [],
       source: input.source ?? 'manual',
       confidence: input.confidence,
       notes: input.notes,
+      expires_at: input.expires_at,
+      created_at: Date.now(),
       ...m,
     };
     await db.items.put(row);
@@ -165,6 +168,14 @@ export const PhotoRepo = {
     const next: Photo = { ...cur, recognition_status: status, recognition_result: result, ...(await meta()), version: cur.version + 1 };
     await db.photos.put(next);
     await enqueue('photo', next);
+  },
+  async remove(id: string) {
+    const cur = await db.photos.get(id); if (!cur) return;
+    const next = { ...cur, deleted: true, updated_at: Date.now(), updated_by: await getDeviceId(), version: cur.version + 1 };
+    await db.photos.put(next);
+    await enqueueDelete('photo', id, next.updated_at);
+    // 同步删除本地 blob
+    await db.blobs.delete(id).catch(() => {});
   },
 };
 

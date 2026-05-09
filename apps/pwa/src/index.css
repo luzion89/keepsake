@@ -2,12 +2,64 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ──────────────────────────────────────────────
+   Design tokens — PR-A v3 (#97)
+   Editorial + Muji minimal  亮色暖调
+   背景：米色 #F1EDE6  主色：深绿灰 #2F3E2E  强调：玫瑰木 #9F4E5A
+   ────────────────────────────────────────────── */
+:root {
+  --color-ink:        #2F3E2E;
+  --color-paper:      #F1EDE6;
+  --color-accent:     #9F4E5A;
+  --color-card:       #FAFAF8;
+  --border-subtle:    rgba(47, 62, 46, 0.08);
+  --border-default:   rgba(47, 62, 46, 0.18);
+  --border-focus:     #9F4E5A;
+  --shadow-card:      0 8px 24px rgba(0,0,0,0.12);
+  --radius:           12px;
+  --noise-opacity:    0.025;
+}
+
 html, body, #root { height: 100%; }
 body {
-  background: #0b1220;
-  color: #e2e8f0;
+  background-color: #F1EDE6;
+  color: #2F3E2E;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   -webkit-tap-highlight-color: transparent;
 }
+
+/* 纸张颗粒纹理 */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background-image: url('/src/assets/noise.svg');
+  background-repeat: repeat;
+  background-size: 200px 200px;
+  opacity: var(--noise-opacity, 0.025);
+}
+
+/* serif 工具类（限定范围：h1、房间卡片名、数量大字） */
+.font-serif {
+  font-family: "Noto Serif SC", "Songti SC", "Source Han Serif CN", Georgia, serif;
+}
+
 input, textarea, select, button { font: inherit; color: inherit; }
 button { cursor: pointer; }
+
+/* iOS safe-area utility */
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+
+/* ── 灯箱滑动切换动画 (#142) ──────────────────── */
+@keyframes slide-in-from-right {
+  from { transform: translateX(60px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes slide-in-from-left {
+  from { transform: translateX(-60px); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+.animate-slide-in-left  { animation: slide-in-from-right 0.25s cubic-bezier(0.25,0.46,0.45,0.94) both; }
+.animate-slide-in-right { animation: slide-in-from-left  0.25s cubic-bezier(0.25,0.46,0.45,0.94) both; }

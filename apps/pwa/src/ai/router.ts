@@ -1,23 +1,22 @@
-// AI router: OpenRouter-only, client-side direct calls.
+// AI router: supports DeepSeek (default for new installs) and OpenRouter.
 // Key is stored locally (IndexedDB KV) and also synced to the server via the
 // settings sync record so other devices/the server can read the same config.
 
 import { kvGet, kvSet } from '../db/dexie.js';
+import { logger } from '../logging/logger.js';
+import type { AiConfig } from '@keepsake/shared';
 
+export type { AiConfig };
 export type AiMode = 'on' | 'off';
-
-export interface AiConfig {
-  mode: AiMode;
-  /** OpenRouter API key (sk-or-...) */
-  apiKey?: string;
-  /** Vision-capable model id, e.g. google/gemini-2.5-flash-lite */
-  model?: string;
-  /** Optional Whisper-class model for voice transcription. */
-  transcribeModel?: string;
-}
+export type AiProvider = 'deepseek' | 'openrouter';
 
 export const DEFAULT_MODEL = 'google/gemini-2.5-flash-lite';
-export const DEFAULT_TRANSCRIBE_MODEL = 'openai/whisper-1';
+/** @deprecated transcribe() now uses chat completions with the same model as vision. */
+export const DEFAULT_TRANSCRIBE_MODEL = DEFAULT_MODEL;
+
+export const DEFAULT_DEEPSEEK_MODEL = 'deepseek-chat';
+const DEEPSEEK_URL = 'https://api.deepseek.com/v1/chat/completions';
+const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 const KEY = 'ai_config';
 
@@ -29,13 +28,32 @@ const LEGACY_MODE_MAP: Record<string, AiMode> = {
   on: 'on',
 };
 
+/**
+ * Resolve the effective provider from a config object.
+ * - If provider is explicitly set, use it.
+ * - If provider is absent (old config), fall back to 'openrouter' to keep
+ *   existing users' OpenRouter key working after upgrade.
+ */
+export function getEffectiveProvider(cfg: AiConfig): AiProvider {
+  return cfg.provider ?? 'openrouter';
+}
+
+/** Return the chat completions URL for the given provider. */
+export function getEffectiveBaseUrl(cfg: AiConfig): string {
+  return getEffectiveProvider(cfg) === 'deepseek' ? DEEPSEEK_URL : OPENROUTER_URL;
+}
+
+/** Return the API key for the given provider. */
+export function getEffectiveApiKey(cfg: AiConfig): string | undefined {
+  return getEffectiveProvider(cfg) === 'deepseek' ? cfg.deepseekApiKey : cfg.apiKey;
+}
+
 export async function getAiConfig(): Promise<AiConfig> {
   const raw = await kvGet<AiConfig>(KEY);
   if (!raw) return { mode: 'off' };
   // 兼容旧 mode 值（client/server）：映射到新枚举；无效值 fallback 到 'off'。
   const normalizedMode: AiMode = LEGACY_MODE_MAP[raw.mode as string] ?? 'off';
   if (normalizedMode !== raw.mode) {
-    // 顺手写回，避免下次再走兼容路径
     const migrated: AiConfig = { ...raw, mode: normalizedMode };
     await kvSet(KEY, migrated);
     return migrated;
@@ -44,12 +62,9 @@ export async function getAiConfig(): Promise<AiConfig> {
 }
 
 export async function setAiConfig(cfg: AiConfig): Promise<{ ok: boolean; error?: string }> {
-  // 保存时附上时间戳，供 LWW 比较使用
   const cfgWithTs = { ...cfg, updated_at: Date.now() };
   await kvSet(KEY, cfgWithTs);
   // Best-effort: mirror to server so the same key works on other devices.
-  // Returns ok=false with error message when server is unreachable.
-  // 注意：剔除 updated_at，服务端 AiConfigSchema.strict() 不接受额外字段（fixes #39/#40）
   const { updated_at: _ts, ...serverPayload } = cfgWithTs;
   try {
     const res = await fetch('/settings/ai', {
@@ -63,39 +78,55 @@ export async function setAiConfig(cfg: AiConfig): Promise<{ ok: boolean; error?:
     }
     return { ok: true };
   } catch (e: unknown) {
+    // "failed to fetch" / "NetworkError" 表示请求根本没到达服务器，常见原因：
+    // 1. 开发模式：Vite devserver 没代理 /settings → 检查 vite.config.ts
+    // 2. 混合内容：页面通过 HTTPS 访问但服务端未启用 TLS（设置 KEEPSAKE_TLS=1）
+    // 3. 自签证书未信任：在系统/浏览器中信任 mkcert 生成的证书
     const msg = e instanceof Error ? e.message : String(e);
+    const isNetworkError =
+      msg.toLowerCase().includes('failed to fetch') ||
+      msg.toLowerCase().includes('networkerror') ||
+      msg.toLowerCase().includes('network request failed') ||
+      e instanceof TypeError;
+    if (isNetworkError) {
+      const hint = location.protocol === 'https:'
+        ? '网络错误（混合内容或证书未信任）：确认服务端已启用 TLS（KEEPSAKE_TLS=1）且证书已信任'
+        : '网络错误：服务端不可达，请确认本地服务器已启动';
+      return { ok: false, error: hint };
+    }
     return { ok: false, error: msg };
   }
 }
 
 /**
  * 启动时从服务端拉取 AI 配置并与本地合并（Last-Write-Wins by updated_at）。
- * 策略：
- *   - 本地无配置（首次使用）→ 直接使用服务端配置。
- *   - 本地有配置且本地 updated_at ≥ 服务端 updated_at → 本地优先，不覆盖。
- *   - 服务端 updated_at 较新 → 用服务端配置覆盖本地。
- * 注意：此函数只 GET，不 PUT，避免循环触发。
  */
 export async function pullAiConfigFromServer(): Promise<void> {
   try {
     const res = await fetch('/settings/ai');
     if (!res.ok) return;
     const remote = await res.json() as AiConfig & { updated_at?: number };
-    if (!remote || remote.mode === 'off' && !remote.apiKey) return;
+    if (!remote || remote.mode === 'off' && !remote.apiKey && !remote.deepseekApiKey) return;
 
     const local = await kvGet<AiConfig & { updated_at?: number }>(KEY);
     const localTs = local?.updated_at ?? 0;
     const remoteTs = remote.updated_at ?? 0;
 
     if (!local || remoteTs > localTs) {
-      // 去掉 updated_at 字段再存入本地（本地 AiConfig 不含此字段）
       const { updated_at: _ts, ...cfg } = remote;
       await kvSet(KEY, cfg as AiConfig);
     }
   } catch { /* 离线或服务不可达，静默忽略 */ }
 }
 
-export interface RecognitionItem { name: string; qty: number; confidence?: number; }
+export interface RecognitionItem {
+  name: string;
+  qty: number;
+  unit?: string;
+  confidence?: number;
+  expires_at?: string | null;
+  notes?: string;
+}
 export interface RecognitionDraft {
   status: 'done' | 'pending';
   items: RecognitionItem[];
@@ -111,10 +142,86 @@ async function blobToDataUrl(b: Blob): Promise<string> {
   });
 }
 
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+/**
+ * Guard against missing or accidentally-serialised-as-string-"undefined" keys.
+ * Fixes #52: old code paths could store the literal string "undefined" in IndexedDB
+ * which passes `!cfg.apiKey` (truthy non-empty string) but is rejected by OpenRouter (401).
+ */
+export function isValidKey(key?: string): key is string {
+  return typeof key === 'string' && key.trim() !== '' && key.trim() !== 'undefined';
+}
 
-async function callOpenRouterVision(blobs: Blob[], cfg: AiConfig): Promise<RecognitionDraft> {
-  const dataUrls = await Promise.all(blobs.map(blobToDataUrl));
+/**
+ * Ping the configured AI provider to validate the API key.
+ * Returns { ok: true, latencyMs } on success, { ok: false, error } on failure.
+ */
+export async function pingProvider(
+  provider: AiProvider,
+  apiKey: string,
+): Promise<{ ok: true; latencyMs: number } | { ok: false; error: string }> {
+  const t0 = Date.now();
+  try {
+    if (provider === 'deepseek') {
+      // DeepSeek: use a minimal chat completions call (no models endpoint)
+      const res = await fetch('https://api.deepseek.com/v1/models', {
+        method: 'GET',
+        headers: { authorization: `Bearer ${apiKey}` },
+      });
+      const latencyMs = Date.now() - t0;
+      if (res.ok) return { ok: true, latencyMs };
+      let detail = `HTTP ${res.status}`;
+      try { const j = await res.json(); detail = j?.error?.message ?? detail; } catch { /* ignore */ }
+      return { ok: false, error: `${res.status}: ${detail}` };
+    } else {
+      // OpenRouter: fetch models list (no tokens consumed)
+      const res = await fetch('https://openrouter.ai/api/v1/models', {
+        method: 'GET',
+        headers: {
+          authorization: `Bearer ${apiKey}`,
+          'HTTP-Referer': location.origin,
+          'X-Title': 'Keepsake',
+        },
+      });
+      const latencyMs = Date.now() - t0;
+      if (res.ok) return { ok: true, latencyMs };
+      let detail = `HTTP ${res.status}`;
+      try { const j = await res.json(); detail = j?.error?.message ?? detail; } catch { /* ignore */ }
+      return { ok: false, error: `${res.status}: ${detail}` };
+    }
+  } catch (e: unknown) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/**
+ * @deprecated Use pingProvider('openrouter', apiKey) instead.
+ */
+export async function pingOpenRouter(
+  apiKey: string,
+): Promise<{ ok: true; latencyMs: number } | { ok: false; error: string }> {
+  return pingProvider('openrouter', apiKey);
+}
+
+/**
+ * Transcribe an audio Blob via OpenRouter using chat completions with input_audio.
+ * Note: transcribe is OpenRouter-only (#64 will handle provider routing for voice).
+ */
+export async function transcribe(audio: Blob): Promise<{ text: string }> {
+  const cfg = await getAiConfig();
+  if (cfg.mode !== 'on' || !isValidKey(cfg.apiKey)) throw new Error('AI 未启用或未配置 OpenRouter Key');
+
+  const format = audio.type.includes('webm') ? 'webm'
+    : audio.type.includes('mp4') || audio.type.includes('m4a') ? 'mp4'
+    : audio.type.includes('wav') ? 'wav'
+    : 'webm';
+
+  const dataUrl = await blobToDataUrl(audio);
+  const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+
+  const model = (cfg.transcribeModel && cfg.transcribeModel.trim())
+    ? cfg.transcribeModel.trim()
+    : (cfg.model || DEFAULT_MODEL);
+
   const res = await fetch(OPENROUTER_URL, {
     method: 'POST',
     headers: {
@@ -124,55 +231,19 @@ async function callOpenRouterVision(blobs: Blob[], cfg: AiConfig): Promise<Recog
       'X-Title': 'Keepsake',
     },
     body: JSON.stringify({
-      model: cfg.model || DEFAULT_MODEL,
-      response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: '你是家庭仓储助手。仅返回 JSON：{"items":[{"name":string,"qty":number,"confidence":0-1}]}。看不清就不要瞎猜。' },
-        { role: 'user', content: [
-          { type: 'text', text: '列出图片中所有可见物品。中文命名。' },
-          ...dataUrls.map(u => ({ type: 'image_url', image_url: { url: u } })),
-        ]},
-      ],
+      model,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'text', text: '请把这段音频准确转写成中文文本，只返回转写结果，不要其他说明。' },
+          { type: 'input_audio', input_audio: { data: base64, format } },
+        ],
+      }],
     }),
-  });
-  if (!res.ok) throw new Error(`openrouter ${res.status}: ${await res.text()}`);
-  const j = await res.json();
-  const text = j.choices?.[0]?.message?.content ?? '{}';
-  const parsed = JSON.parse(text);
-  return { status: 'done', items: Array.isArray(parsed.items) ? parsed.items : [], raw: j };
-}
-
-export async function recognize(blobs: Blob[]): Promise<RecognitionDraft> {
-  const cfg = await getAiConfig();
-  if (cfg.mode === 'on' && cfg.apiKey) {
-    try { return await callOpenRouterVision(blobs, cfg); }
-    catch (e) { console.warn('openrouter vision failed', e); }
-  }
-  return { status: 'pending', items: [] };
-}
-
-/**
- * Transcribe an audio Blob via OpenRouter (Whisper-style model).
- * Note: OpenRouter exposes /audio/transcriptions for select audio models.
- */
-export async function transcribe(audio: Blob): Promise<{ text: string }> {
-  const cfg = await getAiConfig();
-  if (cfg.mode !== 'on' || !cfg.apiKey) throw new Error('AI 未启用或未配置 OpenRouter Key');
-  const fd = new FormData();
-  fd.append('file', audio, 'voice.webm');
-  fd.append('model', cfg.transcribeModel || DEFAULT_TRANSCRIBE_MODEL);
-  const res = await fetch('https://openrouter.ai/api/v1/audio/transcriptions', {
-    method: 'POST',
-    headers: {
-      authorization: `Bearer ${cfg.apiKey}`,
-      'HTTP-Referer': location.origin,
-      'X-Title': 'Keepsake',
-    },
-    body: fd,
   });
   if (!res.ok) throw new Error(`transcribe ${res.status}: ${await res.text()}`);
   const j = await res.json();
-  return { text: j.text ?? '' };
+  return { text: j.choices?.[0]?.message?.content?.trim() ?? '' };
 }
 
 export interface SearchContext {
@@ -180,60 +251,67 @@ export interface SearchContext {
   name: string;
   qty: number;
   unit?: string;
-  location: string; // e.g. "厨房 / 洗手台柜子"
+  location: string;
   notes?: string;
   tags?: string[];
 }
 
 export interface SearchAnswerResult {
   answer: string;
-  /** item ids explicitly mentioned / cited in the answer */
   citedIds: string[];
 }
 
 /**
- * Natural-language search: given a user query and up to 30 candidate items
- * (pre-filtered by keyword search), ask the model to answer in Chinese,
- * citing specific items and their locations.
- * Returns { ok: false, error } on failure so callers can surface the error.
+ * Natural-language search using the configured AI provider.
  */
 export async function searchAnswer(
   query: string,
   contextItems: SearchContext[],
 ): Promise<{ ok: true; result: SearchAnswerResult } | { ok: false; error: string }> {
   const cfg = await getAiConfig();
-  if (cfg.mode !== 'on' || !cfg.apiKey) {
+  const provider = getEffectiveProvider(cfg);
+  const apiKey = getEffectiveApiKey(cfg);
+
+  if (cfg.mode !== 'on' || !isValidKey(apiKey)) {
     return { ok: false, error: 'AI 未启用' };
   }
 
-  // Build a compact context block (~50 chars per item)
   const contextBlock = contextItems
     .map(it => {
-      const parts = [`[${it.id}] ${it.name} ×${it.qty}${it.unit ?? ''}`, `位置：${it.location}`];
+      const parts = [`${it.name} ×${it.qty}${it.unit ?? ''}`, `位置：${it.location}`];
       if (it.notes) parts.push(`备注：${it.notes}`);
       if (it.tags?.length) parts.push(`标签：${it.tags.join('、')}`);
-      return parts.join('；');
+      return parts.join('；') + `  (id:${it.id})`;
     })
     .join('\n');
 
   const systemPrompt = `你是家庭仓储助手。用户查询他们家里存放的物品。
-以下是相关物品列表（格式：[id] 名称 数量 位置 备注）：
+以下是相关物品列表（格式：名称 数量 位置 备注，行末括号内为物品 id）：
 ${contextBlock || '（无匹配物品）'}
 
-请用中文简洁回答用户问题，引用具体物品名称和位置。回答里如需引用物品，请在文中用 [id] 标注。
+请用中文自然语言简洁回答用户问题，提及具体物品名称和位置即可，不要在回答中包含任何 id 或 [括号标记]。所有被提及的物品 id 单独放在 citedIds 数组里。
 仅返回 JSON：{"answer": string, "citedIds": string[]}`;
 
+  const url = getEffectiveBaseUrl(cfg);
+  const model = provider === 'deepseek'
+    ? (cfg.model || DEFAULT_DEEPSEEK_MODEL)
+    : (cfg.model || DEFAULT_MODEL);
+
+  const headers: Record<string, string> = {
+    'content-type': 'application/json',
+    authorization: `Bearer ${apiKey}`,
+  };
+  if (provider === 'openrouter') {
+    headers['HTTP-Referer'] = location.origin;
+    headers['X-Title'] = 'Keepsake';
+  }
+
   try {
-    const res = await fetch(OPENROUTER_URL, {
+    const res = await fetch(url, {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        authorization: `Bearer ${cfg.apiKey}`,
-        'HTTP-Referer': location.origin,
-        'X-Title': 'Keepsake',
-      },
+      headers,
       body: JSON.stringify({
-        model: cfg.model || DEFAULT_MODEL,
+        model,
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: systemPrompt },
@@ -248,10 +326,13 @@ ${contextBlock || '（无匹配物品）'}
     const j = await res.json();
     const raw = j.choices?.[0]?.message?.content ?? '{}';
     const parsed = JSON.parse(raw);
+    // 防御性清理：即使 AI 不遵守 prompt 约定，也剥除 answer 中的 [id] 标记
+    const rawAnswer = typeof parsed.answer === 'string' ? parsed.answer : '（无回答）';
+    const cleanAnswer = rawAnswer.replace(/\[[^\]]{8,}\]/g, '').replace(/\s{2,}/g, ' ').trim();
     return {
       ok: true,
       result: {
-        answer: typeof parsed.answer === 'string' ? parsed.answer : '（无回答）',
+        answer: cleanAnswer,
         citedIds: Array.isArray(parsed.citedIds) ? parsed.citedIds : [],
       },
     };
@@ -261,26 +342,90 @@ ${contextBlock || '（无匹配物品）'}
   }
 }
 
+const PARSE_ITEMS_SYSTEM_PROMPT = `从用户的中文描述中抽取家庭物品清单。每个物品输出 { name, qty, unit, expires_at, notes }：
+- qty: 纯数字，用户没说默认 1；中文数字转阿拉伯数字（一→1，两/二→2，三→3，半→0.5，以此类推）
+- unit: 量词单位（如 盒、瓶、包、个、根、张、套、组、卷、袋、罐、块……），从描述中单独提取；无法识别则输出 null
+- 示例："一盒创可贴" → qty:1, unit:"盒", name:"创可贴"；"三瓶洗发水" → qty:3, unit:"瓶", name:"洗发水"
+- expires_at: 如果用户提到"过期"、"保质期到"、"X 月前买的可以放 X 个月"等可推断的，输出 ISO 日期字符串（YYYY-MM-DD）；不确定就 null
+- notes: 用户对这个物品的额外描述（品牌、型号、用途等）；qty/unit 已结构化的数量词不要放入 notes
+仅返回 JSON：{"items":[{"name":string,"qty":number,"unit":string|null,"expires_at":string|null,"notes":string?}]}`;
+
+function buildMergeSystemPrompt(existingItems: ExistingItem[]): string {
+  const existingJson = JSON.stringify(existingItems, null, 2);
+  return `你是家庭仓储助手。以下是该区域现有物品列表（JSON）：
+${existingJson}
+
+请结合用户新输入，输出**最终完整物品列表**（含已有未变动项 + 新增项 + 修改项）。
+合并规则：
+- 用户提到的物品，若与现有物品名称相同（忽略空格大小写），则更新其 qty（累加或以用户指定为准）、unit、expires_at、notes
+- 用户提到的新物品直接加入列表
+- 未被用户提及的现有物品保留原样（qty/expires_at/notes 不变）
+- qty: 纯数字，用户没说数量默认 1，中文数字转阿拉伯数字，若是追加说明则累加到现有数量
+- unit: 量词单位（盒、瓶、包、个……）；无法识别则 null
+- expires_at: ISO 日期字符串（YYYY-MM-DD）或 null
+- notes: 合并有意义的备注，重复的去掉
+仅返回 JSON：{"items":[{"name":string,"qty":number,"unit":string|null,"expires_at":string|null,"notes":string?}]}`;
+}
+
+export interface ExistingItem {
+  name: string;
+  qty: number;
+  unit?: string;
+  expires_at?: string | null;
+  notes?: string;
+}
+
+export type ParseMode = 'replace' | 'merge';
+
 /**
- * Parse a free-form Chinese sentence ("我在厨房柜子里放了两瓶消毒水")
- * into a list of items. Uses the same chat model as vision.
+ * Parse a free-form Chinese sentence into a list of items.
+ * Routes to DeepSeek or OpenRouter based on configured provider.
+ *
+ * @param text - User input text
+ * @param existingItems - Existing items in the area (for merge mode)
+ * @param mode - 'replace' (default) ignores existing items; 'merge' feeds them to AI for context-aware output
  */
-export async function parseVoiceText(text: string): Promise<RecognitionItem[]> {
+export async function parseItemsFromText(
+  text: string,
+  existingItems?: ExistingItem[],
+  mode: ParseMode = 'replace',
+): Promise<RecognitionItem[]> {
   const cfg = await getAiConfig();
-  if (cfg.mode !== 'on' || !cfg.apiKey) throw new Error('AI 未启用或未配置 OpenRouter Key');
-  const res = await fetch(OPENROUTER_URL, {
+  const provider = getEffectiveProvider(cfg);
+  const apiKey = getEffectiveApiKey(cfg);
+
+  if (cfg.mode !== 'on' || !isValidKey(apiKey)) {
+    throw new Error(provider === 'deepseek'
+      ? 'AI 未启用或未配置 DeepSeek Key'
+      : 'AI 未启用或未配置 OpenRouter Key');
+  }
+
+  const url = getEffectiveBaseUrl(cfg);
+  const model = provider === 'deepseek'
+    ? (cfg.model || DEFAULT_DEEPSEEK_MODEL)
+    : (cfg.model || DEFAULT_MODEL);
+
+  const headers: Record<string, string> = {
+    'content-type': 'application/json',
+    authorization: `Bearer ${apiKey}`,
+  };
+  if (provider === 'openrouter') {
+    headers['HTTP-Referer'] = location.origin;
+    headers['X-Title'] = 'Keepsake';
+  }
+
+  const systemPrompt = (mode === 'merge' && existingItems && existingItems.length > 0)
+    ? buildMergeSystemPrompt(existingItems)
+    : PARSE_ITEMS_SYSTEM_PROMPT;
+
+  const res = await fetch(url, {
     method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      authorization: `Bearer ${cfg.apiKey}`,
-      'HTTP-Referer': location.origin,
-      'X-Title': 'Keepsake',
-    },
+    headers,
     body: JSON.stringify({
-      model: cfg.model || DEFAULT_MODEL,
+      model,
       response_format: { type: 'json_object' },
       messages: [
-        { role: 'system', content: '从用户的中文口语描述中抽取物品。仅返回 JSON：{"items":[{"name":string,"qty":number}]}。数字未说默认 1。' },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: text },
       ],
     }),
@@ -291,3 +436,9 @@ export async function parseVoiceText(text: string): Promise<RecognitionItem[]> {
   const parsed = JSON.parse(inner);
   return Array.isArray(parsed.items) ? parsed.items : [];
 }
+
+/**
+ * @deprecated Use parseItemsFromText instead.
+ * @alias parseItemsFromText
+ */
+export const parseVoiceText = parseItemsFromText;

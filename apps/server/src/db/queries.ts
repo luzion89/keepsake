@@ -104,7 +104,10 @@ export function mergeUpsert(db: Database.Database, table: TableName, incoming: a
   }
   const { merged, conflicts } = MERGE_FNS[table](local, incoming);
   upsertRow(db, table, merged);
-  return { applied: merged, conflicts };
+  // merge-rules passes (local=server, remote=client), so conflict.client=server_val,
+  // conflict.server=client_val — swap to match correct semantics (#158)
+  const corrected = conflicts.map(c => ({ ...c, client: c.server, server: c.client }));
+  return { applied: merged, conflicts: corrected };
 }
 
 export function logConflict(db: Database.Database, table: TableName, rowId: string, deviceId: string, conflict: {field:string;client:unknown;server:unknown}) {

@@ -46,6 +46,7 @@ export const ItemSchema = SyncMetaSchema.extend({
   source: z.enum(['ai', 'voice', 'manual']),
   confidence: z.number().min(0).max(1).optional(),
   bbox: BBoxSchema.optional(),
+  created_at: z.number().int().nonnegative().optional(),
   notes: z.string().max(4000).optional(),
 });
 export type Item = z.infer<typeof ItemSchema>;
@@ -85,8 +86,20 @@ export type TableName = z.infer<typeof TableNameSchema>;
 // ---------- AI 配置（跨设备同步，存于 server kv 表） ----------
 export const AiConfigSchema = z.object({
   mode: z.enum(['on', 'off']),
+  /**
+   * provider 字段：
+   * - 新安装默认 'deepseek'。
+   * - 旧配置（无此字段）读取时 safeParse 会返回 undefined，调用方应 fallback 到 'openrouter'
+   *   以避免已配置 OpenRouter key 的老用户突然失效。
+   */
+  provider: z.enum(['deepseek', 'openrouter']).optional(),
+  /** OpenRouter API key（sk-or-...），保留字段名向后兼容 */
   apiKey: z.string().max(200).optional(),
+  /** DeepSeek API key（sk-...），与 apiKey 分开存储 */
+  deepseekApiKey: z.string().max(200).optional(),
+  /** Vision-capable model id（OpenRouter 专用，DeepSeek 不支持 vision） */
   model: z.string().max(120).optional(),
+  /** Optional Whisper-class model for voice transcription（OpenRouter 专用） */
   transcribeModel: z.string().max(120).optional(),
 }).strict();
 export type AiConfig = z.infer<typeof AiConfigSchema>;

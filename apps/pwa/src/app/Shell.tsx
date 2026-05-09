@@ -1,5 +1,6 @@
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { Bell, Home, Search, Settings, AlertTriangle } from 'lucide-react';
 import { db, type ConflictRow } from '../db/dexie.js';
 import { syncOnce } from '../sync/client.js';
 import { scanReminders, type TriggeredReminder } from '../notifications/scanner.js';
@@ -9,6 +10,7 @@ function ConflictBanner() {
   const [count, setCount] = useState(0);
   const [expanded, setExpanded] = useState(false);
   const [rows, setRows] = useState<ConflictRow[]>([]);
+  const [enriched, setEnriched] = useState<Array<ConflictRow & { label: string }>>([]);
 
   useEffect(() => {
     const tick = async () => {
@@ -25,6 +27,34 @@ function ConflictBanner() {
   const loadRows = async () => {
     const r = await db.conflicts.where('acknowledged').equals(0).toArray();
     setRows(r);
+    // Enrich: join item/area/room info for human-readable display
+    const rich = await Promise.all(r.map(async row => {
+      let label = `${row.table}/${row.row_id}`;
+      try {
+        if (row.table === 'items') {
+          const item = await db.items.get(row.row_id);
+          if (item) {
+            const area = await db.areas.get(item.area_id);
+            const room = area ? await db.rooms.get(area.room_id) : null;
+            const createdStr = item.created_at
+              ? new Date(item.created_at).toLocaleDateString('zh-CN')
+              : '';
+            label = [room?.name, area?.name, item.name, createdStr].filter(Boolean).join(' > ');
+          }
+        } else if (row.table === 'areas') {
+          const area = await db.areas.get(row.row_id);
+          if (area) {
+            const room = await db.rooms.get(area.room_id);
+            label = [room?.name, area.name].filter(Boolean).join(' > ');
+          }
+        } else if (row.table === 'rooms') {
+          const room = await db.rooms.get(row.row_id);
+          if (room) label = room.name;
+        }
+      } catch { /* keep default label */ }
+      return { ...row, label };
+    }));
+    setEnriched(rich);
   };
 
   const toggle = () => {
@@ -39,33 +69,65 @@ function ConflictBanner() {
     setRows([]);
   };
 
+  const acceptAllServer = async () => {
+    const pending = await db.conflicts.where('acknowledged').equals(0).toArray();
+    for (const r of pending) {
+      try {
+        const table = (db as any)[r.table];
+        if (table) {
+          const row = await table.get(r.row_id);
+          if (row) {
+            await table.put({ ...row, [r.field]: r.server });
+          }
+        }
+      } catch { /* skip */ }
+    }
+    await db.conflicts.where('acknowledged').equals(0).modify({ acknowledged: 1 });
+    setCount(0);
+    setExpanded(false);
+    setRows([]);
+  };
+
   return (
-    <div className="bg-rose-950 border-b border-rose-700 px-4 py-2 text-xs">
+    <div className="bg-danger-bg border-b border-danger/30 px-4 py-1.5 text-xs">
       <div className="flex items-center gap-2">
-        <span className="text-rose-300 font-medium">⚠️ 检测到 {count} 条冲突</span>
+        <AlertTriangle size={14} strokeWidth={1.5} className="text-danger-text shrink-0" />
+        <span className="text-danger-text font-medium">检测到 {count} 条冲突</span>
         <button
           onClick={toggle}
-          className="text-rose-200 hover:text-white underline underline-offset-2"
+          className="text-danger-text/80 hover:text-danger-text underline underline-offset-2"
         >
           {expanded ? '收起' : '查看详情'}
         </button>
       </div>
       {expanded && (
         <div className="mt-2 space-y-1">
-          {rows.map(r => (
-            <div key={r.id} className="text-rose-200 bg-rose-900/50 rounded px-2 py-1">
-              <span className="font-mono">{r.table}/{r.row_id}</span> · 字段{' '}
-              <span className="font-medium">{r.field}</span> · 本地{' '}
-              <span className="text-amber-300">{JSON.stringify(r.client)}</span> / 服务端{' '}
-              <span className="text-sky-300">{JSON.stringify(r.server)}</span>
+          {enriched.map(r => (
+            <div key={r.id} className="text-danger-text bg-danger-bg rounded px-2 py-1 border border-danger/20 space-y-0.5">
+              <div className="font-medium">{r.label}</div>
+              <div className="text-danger-text/80">
+                字段 <span className="font-semibold">{r.field}</span>
+                {' · '}本地: <span className="text-warn-text">{r.client == null ? '（空）' : JSON.stringify(r.client)}</span>
+                {' / '}服务端: <span className="text-ink-muted">{r.server == null ? '（空）' : JSON.stringify(r.server)}</span>
+              </div>
             </div>
           ))}
-          <button
-            onClick={acknowledgeAll}
-            className="mt-1 px-3 py-1 rounded bg-rose-700 hover:bg-rose-600 text-white font-medium"
-          >
-            全部确认
-          </button>
+          <div className="mt-1 flex gap-2">
+            <button
+              onClick={acknowledgeAll}
+              className="flex-1 px-3 py-1 rounded-[12px] border border-danger/40 text-danger-text font-medium transition-colors hover:bg-danger-bg/60 text-xs"
+              title="保留本地数据，忽略云端差异"
+            >
+              全部保留本地
+            </button>
+            <button
+              onClick={acceptAllServer}
+              className="flex-1 px-3 py-1 rounded-[12px] bg-danger hover:opacity-90 text-paper font-medium transition-colors text-xs"
+              title="用云端数据覆盖本地对应字段"
+            >
+              全部采用云端
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -94,20 +156,23 @@ function NotificationBanner() {
   };
 
   return (
-    <div className="bg-amber-950 border-b border-amber-700 px-4 py-2 text-xs space-y-1">
-      <p className="text-amber-300 font-medium">🔔 {triggered.length} 条提醒待处理</p>
+    <div className="bg-warn-bg border-b border-warn/30 px-4 py-1.5 text-xs space-y-1">
+      <p className="text-warn-text font-medium flex items-center gap-1.5">
+        <Bell size={14} strokeWidth={1.5} className="shrink-0" />
+        {triggered.length} 条提醒待处理
+      </p>
       {triggered.map(t => (
-        <div key={t.rule.id} className="flex items-center gap-2 text-amber-200">
+        <div key={t.rule.id} className="flex items-center gap-2 text-warn-text">
           <span className="flex-1">{t.reason}</span>
           <button
             onClick={() => navigate(`/items/${t.item.id}`)}
-            className="underline underline-offset-2 hover:text-white"
+            className="underline underline-offset-2 hover:text-ink transition-colors"
           >
             查看
           </button>
           <button
             onClick={() => dismiss(t)}
-            className="text-amber-400 hover:text-white"
+            className="hover:text-ink transition-colors"
           >
             知道了
           </button>
@@ -135,22 +200,47 @@ export function Shell() {
     return () => { clearInterval(i); window.removeEventListener('online', on); window.removeEventListener('offline', off); };
   }, [loc.pathname]);
 
+  const tabs = [
+    { to: '/', label: '房间', Icon: Home },
+    { to: '/search', label: '搜索', Icon: Search },
+    { to: '/settings', label: '设置', Icon: Settings },
+  ];
+
   return (
     <div className="min-h-full flex flex-col">
-      <header className="sticky top-0 z-10 bg-slate-900/80 backdrop-blur border-b border-slate-800 px-4 py-3 flex items-center gap-3">
-        <Link to="/" className="font-semibold tracking-tight text-lg">Keepsake</Link>
+      {/* ── Header ────────────────────────────────────── */}
+      <header className="sticky top-0 z-10 h-14 bg-paper/95 backdrop-blur-md border-b border-ink-faint px-4 flex items-center gap-3">
+        <Link
+          to="/"
+          className="flex items-center gap-1.5 text-base font-bold font-serif tracking-tight text-ink hover:text-ink-hover transition-colors"
+        >
+          Keepsake
+        </Link>
         <div className="flex-1" />
-        <Link to="/search" className="text-sm text-slate-300 hover:text-white">搜索</Link>
-        <Link to="/settings" className="text-sm text-slate-300 hover:text-white">设置</Link>
+        <Link
+          to="/search"
+          aria-label="搜索"
+          className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-[12px] text-ink-muted hover:text-ink hover:bg-paper-dark transition-all duration-150"
+        >
+          <Search size={18} strokeWidth={1.5} />
+        </Link>
+        <Link
+          to="/settings"
+          aria-label="设置"
+          className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-[12px] text-ink-muted hover:text-ink hover:bg-paper-dark transition-all duration-150"
+        >
+          <Settings size={18} strokeWidth={1.5} />
+        </Link>
       </header>
 
+      {/* ── Offline / Pending banner ───────────────────── */}
       {(pending > 0 || !online) && (
-        <div className="px-4 py-2 text-xs flex gap-3 bg-slate-800/60 border-b border-slate-700">
-          {!online && <span className="text-amber-300">● 离线</span>}
-          {pending > 0 && <span className="text-sky-300">待同步 {pending}</span>}
+        <div className="px-4 py-1.5 text-xs flex gap-3 items-center bg-paper-dark border-b border-ink-faint">
+          {!online && <span className="text-warn-text">● 离线</span>}
+          {pending > 0 && <span className="text-ink-muted">待同步 {pending}</span>}
           <button
             onClick={() => syncOnce()}
-            className="ml-auto text-slate-300 hover:text-white underline-offset-2 hover:underline"
+            className="ml-auto text-accent hover:text-accent-hover underline-offset-2 hover:underline transition-colors"
           >
             立即同步
           </button>
@@ -160,25 +250,32 @@ export function Shell() {
       <ConflictBanner />
       <NotificationBanner />
 
-      <main className="flex-1 px-4 py-4 max-w-3xl w-full mx-auto">
+      {/* ── Main content ──────────────────────────────── */}
+      <main className="flex-1 px-4 py-4 max-w-3xl w-full mx-auto pb-6">
         <Outlet />
       </main>
 
-      <nav className="sticky bottom-0 bg-slate-900 border-t border-slate-800 grid grid-cols-3 text-center text-sm">
-        {[
-          { to: '/', label: '房间' },
-          { to: '/search', label: '搜索' },
-          { to: '/settings', label: '设置' },
-        ].map(t => (
+      {/* ── Bottom nav ────────────────────────────────── */}
+      <nav className="sticky bottom-0 z-10 h-16 pb-safe bg-paper/95 backdrop-blur-sm border-t border-ink-faint grid grid-cols-3">
+        {tabs.map(({ to, label, Icon }) => (
           <NavLink
-            key={t.to}
-            to={t.to}
-            end={t.to === '/'}
+            key={to}
+            to={to}
+            end={to === '/'}
             className={({ isActive }) =>
-              `py-3 ${isActive ? 'text-sky-300' : 'text-slate-400 hover:text-slate-100'}`
+              `flex flex-col items-center justify-center gap-0.5 text-xs transition-all duration-150 ${
+                isActive ? 'text-ink font-semibold' : 'text-ink-muted hover:text-ink'
+              }`
             }
           >
-            {t.label}
+            {({ isActive }) => (
+              <>
+                {/* Active indicator bar */}
+                <span className={`w-6 h-0.5 rounded-full mb-0.5 transition-all duration-150 ${isActive ? 'bg-accent' : 'bg-transparent'}`} />
+                <Icon size={20} strokeWidth={1.5} />
+                <span>{label}</span>
+              </>
+            )}
           </NavLink>
         ))}
       </nav>

@@ -36,3 +36,38 @@ model: sonnet
 - 阻塞核心流程（无法添加房间/区域/物品/拍照/语音）→ `priority:high`
 - UI 错乱、文案错误、小功能缺失 → `priority:med`
 - 优化、清理、文档 → `priority:low`
+
+## 分支清理（强制）
+每次 PR merge 后必须执行以下步骤：
+1. 删除本地分支：`git branch -d <local-branch>`（如 squash merge 无法 -d，用 `git branch -D`）
+2. 删除远端分支：`git push origin --delete <remote-branch>`（若仓库有 deletion 保护规则，走 GitHub 网页或 `gh pr merge --delete-branch`）
+3. 推荐合并时直接用：`gh pr merge --squash --delete-branch <PR号>`
+4. 清理过期远端追踪：`git fetch -p`
+
+## 本地同步（强制）
+每次 PM 任务结束前，必须确保 local main fast-forward 到 origin/main：
+```
+git checkout main && git pull --ff-only
+```
+并在任务汇总末尾明确写一行：**本地 main 已与 origin/main 同步**。
+
+## 协作记录（强制）
+每个 issue 的 merge 流程中，PM 必须在 issue 上留下以下两条评论：
+
+1. **review 通过时**：
+   ```
+   gh issue comment N --body "**[PM]** review 通过，准备 merge"
+   ```
+2. **merge 后**：
+   ```
+   gh issue comment N --body "**[PM]** PR #M 已合并 (commit <SHA>)"
+   ```
+
+**关闭前必须核查**：所有即将 close 的 issue 都必须含有：
+- `**[Coder]** 开始处理` 评论
+- `**[Coder]** PR #M 已开` 评论
+- `**[QA]** 已验证` 评论（含具体复测点）
+- `**[PM]** review 通过` 评论
+- `**[PM]** PR #M 已合并` 评论
+
+缺少任何一条，issue 不允许 close。PM 每轮汇总时需逐条列出 close 的 issue 并标注是否含全套评论，没有的要补打。

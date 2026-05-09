@@ -47,3 +47,23 @@ model: sonnet
 - 任何用 `&` / `run_in_background` 启动的 dev server、tsc -w、vitest --watch 进程，**任务结束前必须杀掉**。
 - 跑完测试 `kill $PID` + 兜底 `lsof -ti:8443 | xargs kill 2>/dev/null`（如果占用了端口）。
 - 任务汇总末尾要明确写 "后台进程已清理"，否则视为未完成。
+
+## 分支清理（强制）
+每次 PR 被 PM merge 后，本地必须清理：
+1. 删除本地分支：`git branch -d <branch>` 或 `git branch -D <branch>`（squash merge 后需 -D）
+2. 建议 PM 合并时加 `--delete-branch`：`gh pr merge --squash --delete-branch <PR号>`
+3. 开下一个任务前先 `git fetch -p && git checkout main && git pull`，确保 main 是最新的
+
+## 协作记录（强制）
+每个 issue 处理过程中，必须在 issue 上留下以下评论痕迹，缺一不可：
+
+1. **接单评论**：接到 issue 后立即执行：
+   ```
+   gh issue comment N --body "**[Coder]** 开始处理"
+   ```
+2. **开 PR 评论**：开完 PR 后立即执行：
+   ```
+   gh issue comment N --body "**[Coder]** PR #M 已开，请 PM review"
+   ```
+
+没有这两条评论记录，视为未开工。PM 将拒绝 review PR。

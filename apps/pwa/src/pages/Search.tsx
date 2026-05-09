@@ -1,17 +1,32 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Pin, Sparkles } from 'lucide-react';
 import type { Item, Area, Room } from '@keepsake/shared';
 import { db } from '../db/dexie.js';
 import { ItemRepo } from '../db/repos.js';
-import { getAiConfig, searchAnswer } from '../ai/router.js';
+import { getAiConfig, getEffectiveApiKey, searchAnswer } from '../ai/router.js';
 import type { SearchContext, SearchAnswerResult } from '../ai/router.js';
+
+/** Simple in-app toast (auto-dismisses after 2.5 s) */
+function useToast() {
+  const [msg, setMsg] = useState<string | null>(null);
+  const show = (m: string) => {
+    setMsg(m);
+    setTimeout(() => setMsg(null), 2500);
+  };
+  const node = msg ? (
+    <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-[12px] bg-ink text-paper text-sm shadow-lg whitespace-nowrap pointer-events-none">
+      {msg}
+    </div>
+  ) : null;
+  return { show, node };
+}
 
 export function SearchPage() {
   const [q, setQ] = useState('');
   const [items, setItems] = useState<Item[]>([]);
   const [areas, setAreas] = useState<Map<string, Area>>(new Map());
   const [rooms, setRooms] = useState<Map<string, Room>>(new Map());
-  const [listening, setListening] = useState(false);
 
   // AI answer state
   const [aiEnabled, setAiEnabled] = useState(false);
@@ -19,9 +34,11 @@ export function SearchPage() {
   const [aiResult, setAiResult] = useState<SearchAnswerResult | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
 
+  const toast = useToast();
+
   // Check if AI is available
   useEffect(() => {
-    getAiConfig().then(cfg => setAiEnabled(cfg.mode === 'on' && !!cfg.apiKey));
+    getAiConfig().then(cfg => setAiEnabled(cfg.mode === 'on' && !!getEffectiveApiKey(cfg)));
   }, []);
 
   useEffect(() => {
@@ -58,33 +75,19 @@ export function SearchPage() {
     return Array.from(g.entries());
   }, [items]);
 
-  const startVoice = () => {
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) { alert('当前浏览器不支持语音识别，请手动输入。'); return; }
-    const rec = new SR();
-    rec.lang = 'zh-CN';
-    rec.continuous = false;
-    rec.interimResults = false;
-    rec.onstart = () => setListening(true);
-    rec.onend = () => setListening(false);
-    rec.onerror = () => setListening(false);
-    rec.onresult = (e: any) => {
-      const text = Array.from(e.results).map((r: any) => r[0].transcript).join('');
-      setQ(text);
-    };
-    rec.start();
-  };
 
   const askAi = async () => {
+    if (!aiEnabled) {
+      toast.show('请先在设置里启用 AI 功能');
+      return;
+    }
     if (!q.trim()) return;
     setAiLoading(true);
     setAiResult(null);
     setAiError(null);
 
-    // Collect up to 30 candidates (from keyword search; if none, use all items capped)
     let candidates = items.slice(0, 30);
     if (candidates.length === 0) {
-      // query didn't hit keyword search, still pass top 30 from all
       const all = (await db.items.toArray()).filter(i => !i.deleted).slice(0, 30);
       candidates = all;
     }
@@ -108,36 +111,77 @@ export function SearchPage() {
   // Highlight items cited by AI
   const citedSet = useMemo(() => new Set(aiResult?.citedIds ?? []), [aiResult]);
 
+  // Build cited items list for the Pin section
+  const citedItems = useMemo(() => {
+    if (!aiResult?.citedIds?.length) return [];
+    return aiResult.citedIds
+      .map(id => items.find(it => it.id === id))
+      .filter((it): it is Item => it !== undefined)
+      .map(it => {
+        const area = areas.get(it.area_id);
+        const room = area ? rooms.get(area.room_id) : undefined;
+        return { ...it, locationLabel: `${room?.name ?? '?'} / ${area?.name ?? '?'}` };
+      });
+  }, [aiResult, items, areas, rooms]);
+
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">搜索物品</h1>
-      <div className="flex gap-2">
-        <input
-          autoFocus
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="如 消毒水、电池、备用灯泡…"
-          className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2"
-        />
-        <button
-          onClick={startVoice}
-          className={`px-4 rounded-lg ${listening ? 'bg-rose-500 text-slate-950' : 'border border-slate-700'}`}
-        >
-          🎙
-        </button>
-        {aiEnabled && q.trim() && (
-          <button
-            onClick={askAi}
-            disabled={aiLoading}
-            className="px-3 rounded-lg bg-violet-600 text-white text-sm disabled:opacity-50"
-          >
-            {aiLoading ? '思考中…' : '✨ AI 回答'}
-          </button>
-        )}
+      {toast.node}
+
+      <h1 className="text-2xl font-bold font-serif text-ink">搜索物品</h1>
+
+      {/* ── 使用提示卡片 ──────────────────────────────── */}
+      <div className="bg-paper-card border border-ink/10 rounded-[12px] px-4 py-3 text-sm text-ink-muted leading-relaxed">
+        直接搜索关键词，也可以用语音输入一段模糊的描述，让 AI 帮忙查找符合描述的物品
       </div>
 
+      {/* ── 搜索输入框 + AI 按钮 ─────────────────────── */}
+      <div className="flex gap-2">
+        <textarea
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value);
+            e.target.style.height = 'auto';
+            e.target.style.height = e.target.scrollHeight + 'px';
+          }}
+          onFocus={(e) => {
+            e.target.style.overflow = 'hidden';
+            e.target.style.height = 'auto';
+            e.target.style.height = e.target.scrollHeight + 'px';
+          }}
+          onBlur={(e) => {
+            e.target.style.height = '48px';
+            e.target.style.overflow = 'hidden';
+          }}
+          placeholder="输入关键词…"
+          rows={1}
+          className="flex-1 bg-paper-card border border-[var(--border-default)] rounded-[12px] px-4 py-3 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-150 text-ink placeholder:text-ink-muted resize-none overflow-hidden leading-[1.5]"
+          style={{ minHeight: '48px' }}
+        />
+        {/* AI 按钮 — 始终渲染 */}
+        <button
+          onClick={askAi}
+          disabled={aiLoading}
+          className={`self-start h-12 px-4 flex items-center justify-center gap-1.5 rounded-[12px] font-medium text-sm transition-all duration-150 active:scale-[0.97] ${
+            aiEnabled && q.trim()
+              ? 'bg-accent hover:bg-accent-hover text-paper'
+              : 'border border-[var(--border-default)] text-ink-muted opacity-60'
+          }`}
+        >
+          {aiLoading ? (
+            '思考中…'
+          ) : (
+            <>
+              <Sparkles size={16} strokeWidth={1.5} />
+              AI
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* ── 搜索结果 ──────────────────────────────────── */}
       {q.trim() && items.length === 0 && (
-        <p className="text-slate-400 text-sm">没有找到 "{q}"。</p>
+        <p className="text-ink-muted text-sm pt-2">没有找到 "{q}"。</p>
       )}
 
       {grouped.map(([areaId, list]) => {
@@ -147,23 +191,26 @@ export function SearchPage() {
           <section key={areaId}>
             <Link
               to={`/areas/${areaId}`}
-              className="block text-sm text-slate-400 hover:text-white mb-1"
+              className="block text-xs text-ink-muted font-medium uppercase tracking-wide hover:text-ink mb-1.5 transition-colors"
             >
               {r?.name ?? '?'} / {a?.name ?? '?'}
             </Link>
-            <ul className="space-y-1">
+            <ul className="space-y-1.5">
               {list.map(it => (
                 <li key={it.id}>
                   <Link
                     to={`/items/${it.id}`}
-                    className={`block px-4 py-2 rounded-lg bg-slate-800 border hover:border-sky-500 ${
-                      citedSet.has(it.id) ? 'border-violet-500 ring-1 ring-violet-500/40' : 'border-slate-700'
+                    className={`block px-4 py-2.5 rounded-[12px] bg-paper-card border hover:border-accent/40 transition-all duration-150 ${
+                      citedSet.has(it.id) ? 'border-accent/60 ring-1 ring-accent/20' : 'border-[var(--border-default)]'
                     }`}
                   >
-                    <span className="font-medium">{it.name}</span>
-                    <span className="text-slate-400 text-sm ml-2">× {it.qty}</span>
+                    <span className="text-sm font-medium text-ink">{it.name}</span>
+                    <span className="text-ink-muted text-xs ml-2">× {it.qty}</span>
                     {citedSet.has(it.id) && (
-                      <span className="ml-2 text-xs text-violet-400">✨ AI 引用</span>
+                      <span className="ml-2 text-xs text-accent inline-flex items-center gap-0.5">
+                        <Sparkles size={10} strokeWidth={1.5} />
+                        AI 引用
+                      </span>
                     )}
                   </Link>
                 </li>
@@ -173,18 +220,41 @@ export function SearchPage() {
         );
       })}
 
-      {/* AI Answer section */}
+      {/* ── AI Answer 卡片 ────────────────────────────── */}
       {(aiResult || aiError) && (
-        <section className="mt-4 p-4 rounded-xl bg-slate-800 border border-violet-700 space-y-2">
-          <div className="flex items-center gap-2 text-sm font-semibold text-violet-300">
-            ✨ AI 回答
+        <section className="mt-2 p-4 rounded-[12px] bg-paper-card border border-accent/30 space-y-2">
+          <div className="flex items-center gap-2 text-sm font-semibold text-accent">
+            <Sparkles size={16} strokeWidth={1.5} />
+            AI 回答
           </div>
           {aiError && (
-            <p className="text-rose-400 text-sm">{aiError}</p>
+            <p className="text-danger-text text-sm">{aiError}</p>
           )}
           {aiResult && (
-            <p className="text-slate-100 text-sm leading-relaxed whitespace-pre-wrap">{aiResult.answer}</p>
+            <p className="text-ink text-sm leading-relaxed whitespace-pre-wrap">{aiResult.answer}</p>
           )}
+        </section>
+      )}
+
+      {/* ── AI 提到的物品 ──────────────────────────── */}
+      {citedItems.length > 0 && (
+        <section className="mt-2">
+          <p className="text-xs text-ink-muted font-medium mb-2 flex items-center gap-1">
+            <Pin size={12} strokeWidth={1.5} />
+            AI 提到的物品
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {citedItems.map(it => (
+              <Link
+                key={it.id}
+                to={`/items/${it.id}`}
+                className="bg-accent-light border border-accent/40 text-ink rounded-full px-3 py-1 text-xs hover:bg-accent/20 transition-colors"
+              >
+                {it.name}
+                <span className="text-accent ml-1">{it.locationLabel}</span>
+              </Link>
+            ))}
+          </div>
         </section>
       )}
     </div>

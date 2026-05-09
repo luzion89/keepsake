@@ -53,3 +53,32 @@ export async function pullMissingBlobs(): Promise<void> {
 
   await kvSet(BLOB_LAST_PULL_KEY, Date.now());
 }
+
+/**
+ * GC: delete local blobs that have been synced to the server AND are no longer
+ * referenced by any photo record (including soft-deleted ones, for safety).
+ *
+ * A blob is safe to remove locally when:
+ *   1. `blob_uploaded:<id>` KV flag is truthy  → already on the server
+ *   2. No photo row has `id === blobId`        → not referenced anymore
+ *
+ * Returns the number of blobs deleted.
+ * Closes #50
+ */
+export async function gcSyncedBlobs(): Promise<number> {
+  const allBlobs = await db.blobs.toArray();
+  // Build a set of photo ids (including soft-deleted) so we never delete a
+  // blob that is still pointed to by a photo row.
+  const allPhotos = await db.photos.toArray();
+  const referencedIds = new Set(allPhotos.map(p => p.id));
+
+  let deleted = 0;
+  for (const row of allBlobs) {
+    if (referencedIds.has(row.id)) continue; // still referenced
+    const uploaded = await kvGet<boolean>(`blob_uploaded:${row.id}`);
+    if (!uploaded) continue; // not yet synced — keep it
+    await db.blobs.delete(row.id);
+    deleted++;
+  }
+  return deleted;
+}
