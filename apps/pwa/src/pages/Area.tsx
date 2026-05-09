@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   AlertTriangle, Camera, ChevronLeft, ChevronRight, Download,
   FileText, Package, Pencil, Trash2, X,
@@ -34,6 +34,7 @@ export function AreaPage() {
   const touchStartX = useRef<number | null>(null);
   const editItemRef = useRef<HTMLInputElement>(null);
   const { confirm, dialog } = useConfirm();
+  const navigate = useNavigate();
 
   const reload = async () => {
     const a = await AreaRepo.get(areaId);
@@ -199,14 +200,20 @@ export function AreaPage() {
                   }
                 }}
               >
-                {/* Delete background */}
-                <div className="absolute inset-y-0 right-0 flex items-center bg-danger px-5 select-none rounded-r-[12px]" aria-hidden="true">
+                {/* Delete background — #201: square right edge, li overflow-hidden clips */}
+                <div className="absolute inset-y-0 right-0 flex items-center bg-danger px-5 select-none" aria-hidden="true">
                   <Trash2 size={18} strokeWidth={1.5} className="text-paper" />
                   <span className="text-paper text-sm ml-1.5">删除</span>
                 </div>
+                {/* #198: whole card is clickable for navigation; #199: py-1 reduces height ~40%;
+                    #201: right border-radius removed when swiped so card flush-meets delete bg */}
                 <div
-                  className="relative flex items-center gap-2 px-3 py-2 min-h-[44px] bg-paper-card border border-[var(--border-default)] rounded-[12px] shadow-card transition-transform duration-200 ease-out"
-                  style={{ transform: swipedItemId === it.id ? "translateX(-88px)" : "translateX(0)", touchAction: 'pan-y' }}
+                  className="relative flex items-center gap-2 px-3 py-1 min-h-[44px] bg-paper-card border border-[var(--border-default)] shadow-card transition-all duration-200 ease-out"
+                  style={{
+                    transform: swipedItemId === it.id ? "translateX(-88px)" : "translateX(0)",
+                    borderRadius: swipedItemId === it.id ? '12px 0 0 12px' : '12px',
+                    touchAction: 'pan-y',
+                  }}
                   onTouchStart={(e) => { touchStartItemX.current = e.touches[0]!.clientX; }}
                   onTouchEnd={(e) => {
                     if (touchStartItemX.current === null) return;
@@ -215,51 +222,58 @@ export function AreaPage() {
                     if (delta < -40) { e.stopPropagation(); setSwipedItemId(it.id); }
                     else if (delta > 10) setSwipedItemId(null);
                   }}
+                  onClick={(e) => {
+                    // #198: clicking anywhere on card (not a button/input) navigates to detail
+                    if (swipedItemId === it.id) return;
+                    if (editingItemId === it.id) return;
+                    if ((e.target as HTMLElement).closest('button,input,a[href]')) return;
+                    navigate(`/items/${it.id}`);
+                  }}
                 >
-                  <div className="flex-1 min-w-0 flex items-center gap-1">
-                    <Link
-                      to={`/items/${it.id}`}
-                      className="flex-1 min-w-0"
-                      onClick={(e) => { if (swipedItemId === it.id) e.preventDefault(); }}
-                    >
-                      {editingItemId === it.id ? (
-                        <input
-                          ref={editItemRef}
-                          value={editItemName}
-                          onChange={(e) => setEditItemName(e.target.value)}
-                          onBlur={() => commitRenameItem(it.id)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') commitRenameItem(it.id);
-                            if (e.key === 'Escape') setEditingItemId(null);
-                          }}
-                          className="w-full bg-paper-dark border border-accent rounded-[8px] px-2 py-1 text-sm outline-none text-ink"
-                          onClick={(e) => e.preventDefault()}
-                        />
-                      ) : (
-                        <div className="text-sm font-medium text-ink truncate">{it.name}</div>
-                      )}
-                      <div className="text-xs text-ink-muted">
-                        {it.source !== 'manual' && <span className="mr-1">{it.source}</span>}
-                        {it.confidence != null && <span>{(it.confidence * 100).toFixed(0)}%</span>}
-                      </div>
-                    </Link>
-                    <button
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); startRenameItem(it); }}
-                      className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-ink-muted hover:text-ink hover:bg-paper-dark transition-all"
-                      aria-label="改名"
-                      title="改名"
-                    >
-                      <Pencil size={14} strokeWidth={1.5} />
-                    </button>
+                  {/* #200: name + pencil inline — pencil hugs name with no excess gap */}
+                  <div className="flex-1 min-w-0 flex items-center gap-0.5 cursor-pointer">
+                    {editingItemId === it.id ? (
+                      <input
+                        ref={editItemRef}
+                        value={editItemName}
+                        onChange={(e) => setEditItemName(e.target.value)}
+                        onBlur={() => commitRenameItem(it.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') commitRenameItem(it.id);
+                          if (e.key === 'Escape') setEditingItemId(null);
+                        }}
+                        className="flex-1 min-w-0 bg-paper-dark border border-accent rounded-[8px] px-2 py-1 text-sm outline-none text-ink"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    ) : (
+                      <>
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium text-ink truncate">{it.name}</div>
+                          <div className="text-xs text-ink-muted">
+                            {it.source !== 'manual' && <span className="mr-1">{it.source}</span>}
+                            {it.confidence != null && <span>{(it.confidence * 100).toFixed(0)}%</span>}
+                          </div>
+                        </div>
+                        {/* #200: pencil icon hugs name */}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); startRenameItem(it); }}
+                          className="shrink-0 w-6 h-6 flex items-center justify-center rounded-md text-ink-muted hover:text-ink hover:bg-paper-dark transition-all"
+                          aria-label="改名"
+                          title="改名"
+                        >
+                          <Pencil size={13} strokeWidth={1.5} />
+                        </button>
+                      </>
+                    )}
                   </div>
                 <button
-                  onClick={() => ItemRepo.qtyDelta(it.id, -1).then(reload)}
+                  onClick={(e) => { e.stopPropagation(); ItemRepo.qtyDelta(it.id, -1).then(reload); }}
                   className="min-w-[44px] min-h-[44px] rounded-full bg-paper-dark border border-[var(--border-default)] text-ink hover:border-accent text-sm flex items-center justify-center transition-all"
                   aria-label="减少数量"
                 >−</button>
                 <span className="text-sm font-medium w-5 text-center text-ink">{it.qty}</span>
                 <button
-                  onClick={() => ItemRepo.qtyDelta(it.id, +1).then(reload)}
+                  onClick={(e) => { e.stopPropagation(); ItemRepo.qtyDelta(it.id, +1).then(reload); }}
                   className="min-w-[44px] min-h-[44px] rounded-full bg-paper-dark border border-[var(--border-default)] text-ink hover:border-accent text-sm flex items-center justify-center transition-all"
                   aria-label="增加数量"
                 >+</button>
