@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ChevronLeft, Plus, X } from 'lucide-react';
-import type { Item, ReminderRule } from '@keepsake/shared';
-import { ItemRepo, ReminderRepo } from '../db/repos.js';
+import type { Area, Item, Room, ReminderRule } from '@keepsake/shared';
+import { AreaRepo, ItemRepo, ReminderRepo, RoomRepo } from '../db/repos.js';
 import { db } from '../db/dexie.js';
 import { useConfirm } from '../components/ConfirmDialog.js';
 
@@ -273,6 +273,8 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
 export function ItemPage() {
   const { itemId = '' } = useParams();
   const [item, setItem] = useState<Item | undefined>();
+  const [area, setArea] = useState<Area | undefined>();
+  const [room, setRoom] = useState<Room | undefined>();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState({ name: '', qty: 0, unit: '', notes: '', tags: '', expiresDate: '' });
   const { confirm, dialog } = useConfirm();
@@ -289,6 +291,13 @@ export function ItemPage() {
         tags: it.tags.join(', '),
         expiresDate: it.expires_at ? new Date(it.expires_at).toISOString().slice(0, 10) : '',
       });
+      // 加载位置信息（面包屑展示，从提醒入口进入时尤为重要 #174）
+      const a = await AreaRepo.get(it.area_id);
+      setArea(a);
+      if (a) {
+        const r = await RoomRepo.get(a.room_id);
+        setRoom(r);
+      }
     }
   };
   useEffect(() => { reload(); }, [itemId]);
@@ -321,11 +330,24 @@ export function ItemPage() {
   return (
     <div className="space-y-5">
       {dialog}
-      <nav className="text-xs text-ink-muted">
+      <nav className="text-xs text-ink-muted space-y-1">
         <Link to={`/areas/${item.area_id}`} className="hover:text-ink transition-colors flex items-center gap-1">
           <ChevronLeft size={14} strokeWidth={1.5} />
           返回区域
         </Link>
+        {/* 位置面包屑：从过期提醒"查看"入口进入时可直观看到物品位置 (#174) */}
+        {(room || area) && (
+          <div className="flex items-center gap-1 text-ink-muted">
+            <span className="text-xs">📍</span>
+            {room ? (
+              <Link to={`/rooms/${room.id}`} className="hover:text-ink transition-colors">{room.name}</Link>
+            ) : null}
+            {room && area && <span>/</span>}
+            {area ? (
+              <Link to={`/areas/${area.id}`} className="hover:text-ink transition-colors">{area.name}</Link>
+            ) : null}
+          </div>
+        )}
       </nav>
 
       {editing ? (
