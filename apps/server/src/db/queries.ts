@@ -3,13 +3,14 @@ import {
   type Item, type Room, type Area, type Photo, type Snapshot, type ReminderRule,
   type TableName,
   mergeRoom, mergeArea, mergeItem, mergePhoto, mergeSnapshot, mergeReminderRule,
+  mergeEncryptedItems, type EncryptedItem,
 } from '@keepsake/shared';
 
 // ---------- Row <-> Object encoding ----------
 const JSON_FIELDS: Record<TableName, string[]> = {
   room: ['photo_ids'],
   area: ['photo_ids'],
-  item: ['tags', 'photo_ids', 'bbox'],
+  item: ['tags', 'photo_ids', 'bbox', 'enc_blob'],
   photo: ['recognition_result'],
   snapshot: ['item_ids'],
   reminder_rule: [],
@@ -48,7 +49,7 @@ const TABLE_MAP: Record<TableName, string> = {
 const COLS: Record<TableName, string[]> = {
   room: ['id','name','icon','photo_ids','note','updated_at','updated_by','deleted','version'],
   area: ['id','room_id','name','photo_ids','note','updated_at','updated_by','deleted','version'],
-  item: ['id','area_id','name','qty','unit','tags','photo_ids','expires_at','source','confidence','bbox','notes','updated_at','updated_by','deleted','version'],
+  item: ['id','area_id','name','qty','unit','tags','photo_ids','expires_at','source','confidence','bbox','notes','enc_blob','updated_at','updated_by','deleted','version'],
   photo: ['id','parent_type','parent_id','taken_at','blob_ref','remote_url','recognition_status','recognition_result','updated_at','updated_by','deleted','version'],
   snapshot: ['id','area_id','taken_at','item_ids','note','updated_at','updated_by','deleted','version'],
   reminder_rule: ['id','item_id','kind','threshold_at','threshold_qty','note','last_fired_at','updated_at','updated_by','deleted','version'],
@@ -102,6 +103,17 @@ export function mergeUpsert(db: Database.Database, table: TableName, incoming: a
     upsertRow(db, table, incoming);
     return { applied: incoming, conflicts: [] };
   }
+
+  // Spike-C: if item has enc_blob, use field-level LWW merge (server never decrypts)
+  if (table === 'item' && incoming.enc_blob && local.enc_blob) {
+    const merged = mergeEncryptedItems(
+      local as unknown as EncryptedItem,
+      incoming as unknown as EncryptedItem,
+    );
+    upsertRow(db, table, merged);
+    return { applied: merged, conflicts: [] };
+  }
+
   const { merged, conflicts } = MERGE_FNS[table](local, incoming);
   upsertRow(db, table, merged);
   // merge-rules passes (local=server, remote=client), so conflict.client=server_val,

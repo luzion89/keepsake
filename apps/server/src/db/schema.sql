@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS items (
   confidence REAL,
   bbox TEXT,
   notes TEXT,
+  enc_blob TEXT,           -- Spike-C: JSON of all EncField ciphertexts (nullable; NULL = unencrypted legacy)
   updated_at INTEGER NOT NULL,
   updated_by TEXT NOT NULL,
   deleted INTEGER NOT NULL DEFAULT 0,

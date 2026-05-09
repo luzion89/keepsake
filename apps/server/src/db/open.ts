@@ -29,6 +29,15 @@ function ensureItemsColumns(db: Database.Database): void {
     }
   }
 
+  if (!cols.includes('enc_blob')) {
+    try {
+      db.exec('ALTER TABLE items ADD COLUMN enc_blob TEXT');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (!msg.includes('duplicate column')) throw e;
+    }
+  }
+
   if (!cols.includes('expires_at')) {
     try {
       db.exec('ALTER TABLE items ADD COLUMN expires_at INTEGER');
