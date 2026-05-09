@@ -50,9 +50,40 @@ function SectionRow({ children }: { children: React.ReactNode }) {
 
 const inputCls = 'w-full bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all placeholder:text-ink-muted';
 
+/**
+ * 全页 skeleton 占位：加载完成前替代整个 SettingsPage，
+ * 根治首帧"保存设置"按钮（含 sticky bottom bar）提前渲染的闪烁问题 (#172)
+ */
+function SettingsSkeleton() {
+  return (
+    <div className="space-y-6 animate-pulse">
+      <div className="h-8 w-16 bg-paper-dark rounded-lg" />
+      <div className="space-y-2">
+        <div className="h-4 w-24 bg-paper-dark rounded" />
+        <div className="rounded-[12px] bg-paper-card border border-[var(--border-default)] divide-y divide-[var(--border-subtle)] overflow-hidden">
+          <div className="px-4 py-3 space-y-2">
+            <div className="h-10 bg-paper-dark rounded-[12px]" />
+            <div className="h-10 bg-paper-dark rounded-[12px]" />
+          </div>
+        </div>
+      </div>
+      <div className="space-y-2">
+        <div className="h-4 w-20 bg-paper-dark rounded" />
+        <div className="rounded-[12px] bg-paper-card border border-[var(--border-default)] overflow-hidden">
+          <div className="px-4 py-3">
+            <div className="h-9 w-28 bg-paper-dark rounded-[12px]" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function SettingsPage() {
   const [cfg, setCfg] = useState<AiConfig | null>(null);
-  const [cfgLoaded, setCfgLoaded] = useState(false);
+  // loaded: 所有异步初始化完成后才置 true，期间渲染 skeleton，
+  // 彻底避免 cfg=null / cfg={mode:'off'} 状态下操作性 UI（含 sticky 保存按钮）提前渲染 (#172)
+  const [loaded, setLoaded] = useState(false);
   const [deviceId, setDeviceId] = useState('');
   const [stats, setStats] = useState({ rooms: 0, areas: 0, items: 0, photos: 0, outbox: 0 });
   const [serverOk, setServerOk] = useState<boolean | null>(null);
@@ -74,17 +105,18 @@ export function SettingsPage() {
 
   useEffect(() => {
     (async () => {
-      const loaded = await getAiConfig();
-      if (!loaded.provider) {
-        setCfg({ ...loaded, provider: loaded.apiKey ? 'openrouter' : 'deepseek' });
+      const raw = await getAiConfig();
+      if (!raw.provider) {
+        setCfg({ ...raw, provider: raw.apiKey ? 'openrouter' : 'deepseek' });
       } else {
-        setCfg(loaded);
+        setCfg(raw);
       }
-      setCfgLoaded(true);
       setDeviceId(await getDeviceId());
-      reloadStats();
+      await reloadStats();
       const q = await getStorageQuota();
       setQuota(q);
+      // 所有数据就绪后一次性翻转，避免分批 setState 引起中间状态渲染 (#172)
+      setLoaded(true);
     })();
   }, []);
 
@@ -150,6 +182,9 @@ export function SettingsPage() {
 
   const btnCls = 'px-3 py-2 rounded-[12px] border border-[var(--border-default)] text-sm text-ink hover:border-accent/60 hover:text-ink-hover transition-all';
 
+  // 加载完成前渲染整页 skeleton，绝不提前渲染任何操作性 UI（根治 #172）
+  if (!loaded) return <SettingsSkeleton />;
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-ink">设置</h1>
@@ -160,13 +195,6 @@ export function SettingsPage() {
           <p className="text-xs text-ink-muted mb-3">
             Key 保存到本地 IndexedDB；保存时立即推送到本地服务器（需服务器在线），其它设备启动时拉取，更新时间最新者胜。
           </p>
-          {/* AI on/off — skeleton until loaded to prevent flicker (#153) */}
-          {!cfgLoaded ? (
-            <div className="space-y-2">
-              <div className="h-10 rounded-[12px] bg-paper-dark animate-pulse" />
-              <div className="h-10 rounded-[12px] bg-paper-dark animate-pulse" />
-            </div>
-          ) : (
           <div className="space-y-2 text-sm">
             {(['on','off'] as const).map(m => (
               <label key={m} className={`flex items-center justify-between px-3 py-2.5 rounded-[12px] border cursor-pointer transition-all ${
@@ -187,7 +215,6 @@ export function SettingsPage() {
               </label>
             ))}
           </div>
-          )}
         </SectionRow>
 
         {cfg?.mode === 'on' && (
