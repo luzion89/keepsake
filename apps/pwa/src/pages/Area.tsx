@@ -205,12 +205,12 @@ export function AreaPage() {
                   <span className="text-paper text-sm ml-1.5">删除</span>
                 </div>
                 <div
-                  className="relative flex items-center gap-2 px-3 py-1.5 bg-paper-card border border-[var(--border-default)] rounded-[12px] shadow-card transition-transform duration-200 ease-out"
-                  style={{ transform: swipedItemId === it.id ? "translateX(-88px)" : "translateX(0)" }}
-                  onPointerDown={(e) => { touchStartItemX.current = e.clientX; }}
-                  onPointerUp={(e) => {
+                  className="relative flex items-center gap-2 px-3 py-2 min-h-[44px] bg-paper-card border border-[var(--border-default)] rounded-[12px] shadow-card transition-transform duration-200 ease-out"
+                  style={{ transform: swipedItemId === it.id ? "translateX(-88px)" : "translateX(0)", touchAction: 'pan-y' }}
+                  onTouchStart={(e) => { touchStartItemX.current = e.touches[0]!.clientX; }}
+                  onTouchEnd={(e) => {
                     if (touchStartItemX.current === null) return;
-                    const delta = e.clientX - touchStartItemX.current;
+                    const delta = e.changedTouches[0]!.clientX - touchStartItemX.current;
                     touchStartItemX.current = null;
                     if (delta < -40) { e.stopPropagation(); setSwipedItemId(it.id); }
                     else if (delta > 10) setSwipedItemId(null);
