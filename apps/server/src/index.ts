@@ -23,7 +23,7 @@ import qrTerminal from 'qrcode-terminal';
 declare module 'fastify' {
   interface FastifyInstance {
     db: Database.Database;
-    tunnelUrl?: string;
+    tunnelUrl?: string | null;
   }
 }
 
@@ -57,7 +57,7 @@ export async function buildServer() {
   });
   const { db } = openDb();
   fastify.decorate('db', db);
-  fastify.decorate('tunnelUrl', undefined as unknown as string);
+  fastify.decorate('tunnelUrl', null as string | null);
 
   await fastify.register(cors, { origin: true, credentials: true });
   await fastify.register(multipart, { limits: { fileSize: 20 * 1024 * 1024 } });
@@ -98,8 +98,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     if (['quick', 'named', '1'].includes(tunnelMode)) {
       try {
         const tunnelUrl = await startTunnel(port);
-        app.tunnelUrl = tunnelUrl;
-        console.log(`\n[CF Tunnel] ✅ Public URL: ${tunnelUrl}\n`);
+        if (tunnelUrl) {
+          app.tunnelUrl = tunnelUrl;
+          console.log(`\n[CF Tunnel] ✅ Public URL: ${tunnelUrl}\n`);
+        }
       } catch (e) {
         console.error('[CF Tunnel] ❌ Failed to start tunnel — continuing in LAN-only mode:', (e as Error).message);
       }
@@ -115,7 +117,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       host: localIp,
       port,
       rootSecret: authState.rootSecret,
-      tunnelUrl: app.tunnelUrl,
+      tunnelUrl: app.tunnelUrl ?? undefined,
     });
 
     console.log('\n╔══════════════════════════════════════════════════════╗');

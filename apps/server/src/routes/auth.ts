@@ -78,7 +78,7 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
       host,
       port,
       rootSecret: authState.rootSecret,
-      tunnelUrl: fastify.tunnelUrl,
+      tunnelUrl: fastify.tunnelUrl ?? undefined,
     });
     const svg = await generateQrSvg(payload);
     reply.header('Content-Type', 'image/svg+xml');
