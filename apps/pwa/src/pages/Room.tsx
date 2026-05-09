@@ -123,11 +123,11 @@ export function RoomPage() {
                 {/* Swipeable row */}
                 <div
                   className="relative flex items-center px-4 min-h-[52px] bg-paper-card transition-transform duration-200 ease-out"
-                  style={{ transform: swipedId === a.id ? 'translateX(-88px)' : 'translateX(0)' }}
-                  onPointerDown={(e) => { touchStartX.current = e.clientX; }}
-                  onPointerUp={(e) => {
+                  style={{ transform: swipedId === a.id ? 'translateX(-88px)' : 'translateX(0)', touchAction: 'pan-y' }}
+                  onTouchStart={(e) => { touchStartX.current = e.touches[0]!.clientX; }}
+                  onTouchEnd={(e) => {
                     if (touchStartX.current === null) return;
-                    const delta = e.clientX - touchStartX.current;
+                    const delta = e.changedTouches[0]!.clientX - touchStartX.current;
                     touchStartX.current = null;
                     if (delta < -40) { e.stopPropagation(); setSwipedId(a.id); }
                     else if (delta > 10) setSwipedId(null);
@@ -148,28 +148,32 @@ export function RoomPage() {
                       onClick={(e) => e.stopPropagation()}
                     />
                   ) : (
-                    <Link
-                      to={`/areas/${a.id}`}
-                      className="flex-1 min-w-0 hover:text-ink-hover transition-colors"
-                      onClick={(e) => { if (swipedId === a.id) e.preventDefault(); }}
-                    >
-                      <div className="text-sm font-medium text-ink">{a.name}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-0">
+                        <Link
+                          to={`/areas/${a.id}`}
+                          className="min-w-0 truncate text-sm font-medium text-ink hover:text-ink-hover transition-colors"
+                          onClick={(e) => { if (swipedId === a.id) e.preventDefault(); }}
+                        >
+                          {a.name}
+                        </Link>
+                        {/* #192: 改名图标紧贴名称右侧 */}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); startRename(a); }}
+                          className="ml-1.5 shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-ink-muted hover:text-ink hover:bg-paper-dark transition-all"
+                          aria-label="改名"
+                          title="改名"
+                        >
+                          <Pencil size={14} strokeWidth={1.5} />
+                        </button>
+                      </div>
                       <div className="text-xs text-ink-muted">
                         {itemCounts[a.id] != null
                           ? itemCounts[a.id] === 0 ? '暂无物品' : `${itemCounts[a.id]} 种物品`
                           : ''}
                       </div>
-                    </Link>
+                    </div>
                   )}
-                  {/* #192: 改名图标 */}
-                  <button
-                    onClick={(e) => { e.stopPropagation(); startRename(a); }}
-                    className="w-8 h-8 flex items-center justify-center rounded-lg text-ink-muted hover:text-ink hover:bg-paper-dark transition-all"
-                    aria-label="改名"
-                    title="改名"
-                  >
-                    <Pencil size={16} strokeWidth={1.5} />
-                  </button>
                 </div>
 
                 {swipedId === a.id && (

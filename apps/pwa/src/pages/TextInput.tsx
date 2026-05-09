@@ -1,6 +1,7 @@
 /**
  * TextInput.tsx — 文字录入页 (#65, #78)
  * 视觉重构 PR-D (#97)
+ * Round-10: #194 草稿卡片简化 + detail sheet; #195 新增物品排前; #196 紧凑行高
  */
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -21,6 +22,13 @@ function toExpiresDate(raw?: string | null): string {
   return raw.slice(0, 10);
 }
 
+// #194: Detail sheet state
+interface DetailEdit {
+  index: number;
+  notes: string;
+  expiresDate: string;
+}
+
 export function TextInputPage() {
   const { areaId = '' } = useParams();
   const nav = useNavigate();
@@ -34,6 +42,8 @@ export function TextInputPage() {
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [parsed, setParsed] = useState(false);
   const [mode, setMode] = useState<InputMode>('merge');
+  // #194: detail sheet
+  const [detailEdit, setDetailEdit] = useState<DetailEdit | null>(null);
 
   const loadArea = async () => {
     if (!areaId) { setAreaState('not-found'); return; }
@@ -69,11 +79,20 @@ export function TextInputPage() {
         notes: it.notes,
       }));
       const items = await parseItemsFromText(text, contextItems, mode);
-      setDrafts(items.map(it => ({
+      const mapped = items.map(it => ({
         ...it,
         expiresDate: toExpiresDate(it.expires_at),
         notes: it.notes ?? '',
-      })));
+      }));
+      // #195: 增改模式下，新增物品排前，已有物品排后
+      if (mode === 'merge') {
+        const existingNames = new Set(existingItems.map(it => it.name.trim().toLowerCase()));
+        const newItems = mapped.filter(d => !existingNames.has(d.name.trim().toLowerCase()));
+        const oldItems = mapped.filter(d => existingNames.has(d.name.trim().toLowerCase()));
+        setDrafts([...newItems, ...oldItems]);
+      } else {
+        setDrafts(mapped);
+      }
       setParsed(true);
     } catch (e: unknown) {
       setErrMsg(e instanceof Error ? e.message : String(e));
@@ -152,6 +171,8 @@ export function TextInputPage() {
       </div>
     );
   }
+
+  const existingNames = new Set(existingItems.map(it => it.name.trim().toLowerCase()));
 
   return (
     <div className="space-y-5">
@@ -238,7 +259,7 @@ export function TextInputPage() {
         </div>
       )}
 
-      {/* ── 草稿列表 ──────────────────────────────────── */}
+      {/* ── 草稿列表（#194 简化卡片 + #196 紧凑行高）──── */}
       {parsed && (
         <section className="space-y-3">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
@@ -249,42 +270,46 @@ export function TextInputPage() {
             <p className="text-ink-muted text-sm">未识别到任何物品，请修改文本后重新解析。</p>
           )}
 
-          <ul className="space-y-2">
+          {/* #196: 紧凑卡片列表 space-y-1.5 */}
+          <ul className="space-y-1.5">
             {drafts.map((d, i) => {
-              const isExisting = existingItems.some(
-                it => it.name.trim().toLowerCase() === d.name.trim().toLowerCase()
-              );
+              const isExisting = existingNames.has(d.name.trim().toLowerCase());
               return (
-                <li key={i} className="bg-paper-card border border-[var(--border-default)] rounded-[12px] p-3 space-y-2">
-                  {/* 第一行：名称（flex-1 min-w-0 截断）+ 删除按钮（始终在行末） */}
-                  <div className="flex items-center gap-2">
+                // #194: 点击卡片背景 → 弹 detail sheet
+                <li
+                  key={i}
+                  className="bg-paper-card border border-[var(--border-default)] rounded-[12px] px-3 py-2 cursor-pointer hover:border-accent/30 transition-all"
+                  onClick={() => setDetailEdit({ index: i, notes: d.notes ?? '', expiresDate: d.expiresDate })}
+                >
+                  {/* 第一行：名称 + 删除 */}
+                  <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
                     <input
                       value={d.name}
                       onChange={e => updateDraft(i, { name: e.target.value })}
                       placeholder="物品名称"
-                      className="flex-1 min-w-0 bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-1.5 text-sm outline-none focus:border-accent transition-all text-ink placeholder:text-ink-muted"
+                      className="flex-1 min-w-0 bg-paper-dark border border-[var(--border-default)] rounded-[8px] px-2 py-1 text-sm outline-none focus:border-accent transition-all text-ink placeholder:text-ink-muted"
                     />
                     <button
-                      onClick={() => removeDraft(i)}
+                      onClick={(e) => { e.stopPropagation(); removeDraft(i); }}
                       className="shrink-0 text-ink-muted hover:text-danger-text transition-colors flex items-center justify-center w-7 h-7"
                       aria-label="删除此行"
-                    ><X size={16} strokeWidth={1.5} /></button>
+                    ><X size={15} strokeWidth={1.5} /></button>
                   </div>
-                  {/* 第二行：数量 + 量词 + 状态 tag */}
-                  <div className="flex items-center gap-2 flex-wrap">
+                  {/* 第二行：qty + unit + tag — 点击不触发 sheet */}
+                  <div className="flex items-center gap-2 mt-1.5" onClick={e => e.stopPropagation()}>
                     <input
                       type="number"
                       value={d.qty}
                       min={0}
                       onChange={e => updateDraft(i, { qty: Number(e.target.value) })}
-                      className="w-16 bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-1.5 text-sm outline-none focus:border-accent transition-all text-ink"
+                      className="w-14 bg-paper-dark border border-[var(--border-default)] rounded-[8px] px-2 py-1 text-sm outline-none focus:border-accent transition-all text-ink text-center"
                       aria-label="数量"
                     />
                     <input
                       value={d.unit ?? ''}
                       onChange={e => updateDraft(i, { unit: e.target.value })}
                       placeholder="量词"
-                      className="w-16 bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-1.5 text-sm outline-none focus:border-accent transition-all text-ink placeholder:text-ink-muted"
+                      className="w-14 bg-paper-dark border border-[var(--border-default)] rounded-[8px] px-2 py-1 text-sm outline-none focus:border-accent transition-all text-ink placeholder:text-ink-muted"
                       aria-label="量词"
                     />
                     {mode === 'merge' && (
@@ -296,23 +321,8 @@ export function TextInputPage() {
                         {isExisting ? '已有' : '新增'}
                       </span>
                     )}
+                    <span className="text-xs text-ink-muted/50 ml-auto">点击编辑详情 ›</span>
                   </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <label className="text-xs text-ink-muted w-16">过期时间</label>
-                    <input
-                      type="date"
-                      value={d.expiresDate}
-                      onChange={e => updateDraft(i, { expiresDate: e.target.value })}
-                      className="bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-1.5 text-sm outline-none focus:border-accent transition-all text-ink"
-                    />
-                  </div>
-                  <textarea
-                    value={d.notes ?? ''}
-                    onChange={e => updateDraft(i, { notes: e.target.value })}
-                    placeholder="备注（可选）"
-                    rows={1}
-                    className="w-full bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-1.5 text-sm resize-none outline-none focus:border-accent transition-all text-ink placeholder:text-ink-muted"
-                  />
                 </li>
               );
             })}
@@ -347,6 +357,75 @@ export function TextInputPage() {
           )}
         </section>
       )}
+
+      {/* ── #194 Detail Bottom Sheet ──────────────────── */}
+      {detailEdit !== null && (() => {
+        const d = drafts[detailEdit.index];
+        if (!d) return null;
+        return (
+          <div
+            className="fixed inset-0 z-50 flex flex-col justify-end"
+            onClick={() => setDetailEdit(null)}
+          >
+            {/* 遮罩 */}
+            <div className="absolute inset-0 bg-black/40" />
+            {/* Sheet */}
+            <div
+              className="relative bg-paper-card rounded-t-[20px] p-5 space-y-4 shadow-lg"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <h3 className="text-base font-semibold text-ink">编辑详情：{d.name || '（未命名）'}</h3>
+                <button
+                  onClick={() => setDetailEdit(null)}
+                  className="w-7 h-7 flex items-center justify-center text-ink-muted hover:text-ink"
+                  aria-label="关闭"
+                ><X size={16} strokeWidth={1.5} /></button>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-ink-muted block mb-1">备注</label>
+                  <input
+                    value={detailEdit.notes}
+                    onChange={e => setDetailEdit(s => s ? { ...s, notes: e.target.value } : s)}
+                    placeholder="可选备注…"
+                    className="w-full bg-paper-dark border border-[var(--border-default)] rounded-[10px] px-3 py-2 text-sm outline-none focus:border-accent transition-all text-ink placeholder:text-ink-muted"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-ink-muted block mb-1">过期时间</label>
+                  <input
+                    type="date"
+                    value={detailEdit.expiresDate}
+                    onChange={e => setDetailEdit(s => s ? { ...s, expiresDate: e.target.value } : s)}
+                    className="w-full bg-paper-dark border border-[var(--border-default)] rounded-[10px] px-3 py-2 text-sm outline-none focus:border-accent transition-all text-ink"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={() => setDetailEdit(null)}
+                  className="flex-1 py-2.5 rounded-[12px] border border-[var(--border-default)] text-ink-muted hover:text-ink text-sm transition-all"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={() => {
+                    updateDraft(detailEdit.index, {
+                      notes: detailEdit.notes,
+                      expiresDate: detailEdit.expiresDate,
+                    });
+                    setDetailEdit(null);
+                  }}
+                  className="flex-1 py-2.5 rounded-[12px] bg-accent hover:bg-accent-hover text-paper text-sm font-medium transition-all"
+                >
+                  保存
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

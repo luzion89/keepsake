@@ -130,11 +130,11 @@ export function HomePage() {
                 {/* Swipeable row */}
                 <div
                   className="relative flex items-center px-4 min-h-[52px] bg-paper-card transition-transform duration-200 ease-out"
-                  style={{ transform: swipedId === r.id ? 'translateX(-88px)' : 'translateX(0)' }}
-                  onPointerDown={(e) => { touchStartX.current = e.clientX; }}
-                  onPointerUp={(e) => {
+                  style={{ transform: swipedId === r.id ? 'translateX(-88px)' : 'translateX(0)', touchAction: 'pan-y' }}
+                  onTouchStart={(e) => { touchStartX.current = e.touches[0]!.clientX; }}
+                  onTouchEnd={(e) => {
                     if (touchStartX.current === null) return;
-                    const delta = e.clientX - touchStartX.current;
+                    const delta = e.changedTouches[0]!.clientX - touchStartX.current;
                     touchStartX.current = null;
                     if (delta < -40) { e.stopPropagation(); setSwipedId(r.id); }
                     else if (delta > 10) setSwipedId(null);
@@ -155,24 +155,26 @@ export function HomePage() {
                       onClick={(e) => e.stopPropagation()}
                     />
                   ) : (
-                    <Link
-                      to={`/rooms/${r.id}`}
-                      className="flex-1 font-serif text-base text-ink hover:text-ink-hover transition-colors"
-                      onClick={(e) => { if (swipedId === r.id) e.preventDefault(); }}
-                    >
-                      {r.name}
-                    </Link>
+                    <div className="flex-1 min-w-0 flex items-center gap-0">
+                      <Link
+                        to={`/rooms/${r.id}`}
+                        className="min-w-0 text-sm font-medium text-ink hover:text-ink-hover transition-colors truncate"
+                        onClick={(e) => { if (swipedId === r.id) e.preventDefault(); }}
+                      >
+                        {r.name}
+                      </Link>
+                      {/* #192: 改名图标紧贴名称右侧 */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); startRename(r); }}
+                        className="ml-1.5 shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-ink-muted hover:text-ink hover:bg-paper-dark transition-all"
+                        aria-label="改名"
+                        title="改名"
+                      >
+                        <Pencil size={14} strokeWidth={1.5} />
+                      </button>
+                    </div>
                   )}
-                  <span className="text-xs text-ink-muted mr-2">{areaCount} 个区域</span>
-                  {/* #192: 改名图标直接在名称右边 */}
-                  <button
-                    onClick={(e) => { e.stopPropagation(); startRename(r); }}
-                    className="w-8 h-8 flex items-center justify-center rounded-lg text-ink-muted hover:text-ink hover:bg-paper-dark transition-all"
-                    aria-label="改名"
-                    title="改名"
-                  >
-                    <Pencil size={16} strokeWidth={1.5} />
-                  </button>
+                  <span className="text-xs text-ink-muted">{areaCount} 个区域</span>
                 </div>
 
                 {/* Invisible delete tap target over the red area */}
