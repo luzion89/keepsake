@@ -306,3 +306,194 @@ curl -s https://<xxx.trycloudflare.com>/manifest.webmanifest | jq .
 ---
 
 *文档由 PM 统筹，Coder 实现，QA 验证，2026-05 spike 阶段产出。*
+
+---
+
+## Spike 二期（2026-05）
+
+### §E2E 应用层加密设计
+
+#### 密钥派生
+
+```
+root_secret (来自 QR 扫码)
+    └─ HKDF-SHA256(salt="keepsake-family-v1", info="data-encryption") → family_key (32字节)
+```
+
+- `root_secret`：由服务器生成，通过 QR 编码传给第一台设备（初始配对）或通过 invite_token 传给后续设备
+- `family_key_salt`：`SHA256("keepsake-family-salt:" + root_secret)` 的前 32 字符，随 QR payload 下发，客户端用此 salt 做 HKDF
+- `family_key`：AES-256-GCM 密钥，所有家庭设备通过相同的 `root_secret` 独立派生，结果一致
+- 服务端**永远不存储、不接触** `root_secret` 或 `family_key`
+
+#### 加密格式
+
+每个可变业务字段独立加密：
+
+```ts
+type EncField = {
+  nonce:      string;  // base64, 12 字节随机 nonce
+  cipher:     string;  // base64, AES-256-GCM 密文 + 16字节 auth tag
+  updated_at: number;  // ms 时间戳，用于字段级 LWW
+  device_id:  string;  // 设备 ID，用于 updated_at 相同时的决胜
+};
+
+type EncryptedItem = {
+  // 明文字段（server 路由/外键/LWW 用）
+  id: string; area_id: string; deleted: boolean;
+  created_at: number; updated_at: number; updated_by: string; version: number;
+  source: string; confidence?: number; bbox?: unknown;
+  // 加密字段
+  enc: {
+    name: EncField; qty: EncField; unit: EncField;
+    expires_at: EncField; notes: EncField;
+    tags: EncField; photo_ids: EncField;
+  };
+};
+```
+
+SQLite 中以 `enc_blob TEXT`（JSON 序列化 `enc` 对象）存储，明文业务列保留兼容性（不加密时为明文，加密时忽略）。
+
+#### 字段级 LWW 合并规则
+
+```
+mergeEncField(a, b):
+  1. a.updated_at > b.updated_at → 返回 a
+  2. b.updated_at > a.updated_at → 返回 b
+  3. 相同时间戳 → device_id 字典序较大者胜
+```
+
+场景举例：设备 A 在 t=3000 改了 `name`，设备 B 在 t=4000 改了 `qty` → 合并后 `name` 来自 A，`qty` 来自 B，两个修改都不丢失。
+
+#### 明文/密文字段清单
+
+| 字段 | 状态 | 说明 |
+|------|------|------|
+| `id` | 明文 | 主键，路由必需 |
+| `area_id` | 明文 | 外键，路由必需 |
+| `deleted` | 明文 | tombstone 标记 |
+| `created_at` | 明文 | 不变字段 |
+| `updated_at` | 明文 | 外层 LWW（= max enc 字段 updated_at） |
+| `updated_by` | 明文 | 外层 LWW 决胜 |
+| `source` / `confidence` / `bbox` | 明文 | AI 元数据，非业务隐私 |
+| `name` | **加密** | 物品名称 |
+| `qty` | **加密** | 数量 |
+| `unit` | **加密** | 单位 |
+| `expires_at` | **加密** | 过期时间 |
+| `notes` | **加密** | 备注 |
+| `tags` | **加密** | 标签数组 |
+| `photo_ids` | **加密** | 照片 ID 数组 |
+
+#### 实现位置
+
+- `packages/shared/src/crypto.ts`：共享加密库（零外部依赖，Web Crypto API / Node 18+ 全局 crypto）
+- `apps/server/src/db/queries.ts`：`mergeUpsert` 检测 `enc_blob` → 用 `mergeEncryptedItems` 做字段级 LWW
+- `apps/server/src/db/schema.sql`：`items` 表新增 `enc_blob TEXT` 列
+- 客户端 Repo 层（待 spike 三期集成）：写前 `encryptItem`，读后 `decryptItem`
+
+---
+
+### §命名隧道使用步骤（Spike-B）
+
+#### 两档模式
+
+| 变量 | 说明 |
+|------|------|
+| `KEEPSAKE_TUNNEL=quick`（默认） | 每次启动随机分配 `xxxx.trycloudflare.com`，无需账号 |
+| `KEEPSAKE_TUNNEL=named` + `KEEPSAKE_TUNNEL_TOKEN=<token>` | 固定子域名，重启后域名不变，需 CF 账号 |
+
+#### 如何在 CF 后台创建命名隧道并获取 Token
+
+1. 登录 [Cloudflare Zero Trust 控制台](https://one.dash.cloudflare.com)
+2. 左侧导航 → **Networks** → **Tunnels** → 点击 **Create a tunnel**
+3. 选择 **Cloudflared** 连接器类型
+4. 填写隧道名称（如 `keepsake-home`），点 **Save tunnel**
+5. 在"Install and run a connector"步骤，复制显示的 `cloudflared tunnel run --token <YOUR_TOKEN>` 命令中的 token 部分（以 `eyJ...` 开头的长字符串）
+6. 在 **Public Hostnames** 标签页配置：
+   - Subdomain: `keepsake`（或自定义）
+   - Domain: 你在 CF 上管理的域名
+   - Service type: `HTTP`, URL: `localhost:8443`
+7. 点击 **Save hostname**
+
+启动 Keepsake 服务器时设置环境变量：
+```bash
+KEEPSAKE_TUNNEL=named KEEPSAKE_TUNNEL_TOKEN=eyJhbGci... node dist/index.js
+```
+
+#### Fallback 机制
+
+若 named 模式在 30 秒内未拿到隧道 URL（网络问题 / token 无效 / `cloudflared` 未安装），自动降级到 quick 模式并打印警告：
+
+```
+[CF Tunnel] Named tunnel failed: ... Falling back to quick (trycloudflare) mode.
+```
+
+---
+
+### §客户端扫码流程（Spike-A）
+
+#### 扫码配对（首次设备）
+
+1. 用户访问 Keepsake 服务器页面 → 点击 **显示配对二维码** → 弹出 SVG 二维码
+2. 新设备打开 PWA → 若无 `device_token` → 自动跳转 `/pair`
+3. `PairPage` 启动相机扫码（html5-qrcode），检测到有效 JSON payload
+4. 解析 `{ server, root_secret, family_key_salt, v }` → POST `<server>/auth/pair`
+5. 服务端验证 root_secret → 颁发 JWT device_token + device_id
+6. 客户端存入 IndexedDB kv：`device_token`, `device_id`, `server_url`, `family_key_salt`, `root_secret_hint`
+7. 跳转到 `/`，后续所有 fetch 自动携带 `Authorization: Bearer <token>`
+
+#### 邀请新设备（Settings → 我的设备）
+
+1. 主设备在 Settings 页点击 **邀请新设备**
+2. POST `/auth/invite` → 拿到 `invite_token`（5分钟有效）
+3. 生成 payload `{ server, invite_token, v: 1 }` 显示为文本（二期未生成图形 QR）
+4. 新设备手动粘贴 payload 到 Pair 页 **手动输入** 框 → POST `/auth/join`
+5. 服务端验证 invite_token → 颁发新 device_token
+
+#### Fetch 拦截器（fetchInterceptor.ts）
+
+- 应用启动时从 IDB 加载 token，注入 `globalThis.fetch` 包装器
+- 每次请求自动追加 `Authorization: Bearer <token>`
+- 收到 401 → 清除 token + 跳 `/pair`（通过 `history.replaceState` + popstate 触发 React Router 重渲染）
+
+---
+
+### §QA 验证结果（Spike 二期）
+
+#### 单元测试（packages/shared vitest）
+
+| 测试用例 | 结果 |
+|---------|------|
+| 加解密对称：明文→密文→明文 | ✅ Pass |
+| 跨设备一致：同 root_secret 派生相同 family_key | ✅ Pass |
+| 错密钥拒绝：GCM tag 校验失败抛异常 | ✅ Pass |
+| 字段级 LWW：A 改 name 晚 + B 改 qty 晚 → 两者都保留 | ✅ Pass |
+| Tombstone：deleted=true sticky across merge | ✅ Pass |
+| 完整 Item round-trip（encryptItem / decryptItem） | ✅ Pass |
+| 总计 41 个测试（含一期 28 个 merge-rules 测试） | ✅ All Pass |
+
+命令：`cd packages/shared && pnpm test`
+
+#### 构建验证
+
+| 项目 | 结果 |
+|------|------|
+| `packages/shared` TypeScript 构建 | ✅ 零错误 |
+| `apps/server` TypeScript 类型检查 | ✅ 零错误 |
+| `apps/pwa` 非测试文件类型检查 | ✅ 零错误 |
+
+#### Spike-B 隧道验证
+
+- named 模式（无真实 CF 账号）：30s 超时后自动 fallback 到 quick 模式 ✅
+- 环境变量 `KEEPSAKE_TUNNEL=named` 无 `KEEPSAKE_TUNNEL_TOKEN`：立即 fallback + 告警 ✅
+
+#### Spike-A 客户端（手动验证路径）
+
+- 无 token 时访问 `/` → 跳转 `/pair` ✅（AuthGuard 实现）
+- `/pair` 页面手动输入 payload → 调 `/auth/pair` → 存 IDB ✅（代码逻辑）
+- 401 响应 → 清 token + 跳 `/pair` ✅（fetchInterceptor）
+
+*（完整端到端跨设备 E2E 加密测试：客户端 Repo 层集成待 spike 三期完成后可真实运行）*
+
+---
+
+*Spike 二期产出：A（客户端扫码认证） + B（命名隧道） + C（E2E 加密库 + server schema） + D（本文档） 均已 commit 至 `spike/auth-cf-tunnel` 分支。*
