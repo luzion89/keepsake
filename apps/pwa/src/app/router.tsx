@@ -8,6 +8,7 @@ import { CapturePage } from '../pages/Capture.js';
 import { TextInputPage } from '../pages/TextInput.js';
 import { SearchPage } from '../pages/Search.js';
 import { SettingsPage } from '../pages/Settings.js';
+import { RemindersPage } from '../pages/Reminders.js';
 
 /** Redirect /areas/:areaId/voice → /areas/:areaId/text to avoid 404s from old links. */
 function VoiceRedirect() {
@@ -29,6 +30,7 @@ export const router = createBrowserRouter([
       { path: 'items/:itemId', element: <ItemPage /> },
       { path: 'search', element: <SearchPage /> },
       { path: 'settings', element: <SettingsPage /> },
+      { path: 'reminders', element: <RemindersPage /> },
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },

@@ -27,7 +27,6 @@ function ConflictBanner() {
   const loadRows = async () => {
     const r = await db.conflicts.where('acknowledged').equals(0).toArray();
     setRows(r);
-    // Enrich: join item/area/room info for human-readable display
     const rich = await Promise.all(r.map(async row => {
       let label = `${row.table}/${row.row_id}`;
       try {
@@ -134,6 +133,11 @@ function ConflictBanner() {
   );
 }
 
+/**
+ * #182 / #183: NotificationBanner — 超过 3 条折叠，点击跳转提醒页面
+ */
+const MAX_VISIBLE = 3;
+
 function NotificationBanner() {
   const [triggered, setTriggered] = useState<TriggeredReminder[]>([]);
   const navigate = useNavigate();
@@ -155,29 +159,41 @@ function NotificationBanner() {
     setTriggered(prev => prev.filter(x => x.rule.id !== t.rule.id));
   };
 
+  const visible = triggered.slice(0, MAX_VISIBLE);
+  const overflow = triggered.length - MAX_VISIBLE;
+
   return (
     <div className="bg-warn-bg border-b border-warn/30 px-4 py-1.5 text-xs space-y-1">
       <p className="text-warn-text font-medium flex items-center gap-1.5">
         <Bell size={14} strokeWidth={1.5} className="shrink-0" />
         {triggered.length} 条提醒待处理
       </p>
-      {triggered.map(t => (
+      {visible.map(t => (
         <div key={t.rule.id} className="flex items-center gap-2 text-warn-text">
-          <span className="flex-1">{t.reason}</span>
+          <span className="flex-1 truncate">{t.reason}</span>
           <button
             onClick={() => navigate(`/items/${t.item.id}`)}
-            className="underline underline-offset-2 hover:text-ink transition-colors"
+            className="underline underline-offset-2 hover:text-ink transition-colors shrink-0"
           >
             查看
           </button>
           <button
             onClick={() => dismiss(t)}
-            className="hover:text-ink transition-colors"
+            className="hover:text-ink transition-colors shrink-0"
           >
             知道了
           </button>
         </div>
       ))}
+      {/* #182: 超过 3 条折叠，点击跳提醒页 */}
+      {overflow > 0 && (
+        <button
+          onClick={() => navigate('/reminders')}
+          className="text-warn-text/80 underline underline-offset-2 hover:text-warn-text transition-colors"
+        >
+          还有 {overflow} 条提醒，点击查看全部 →
+        </button>
+      )}
     </div>
   );
 }
@@ -200,9 +216,11 @@ export function Shell() {
     return () => { clearInterval(i); window.removeEventListener('online', on); window.removeEventListener('offline', off); };
   }, [loc.pathname]);
 
+  // #183: 4 tabs — 房间 / 搜索 / 提醒 / 设置
   const tabs = [
     { to: '/', label: '房间', Icon: Home },
     { to: '/search', label: '搜索', Icon: Search },
+    { to: '/reminders', label: '提醒', Icon: Bell },
     { to: '/settings', label: '设置', Icon: Settings },
   ];
 
@@ -255,8 +273,8 @@ export function Shell() {
         <Outlet />
       </main>
 
-      {/* ── Bottom nav ────────────────────────────────── */}
-      <nav className="sticky bottom-0 z-10 h-16 pb-safe bg-paper/95 backdrop-blur-sm border-t border-ink-faint grid grid-cols-3">
+      {/* ── Bottom nav (4 tabs) ───────────────────────── */}
+      <nav className="sticky bottom-0 z-10 h-16 pb-safe bg-paper/95 backdrop-blur-sm border-t border-ink-faint grid grid-cols-4">
         {tabs.map(({ to, label, Icon }) => (
           <NavLink
             key={to}
@@ -270,7 +288,6 @@ export function Shell() {
           >
             {({ isActive }) => (
               <>
-                {/* Active indicator bar */}
                 <span className={`w-6 h-0.5 rounded-full mb-0.5 transition-all duration-150 ${isActive ? 'bg-accent' : 'bg-transparent'}`} />
                 <Icon size={20} strokeWidth={1.5} />
                 <span>{label}</span>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ChevronLeft, Plus, X } from 'lucide-react';
+import { ChevronLeft, Minus, Plus, X } from 'lucide-react';
 import type { Area, Item, Room, ReminderRule } from '@keepsake/shared';
 import { AreaRepo, ItemRepo, ReminderRepo, RoomRepo } from '../db/repos.js';
 import { db } from '../db/dexie.js';
@@ -29,18 +29,16 @@ function ExpiryBadge({ expiresAt }: { expiresAt: number }) {
   return <span className="ml-2 text-xs font-medium px-2 py-0.5 rounded-full bg-ok-bg text-ok-text">剩 {days} 天</span>;
 }
 
-// 主类型：'expiry_group'（过期提醒大类，含子选项）或 'low_stock'
-// 子选项（仅 expiry_group 时）：'expiry'（有效期前 N 天）或 'recheck'（每隔 N 天复查）
+// #181 fix: use string state for thresholdQtyStr so user can freely edit/clear
 function ReminderSection({ itemId }: { itemId: string }) {
   const [rules, setRules] = useState<ReminderRule[]>([]);
   const [adding, setAdding] = useState(false);
-  // 主类型 toggle：'expiry_group' | 'low_stock'
   const [mainType, setMainType] = useState<'expiry_group' | 'low_stock'>('expiry_group');
-  // 过期提醒子选项：'expiry'（有效期前 N 天）| 'recheck'（每隔 N 天复查）
   const [expirySubType, setExpirySubType] = useState<'expiry' | 'recheck'>('recheck');
   const [expiryDaysStr, setExpiryDaysStr] = useState('7');
   const [recheckDaysStr, setRecheckDaysStr] = useState('30');
-  const [thresholdQty, setThresholdQty] = useState(1);
+  // #181: string state allows clearing without auto-converting to 0
+  const [thresholdQtyStr, setThresholdQtyStr] = useState('1');
   const [note, setNote] = useState('');
 
   const reload = async () => {
@@ -55,9 +53,9 @@ function ReminderSection({ itemId }: { itemId: string }) {
 
     if (mainType === 'low_stock') {
       kind = 'low_stock';
-      threshold_qty = thresholdQty;
+      const n = parseInt(thresholdQtyStr, 10);
+      threshold_qty = isNaN(n) || n < 0 ? 1 : n;
     } else {
-      // expiry_group
       kind = expirySubType;
       if (expirySubType === 'expiry') {
         const d = Math.max(1, parseInt(expiryDaysStr, 10) || 7);
@@ -78,14 +76,12 @@ function ReminderSection({ itemId }: { itemId: string }) {
     await reload();
   };
 
-  // 更新 kindLabel：expiry/recheck 统一归为"过期提醒"大类，附带策略说明
   const kindLabel = (r: ReminderRule): string => {
     if (r.kind === 'low_stock') return `库存不足（≤${r.threshold_qty ?? '?'}）`;
     if (r.kind === 'expiry') {
       const days = r.threshold_at != null ? Math.round(r.threshold_at / 86400000) : 7;
       return `过期提醒 · 有效期前 ${days} 天`;
     }
-    // recheck
     const days = r.threshold_at != null ? Math.round(r.threshold_at / 86400000) : 30;
     return `过期提醒 · 每隔 ${days} 天复查`;
   };
@@ -121,7 +117,6 @@ function ReminderSection({ itemId }: { itemId: string }) {
         <div className="mx-4 mb-2 bg-paper-dark border border-[var(--border-default)] rounded-[12px] p-3 space-y-3 text-sm">
           <p className="text-xs text-ink-muted">提醒方式：打开 App 时页面横幅提示（暂不支持系统推送）</p>
 
-          {/* 主类型 toggle */}
           <div>
             <p className="text-xs text-ink-muted mb-1.5">提醒类型</p>
             <div className="flex gap-2">
@@ -134,12 +129,10 @@ function ReminderSection({ itemId }: { itemId: string }) {
             </div>
           </div>
 
-          {/* 过期提醒子选项 */}
           {mainType === 'expiry_group' && (
             <div className="space-y-2">
               <p className="text-xs text-ink-muted">提醒策略</p>
 
-              {/* 子选项 (a)：每隔 N 天复查 */}
               <button onClick={() => setExpirySubType('recheck')} className={subBtnCls(expirySubType === 'recheck')}>
                 <span className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${expirySubType === 'recheck' ? 'border-accent' : 'border-[var(--border-default)]'}`}>
                   {expirySubType === 'recheck' && <span className="w-2 h-2 rounded-full bg-accent" />}
@@ -167,7 +160,6 @@ function ReminderSection({ itemId }: { itemId: string }) {
                 </span>
               </button>
 
-              {/* 子选项 (b)：过期前 N 天提醒 */}
               <button onClick={() => setExpirySubType('expiry')} className={subBtnCls(expirySubType === 'expiry')}>
                 <span className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${expirySubType === 'expiry' ? 'border-accent' : 'border-[var(--border-default)]'}`}>
                   {expirySubType === 'expiry' && <span className="w-2 h-2 rounded-full bg-accent" />}
@@ -197,15 +189,19 @@ function ReminderSection({ itemId }: { itemId: string }) {
             </div>
           )}
 
-          {/* 库存不足：数量阈值 */}
+          {/* #181 fix: thresholdQtyStr string state, blur 时校验 */}
           {mainType === 'low_stock' && (
             <div className="flex items-center gap-2">
               <span className="text-ink-muted text-xs">库存阈值</span>
               <input
                 type="number"
                 min={0}
-                value={thresholdQty}
-                onChange={e => setThresholdQty(Number(e.target.value))}
+                value={thresholdQtyStr}
+                onChange={e => setThresholdQtyStr(e.target.value)}
+                onBlur={() => {
+                  const n = parseInt(thresholdQtyStr, 10);
+                  if (isNaN(n) || n < 0) setThresholdQtyStr('1');
+                }}
                 className="w-20 bg-paper-card border border-[var(--border-default)] rounded-[12px] px-3 py-1.5 outline-none focus:border-accent transition-all text-ink"
               />
               <span className="text-xs text-ink-muted">（数量 ≤ 此值时提醒）</span>
@@ -291,7 +287,6 @@ export function ItemPage() {
         tags: it.tags.join(', '),
         expiresDate: it.expires_at ? new Date(it.expires_at).toISOString().slice(0, 10) : '',
       });
-      // 加载位置信息（面包屑展示，从提醒入口进入时尤为重要 #174）
       const a = await AreaRepo.get(it.area_id);
       setArea(a);
       if (a) {
@@ -327,6 +322,13 @@ export function ItemPage() {
     history.back();
   };
 
+  // #180: quick adjust qty from view mode
+  const adjustQty = async (delta: number) => {
+    const newQty = Math.max(0, item.qty + delta);
+    await ItemRepo.update(item.id, { qty: newQty });
+    await reload();
+  };
+
   return (
     <div className="space-y-5">
       {dialog}
@@ -335,7 +337,6 @@ export function ItemPage() {
           <ChevronLeft size={14} strokeWidth={1.5} />
           返回区域
         </Link>
-        {/* 位置面包屑：从过期提醒"查看"入口进入时可直观看到物品位置 (#174) */}
         {(room || area) && (
           <div className="flex items-center gap-1 text-ink-muted">
             <span className="text-xs">📍</span>
@@ -351,7 +352,6 @@ export function ItemPage() {
       </nav>
 
       {editing ? (
-        /* ── 编辑模式（grouped sections）─────────────── */
         <div className="space-y-4">
           <SectionCard label="基本信息">
             <FieldRow label="名称">
@@ -432,21 +432,35 @@ export function ItemPage() {
           </div>
         </div>
       ) : (
-        /* ── 查看模式 ─────────────────────────────────── */
         <>
-          {/* 物品名 + 过期 badge */}
           <div className="flex items-center flex-wrap gap-1">
             <h1 className="text-2xl font-bold font-serif text-ink">{item.name}</h1>
             {item.expires_at != null && <ExpiryBadge expiresAt={item.expires_at} />}
           </div>
 
-          {/* 数量大字展示 */}
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-3xl font-bold font-serif text-ink">{item.qty}</span>
-            <span className="text-ink-muted text-sm">{item.unit || '个'}</span>
+          {/* #180: 数量大字 + 快速加减按钮 */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => adjustQty(-1)}
+              disabled={item.qty <= 0}
+              className="w-9 h-9 flex items-center justify-center rounded-full border border-[var(--border-default)] text-ink-muted hover:border-accent hover:text-ink disabled:opacity-30 transition-all active:scale-95"
+              aria-label="减少数量"
+            >
+              <Minus size={16} strokeWidth={1.5} />
+            </button>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-3xl font-bold font-serif text-ink">{item.qty}</span>
+              <span className="text-ink-muted text-sm">{item.unit || '个'}</span>
+            </div>
+            <button
+              onClick={() => adjustQty(+1)}
+              className="w-9 h-9 flex items-center justify-center rounded-full border border-[var(--border-default)] text-ink-muted hover:border-accent hover:text-ink transition-all active:scale-95"
+              aria-label="增加数量"
+            >
+              <Plus size={16} strokeWidth={1.5} />
+            </button>
           </div>
 
-          {/* 元信息行 */}
           <div className="space-y-1 text-xs text-ink-muted">
             {item.created_at != null && (
               <p>创建于：{new Date(item.created_at).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</p>
@@ -471,7 +485,6 @@ export function ItemPage() {
             </div>
           )}
 
-          {/* 操作按钮 */}
           <div className="flex gap-2">
             <button
               onClick={() => setEditing(true)}
@@ -490,8 +503,6 @@ export function ItemPage() {
           <ReminderSection itemId={itemId} />
         </>
       )}
-
-
     </div>
   );
 }
