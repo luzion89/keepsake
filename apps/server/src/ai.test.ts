@@ -2,17 +2,20 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { buildServer } from './index.js';
 import { rmSync } from 'node:fs';
 import type { FastifyInstance } from 'fastify';
+import { getTestAuthHeader } from './test-helpers.js';
 
 const TEST_DB = './data/test-ai.sqlite';
 
 describe('/settings/ai 路由 Zod 校验', () => {
   let app: FastifyInstance;
+  let auth: string;
 
   beforeAll(async () => {
     process.env.KEEPSAKE_DB = TEST_DB;
     try { rmSync(TEST_DB, { force: true }); } catch {}
     app = await buildServer();
     await app.ready();
+    auth = await getTestAuthHeader(app);
   });
 
   afterAll(async () => {
@@ -24,6 +27,7 @@ describe('/settings/ai 路由 Zod 校验', () => {
     const res = await app.inject({
       method: 'PUT',
       url: '/settings/ai',
+      headers: { authorization: auth },
       payload: { mode: 'on', apiKey: 'sk-or-test', model: 'google/gemini' },
     });
     expect(res.statusCode).toBe(200);
@@ -34,6 +38,7 @@ describe('/settings/ai 路由 Zod 校验', () => {
     const res = await app.inject({
       method: 'PUT',
       url: '/settings/ai',
+      headers: { authorization: auth },
       payload: { mode: 'invalid' },
     });
     expect(res.statusCode).toBe(400);
@@ -44,6 +49,7 @@ describe('/settings/ai 路由 Zod 校验', () => {
     const res = await app.inject({
       method: 'PUT',
       url: '/settings/ai',
+      headers: { authorization: auth },
       payload: { mode: 'on', apiKey: 'x'.repeat(201) },
     });
     expect(res.statusCode).toBe(400);
@@ -54,6 +60,7 @@ describe('/settings/ai 路由 Zod 校验', () => {
     const res = await app.inject({
       method: 'PUT',
       url: '/settings/ai',
+      headers: { authorization: auth },
       payload: { mode: 'off', unknownField: 'hacked' },
     });
     expect(res.statusCode).toBe(400);

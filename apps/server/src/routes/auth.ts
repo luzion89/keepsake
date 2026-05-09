@@ -1,9 +1,9 @@
 /**
  * Auth routes for spike/auth-cf-tunnel
  *
- * POST /auth/pair          { root_secret, device_name? }  → { device_token, device_id }
+ * POST /auth/pair          { root_secret, device_name? }  → { device_token, device_id, family_id }
  * POST /auth/invite        (authed) → { invite_token, expires_in }
- * POST /auth/join          { invite_token, device_name? } → { device_token, device_id }
+ * POST /auth/join          { invite_token, device_name? } → { device_token, device_id, family_id }
  * GET  /auth/devices       (authed) → device[]
  * DELETE /auth/devices/:id (authed) → { ok }
  * GET  /auth/qrcode        → SVG image (pair QR)
@@ -29,17 +29,25 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     if (!root_secret || root_secret !== authState.rootSecret) {
       return reply.code(401).send({ error: 'invalid root_secret' });
     }
+    // Server generates both family_id and device_id
+    const familyId = randomUUID();
     const deviceId = randomUUID();
-    const token = issueDeviceToken(deviceId, authState.jwtSecret);
-    db.prepare('INSERT INTO devices (id, name, token_hash, created_at) VALUES (?, ?, ?, ?)').run(
-      deviceId, device_name, hashToken(token), Date.now()
+    const token = issueDeviceToken(deviceId, familyId, authState.jwtSecret);
+
+    // Ensure family record exists
+    db.prepare('INSERT OR IGNORE INTO families (id, created_at) VALUES (?, ?)').run(familyId, Date.now());
+    db.prepare('INSERT INTO devices (id, family_id, name, token_hash, created_at) VALUES (?, ?, ?, ?, ?)').run(
+      deviceId, familyId, device_name, hashToken(token), Date.now()
     );
-    return { device_token: token, device_id: deviceId };
+    return { device_token: token, device_id: deviceId, family_id: familyId };
   });
 
   // ── POST /auth/invite ────────────────────────────────────────────────────
-  fastify.post('/auth/invite', async (_req, _reply) => {
-    const token = issueInviteToken(authState.jwtSecret);
+  // Requires auth; family_id is read from the requesting device's JWT.
+  fastify.post('/auth/invite', async (req, reply) => {
+    const familyId = (req as any).jwtPayload?.family_id as string | undefined;
+    if (!familyId) return reply.code(401).send({ error: 'no family_id in token' });
+    const token = issueInviteToken(familyId, authState.jwtSecret);
     return { invite_token: token, expires_in: 300 };
   });
 
@@ -51,22 +59,29 @@ export const authRoutes: FastifyPluginAsync = async (fastify) => {
     if (!payload || payload.type !== 'invite') {
       return reply.code(401).send({ error: 'invalid or expired invite_token' });
     }
+    const familyId = payload.family_id as string;
+    if (!familyId) return reply.code(400).send({ error: 'invite_token missing family_id' });
+
     const deviceId = randomUUID();
-    const token = issueDeviceToken(deviceId, authState.jwtSecret);
-    db.prepare('INSERT INTO devices (id, name, token_hash, created_at) VALUES (?, ?, ?, ?)').run(
-      deviceId, device_name, hashToken(token), Date.now()
+    const token = issueDeviceToken(deviceId, familyId, authState.jwtSecret);
+    db.prepare('INSERT INTO devices (id, family_id, name, token_hash, created_at) VALUES (?, ?, ?, ?, ?)').run(
+      deviceId, familyId, device_name, hashToken(token), Date.now()
     );
-    return { device_token: token, device_id: deviceId };
+    return { device_token: token, device_id: deviceId, family_id: familyId };
   });
 
   // ── GET /auth/devices ────────────────────────────────────────────────────
-  fastify.get('/auth/devices', async () => {
-    return db.prepare('SELECT id, name, created_at, last_seen FROM devices ORDER BY created_at DESC').all();
+  fastify.get('/auth/devices', async (req) => {
+    const familyId = (req as any).jwtPayload?.family_id as string | undefined;
+    if (!familyId) return [];
+    return db.prepare('SELECT id, name, created_at, last_seen FROM devices WHERE family_id = ? ORDER BY created_at DESC').all(familyId);
   });
 
   // ── DELETE /auth/devices/:id ─────────────────────────────────────────────
   fastify.delete<{ Params: { id: string } }>('/auth/devices/:id', async (req, _reply) => {
-    db.prepare('DELETE FROM devices WHERE id = ?').run(req.params.id);
+    const familyId = (req as any).jwtPayload?.family_id as string | undefined;
+    // Only allow deleting devices in same family
+    db.prepare('DELETE FROM devices WHERE id = ? AND family_id = ?').run(req.params.id, familyId ?? '');
     return { ok: true };
   });
 
