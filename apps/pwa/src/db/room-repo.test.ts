@@ -42,7 +42,7 @@ describe('RoomRepo #113 竞态回归', () => {
     await RoomRepo.create({ name: '厨房' });
     const rooms = await RoomRepo.list();
     expect(rooms).toHaveLength(1);
-    expect(rooms[0].name).toBe('厨房');
+    expect(rooms[0]!.name).toBe('厨房');
   });
 
   it('create() 调用两次后 list() 返回 2 条，不重复', async () => {
@@ -66,8 +66,8 @@ describe('RoomRepo #113 竞态回归', () => {
     expect(r1).toHaveLength(1);
     expect(r2).toHaveLength(1);
     expect(r3).toHaveLength(1);
-    expect(r1[0].id).toBe(r2[0].id);
-    expect(r2[0].id).toBe(r3[0].id);
+    expect(r1[0]!.id).toBe(r2[0]!.id);
+    expect(r2[0]!.id).toBe(r3[0]!.id);
   });
 
   it('软删除的房间不应出现在 list() 中', async () => {
@@ -82,6 +82,6 @@ describe('RoomRepo #113 竞态回归', () => {
     const first = await RoomRepo.list();
     const second = await RoomRepo.list();
     expect(first).toHaveLength(second.length);
-    expect(first[0].id).toBe(second[0].id);
+    expect(first[0]!.id).toBe(second[0]!.id);
   });
 });

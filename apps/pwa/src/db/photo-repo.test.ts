@@ -67,18 +67,18 @@ beforeEach(() => {
 
 describe('PhotoRepo.setRecognition — pending → done 状态切换', () => {
   it('从 pending 切换到 done 后，DB 中 recognition_status 为 done', async () => {
-    expect(dbPhotos['photo-001'].recognition_status).toBe('pending');
+    expect(dbPhotos['photo-001']!.recognition_status).toBe('pending');
 
     await PhotoRepo.setRecognition('photo-001', 'done', [{ name: '苹果', qty: 2 }]);
 
-    expect(dbPhotos['photo-001'].recognition_status).toBe('done');
-    expect(dbPhotos['photo-001'].recognition_result).toEqual([{ name: '苹果', qty: 2 }]);
+    expect(dbPhotos['photo-001']!.recognition_status).toBe('done');
+    expect(dbPhotos['photo-001']!.recognition_result).toEqual([{ name: '苹果', qty: 2 }]);
   });
 
   it('状态切换后 version 递增', async () => {
-    const before = dbPhotos['photo-001'].version; // 0
+    const before = dbPhotos['photo-001']!.version; // 0
     await PhotoRepo.setRecognition('photo-001', 'done', {});
-    expect(dbPhotos['photo-001'].version).toBe(before + 1);
+    expect(dbPhotos['photo-001']!.version).toBe(before + 1);
   });
 
   it('状态切换后向 outbox 推入一条 upsert 记录', async () => {
@@ -97,7 +97,7 @@ describe('PhotoRepo.setRecognition — pending → done 状态切换', () => {
 
   it('pending → failed 也能正常切换', async () => {
     await PhotoRepo.setRecognition('photo-001', 'failed', { reason: 'timeout' });
-    expect(dbPhotos['photo-001'].recognition_status).toBe('failed');
+    expect(dbPhotos['photo-001']!.recognition_status).toBe('failed');
   });
 });
 

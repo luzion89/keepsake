@@ -456,7 +456,7 @@ export function SettingsPage() {
   );
 }
 
-// ── Spike-A: DevicesSection ───────────────────────────────────────────────
+// ── 设备配对：DevicesSection ────────────────────────────────────────────────
 
 interface DeviceInfo {
   id: string;
@@ -465,17 +465,160 @@ interface DeviceInfo {
   last_seen: number | null;
 }
 
+/** 清除认证相关 kv，不碰业务数据 */
+async function clearAuthKv() {
+  await db.kv.delete('device_token');
+  await db.kv.delete('server_url');
+  await db.kv.delete('family_id');
+  await db.kv.delete('family_key');
+  await db.kv.delete('family_key_salt');
+  await db.kv.delete('root_secret_hint');
+  // device_id 保留（业务用）
+}
+
+function InviteQrModal({
+  serverUrl,
+  onClose,
+}: {
+  serverUrl: string;
+  onClose: () => void;
+}) {
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [payload, setPayload] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [secsLeft, setSecsLeft] = useState<number>(300); // 5 min
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch('/auth/invite', { method: 'POST' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const { invite_token, family_id } = await res.json();
+        if (cancelled) return;
+        const p = JSON.stringify({
+          server: serverUrl || window.location.origin,
+          invite_token,
+          ...(family_id ? { family_id } : {}),
+          v: 1,
+        });
+        setPayload(p);
+        const url = await import('qrcode').then(m => m.toDataURL(p, { margin: 2, width: 260 }));
+        if (!cancelled) setQrDataUrl(url);
+      } catch (e: unknown) {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [serverUrl]);
+
+  // 5-minute countdown
+  useEffect(() => {
+    if (secsLeft <= 0) return;
+    const t = setTimeout(() => setSecsLeft(s => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [secsLeft]);
+
+  const mins = String(Math.floor(secsLeft / 60)).padStart(1, '0');
+  const secs = String(secsLeft % 60).padStart(2, '0');
+  const expired = secsLeft <= 0;
+
+  const copyPayload = async () => {
+    try {
+      await navigator.clipboard.writeText(payload);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { /* ignore */ }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-paper-card rounded-[16px] shadow-card w-full max-w-xs p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-base text-ink">邀请新设备</h3>
+          <button onClick={onClose} className="text-ink-muted hover:text-ink transition-colors">
+            <X size={18} strokeWidth={1.5} />
+          </button>
+        </div>
+
+        {loading && (
+          <div className="flex justify-center py-8 text-ink-muted text-sm">生成二维码中…</div>
+        )}
+
+        {error && (
+          <div className="text-danger-text text-sm bg-danger/10 rounded-[10px] px-3 py-2">{error}</div>
+        )}
+
+        {!loading && !error && (
+          <>
+            {expired ? (
+              <div className="text-center py-4 text-ink-muted text-sm">
+                <p className="text-danger-text font-medium mb-2">二维码已过期</p>
+                <p>请关闭后重新点击「邀请新设备」生成</p>
+              </div>
+            ) : (
+              <>
+                <div className="flex justify-center">
+                  {qrDataUrl && (
+                    <img
+                      src={qrDataUrl}
+                      alt="邀请二维码"
+                      className="rounded-[10px] border border-[var(--border-default)]"
+                      style={{ width: 220, height: 220, objectFit: 'contain' }}
+                    />
+                  )}
+                </div>
+                <p className="text-center text-xs text-ink-muted">
+                  剩余有效时间：<span className={`font-mono font-medium ${secsLeft < 60 ? 'text-danger-text' : 'text-ink'}`}>{mins}:{secs}</span>
+                </p>
+              </>
+            )}
+
+            <div className="space-y-2">
+              <p className="text-xs text-ink-muted">或复制以下文本到另一台设备手动输入：</p>
+              <div className="bg-paper-dark rounded-[10px] px-3 py-2 text-xs font-mono text-ink break-all leading-relaxed">
+                {payload}
+              </div>
+              <button
+                onClick={copyPayload}
+                disabled={!payload}
+                className="w-full py-2 rounded-[10px] border border-[var(--border-default)] text-sm text-ink hover:border-accent/60 transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+              >
+                {copied ? <><Check size={13} strokeWidth={2} />已复制</> : '复制'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function DevicesSection() {
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [inviteQr, setInviteQr] = useState<string | null>(null);
-  const [inviteLoading, setInviteLoading] = useState(false);
   const [serverUrl, setServerUrl] = useState<string>('');
+  const [familyId, setFamilyId] = useState<string>('');
   const [myDeviceId, setMyDeviceId] = useState<string>('');
+
+  // 切换 server 确认弹窗
+  const [showRepairConfirm, setShowRepairConfirm] = useState(false);
+  // 邀请二维码弹窗
+  const [showInviteQr, setShowInviteQr] = useState(false);
 
   useEffect(() => {
     kvGet<string>('server_url').then((u) => setServerUrl(u ?? ''));
+    kvGet<string>('family_id').then((f) => setFamilyId(f ?? ''));
     getDeviceId().then((id) => setMyDeviceId(id));
     loadDevices();
   }, []);
@@ -500,79 +643,129 @@ function DevicesSection() {
     loadDevices();
   };
 
-  const generateInvite = async () => {
-    setInviteLoading(true);
-    setInviteQr(null);
-    try {
-      const res = await fetch('/auth/invite', { method: 'POST' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const { invite_token } = await res.json();
-      const payload = JSON.stringify({
-        server: serverUrl || window.location.origin,
-        invite_token,
-        v: 1,
-      });
-      // Generate a simple QR via server endpoint by encoding in URL
-      setInviteQr(payload);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setInviteLoading(false);
-    }
+  const doRepair = async () => {
+    await clearAuthKv();
+    window.location.href = '/pair';
   };
 
   const fmt = (ts: number | null) => ts ? new Date(ts).toLocaleDateString('zh-CN') : '未知';
+  const shortId = (id: string) => id ? `${id.slice(0, 8)}…` : '—';
 
   return (
-    <section className="space-y-1">
-      <h2 className="text-xs font-semibold text-ink-muted uppercase tracking-wide px-1 mb-1">我的设备</h2>
-      <div className="bg-paper rounded-[14px] shadow-card divide-y divide-ink-hairline overflow-hidden">
+    <>
+      {showInviteQr && (
+        <InviteQrModal serverUrl={serverUrl} onClose={() => setShowInviteQr(false)} />
+      )}
+
+      {/* 重新配对确认弹窗 */}
+      {showRepairConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowRepairConfirm(false); }}
+        >
+          <div className="bg-paper-card rounded-[16px] shadow-card w-full max-w-xs p-5 space-y-4">
+            <div className="flex items-center gap-2 text-warn-text">
+              <AlertTriangle size={18} strokeWidth={1.5} className="shrink-0" />
+              <h3 className="font-semibold text-base text-ink">重新配对到其他 server？</h3>
+            </div>
+            <p className="text-sm text-ink-muted leading-relaxed">
+              切换 server 后，本机数据将无法与新 server 同步，仅作为本地缓存保留。
+              <br /><br />
+              建议先在「本机数据」区域导出 JSON 备份。
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowRepairConfirm(false)}
+                className="flex-1 py-2.5 rounded-[12px] border border-[var(--border-default)] text-sm text-ink hover:border-accent/60 transition-all"
+              >
+                取消
+              </button>
+              <button
+                onClick={doRepair}
+                className="flex-1 py-2.5 rounded-[12px] bg-danger hover:bg-danger/90 text-paper text-sm font-medium transition-all"
+              >
+                确认切换
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Section title="设备配对">
+        {/* 当前配对信息 */}
+        <SectionRow>
+          <div className="space-y-1.5 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-ink-muted w-20 shrink-0">Server</span>
+              <span className="font-mono text-ink break-all">{serverUrl || '未配对'}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-ink-muted w-20 shrink-0">Family ID</span>
+              <span className="font-mono text-ink">{familyId ? shortId(familyId) : '—'}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-ink-muted w-20 shrink-0">Device ID</span>
+              <span className="font-mono text-ink">{myDeviceId ? shortId(myDeviceId) : '—'}</span>
+            </div>
+          </div>
+        </SectionRow>
+
+        {/* 操作按钮 */}
+        <SectionRow>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setShowInviteQr(true)}
+              className="px-3 py-2 rounded-[12px] border border-[var(--border-default)] text-sm text-ink hover:border-accent/60 hover:text-ink-hover transition-all"
+            >
+              邀请新设备
+            </button>
+            <button
+              onClick={() => setShowRepairConfirm(true)}
+              className="px-3 py-2 rounded-[12px] border border-danger/50 text-sm text-danger-text hover:bg-danger/5 transition-all"
+            >
+              重新配对到其他 server
+            </button>
+          </div>
+        </SectionRow>
+
+        {/* 设备列表 */}
         {loading && (
-          <div className="px-4 py-3 text-xs text-ink-muted">加载中…</div>
+          <SectionRow>
+            <p className="text-xs text-ink-muted">加载中…</p>
+          </SectionRow>
         )}
         {error && (
-          <div className="px-4 py-3 text-xs text-danger-text">{error}</div>
+          <SectionRow>
+            <p className="text-xs text-danger-text">{error}</p>
+          </SectionRow>
         )}
         {!loading && devices.map((d) => (
-          <div key={d.id} className="flex items-center justify-between px-4 py-3">
-            <div>
-              <p className="text-sm font-medium text-ink-base">
-                {d.name}
-                {d.id === myDeviceId && (
-                  <span className="ml-2 text-xs text-ok-text font-normal">（本机）</span>
-                )}
-              </p>
-              <p className="text-xs text-ink-muted">
-                注册 {fmt(d.created_at)} · 最近活跃 {fmt(d.last_seen)}
-              </p>
+          <SectionRow key={d.id}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-ink">
+                  {d.name}
+                  {d.id === myDeviceId && (
+                    <span className="ml-2 text-xs text-ok-text font-normal">（本机）</span>
+                  )}
+                </p>
+                <p className="text-xs text-ink-muted">
+                  注册 {fmt(d.created_at)} · 最近活跃 {fmt(d.last_seen)}
+                </p>
+              </div>
+              {d.id !== myDeviceId && (
+                <button
+                  onClick={() => revokeDevice(d.id)}
+                  className="text-xs text-danger-text hover:underline ml-4 shrink-0"
+                >
+                  撤销
+                </button>
+              )}
             </div>
-            {d.id !== myDeviceId && (
-              <button
-                onClick={() => revokeDevice(d.id)}
-                className="text-xs text-danger-text hover:underline"
-              >
-                撤销
-              </button>
-            )}
-          </div>
+          </SectionRow>
         ))}
-        <div className="px-4 py-3">
-          <button
-            onClick={generateInvite}
-            disabled={inviteLoading}
-            className="text-sm text-accent hover:underline"
-          >
-            {inviteLoading ? '生成中…' : '+ 邀请新设备（生成邀请码）'}
-          </button>
-          {inviteQr && (
-            <div className="mt-2 p-2 bg-ink-hairline rounded text-xs font-mono break-all">
-              <p className="text-ink-muted mb-1">Payload（让对方扫描或手动粘贴）：</p>
-              {inviteQr}
-            </div>
-          )}
-        </div>
-      </div>
-    </section>
+      </Section>
+    </>
   );
 }
 

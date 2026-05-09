@@ -29,6 +29,7 @@ const mockArea: Area = {
   updated_at: Date.now(),
   updated_by: 'device-1',
   version: 1,
+  photo_ids: [],
 };
 
 describe('resolveAreaState (#5 三态加载)', () => {
