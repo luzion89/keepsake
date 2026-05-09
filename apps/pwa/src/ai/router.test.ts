@@ -52,10 +52,17 @@ describe('transcribe() #58 — chat completions 路径', () => {
 
   beforeEach(() => {
     // Mock FileReader used inside blobToDataUrl
+    interface MockFileReader {
+      onerror: unknown;
+      onload: unknown;
+      readAsDataURL(): void;
+      result: string | ArrayBuffer | null;
+      error: null;
+    }
     const mockFileReader = {
       onerror: null as unknown,
       onload: null as unknown,
-      readAsDataURL(this: typeof mockFileReader) {
+      readAsDataURL(this: MockFileReader) {
         this.result = 'data:audio/webm;base64,dGVzdA==';
         if (typeof this.onload === 'function') (this.onload as () => void)();
       },
@@ -85,7 +92,7 @@ describe('transcribe() #58 — chat completions 路径', () => {
     const blob = new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/webm' });
     await transcribe(blob);
     const calls = (fetch as ReturnType<typeof vi.fn>).mock.calls;
-    const url = calls[0][0] as string;
+    const url = calls[0]![0]! as string;
     expect(url).toBe(CHAT_URL);
     expect(url).not.toContain('/audio/transcriptions');
   });
@@ -94,7 +101,7 @@ describe('transcribe() #58 — chat completions 路径', () => {
     const { transcribe } = await import('./router.js');
     const blob = new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/webm' });
     await transcribe(blob);
-    const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body as string);
+    const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string);
     const content = body.messages[0].content as Array<{ type: string }>;
     expect(content.some((c) => c.type === 'input_audio')).toBe(true);
   });
@@ -161,12 +168,12 @@ describe('parseItemsFromText() #64 — 抽取 expires_at / notes', () => {
     const { parseItemsFromText } = await import('./router.js');
     const items = await parseItemsFromText('两盒牛奶（全脂，6月1日到期）和一条面包');
     expect(items).toHaveLength(2);
-    expect(items[0].expires_at).toBe('2026-06-01');
-    expect(items[0].notes).toBe('全脂');
-    expect(items[1].expires_at).toBeNull();
+    expect(items[0]!.expires_at).toBe('2026-06-01');
+    expect(items[0]!.notes).toBe('全脂');
+    expect(items[1]!.expires_at).toBeNull();
 
     // 确认请求发往 OpenRouter
-    const url = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    const url = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]![0]!;
     expect(url).toBe(OPENROUTER_URL);
   });
 
@@ -193,11 +200,11 @@ describe('parseItemsFromText() #64 — 抽取 expires_at / notes', () => {
 
     const { parseItemsFromText } = await import('./router.js');
     const items = await parseItemsFromText('六罐330ml可乐，2026年底过期');
-    expect(items[0].name).toBe('可乐');
-    expect(items[0].expires_at).toBe('2026-12-31');
-    expect(items[0].notes).toBe('330ml罐装');
+    expect(items[0]!.name).toBe('可乐');
+    expect(items[0]!.expires_at).toBe('2026-12-31');
+    expect(items[0]!.notes).toBe('330ml罐装');
 
-    const url = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    const url = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]![0]!;
     expect(url).toBe(DEEPSEEK_URL);
   });
 
@@ -240,7 +247,7 @@ describe('parseItemsFromText() #78 — replace/merge 模式 prompt', () => {
     }));
     const { parseItemsFromText } = await import('./router.js');
     await parseItemsFromText('两瓶可乐', [], 'replace');
-    const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body as string);
+    const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string);
     const sysPrompt: string = body.messages[0].content;
     // Replace mode uses the standard prompt — no existing items JSON
     expect(sysPrompt).not.toContain('现有物品列表');
@@ -261,13 +268,13 @@ describe('parseItemsFromText() #78 — replace/merge 模式 prompt', () => {
     const { parseItemsFromText } = await import('./router.js');
     const existing = [{ name: '牛奶', qty: 2, expires_at: '2026-06-01', notes: '全脂' }];
     const items = await parseItemsFromText('再加一盒牛奶', existing, 'merge');
-    const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body as string);
+    const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string);
     const sysPrompt: string = body.messages[0].content;
     expect(sysPrompt).toContain('现有物品列表');
     expect(sysPrompt).toContain('牛奶');
-    expect(items[0].name).toBe('牛奶');
+    expect(items[0]!.name).toBe('牛奶');
     // Verify request went to OpenRouter
-    expect((fetch as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe(OPENROUTER_URL);
+    expect((fetch as ReturnType<typeof vi.fn>).mock.calls[0]![0]!).toBe(OPENROUTER_URL);
   });
 
   it('merge 模式但无已有物品：降级为标准 prompt', async () => {
@@ -281,7 +288,7 @@ describe('parseItemsFromText() #78 — replace/merge 模式 prompt', () => {
     }));
     const { parseItemsFromText } = await import('./router.js');
     await parseItemsFromText('一瓶醋', [], 'merge');
-    const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body as string);
+    const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string);
     // Empty existing → fallback to standard prompt
     expect(body.messages[0].content).not.toContain('现有物品列表');
   });
@@ -322,7 +329,7 @@ describe('searchAnswer() #89 — system prompt 不要求 AI 在 answer 中使用
     const ctx = [{ id: 'abc-123', name: '消毒水', qty: 2, location: '主卧 / 洗手台柜子' }];
     await searchAnswer('消毒水在哪里', ctx);
 
-    const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body as string);
+    const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string);
     const sysPrompt: string = body.messages[0].content;
 
     // Must NOT instruct AI to embed [id] in answer
@@ -353,7 +360,7 @@ describe('searchAnswer() #89 — system prompt 不要求 AI 在 answer 中使用
     const ctx = [{ id: 'abc-123', name: '消毒水', qty: 2, location: '主卧 / 洗手台柜子' }];
     await searchAnswer('消毒水', ctx);
 
-    const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body as string);
+    const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0]![1]!.body as string);
     const sysPrompt: string = body.messages[0].content;
 
     // id should appear as trailing comment (id:xxx), not as leading [xxx]

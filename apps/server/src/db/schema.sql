@@ -2,9 +2,16 @@
 -- All domain tables share the same sync metadata columns:
 --   id TEXT PK, updated_at INT, updated_by TEXT, deleted INT (0/1), version INT
 -- JSON fields are stored as TEXT and parsed at boundary.
+-- family_id column added to all domain tables for multi-family data isolation.
+
+CREATE TABLE IF NOT EXISTS families (
+  id TEXT PRIMARY KEY,
+  created_at INTEGER NOT NULL
+);
 
 CREATE TABLE IF NOT EXISTS rooms (
   id TEXT PRIMARY KEY,
+  family_id TEXT NOT NULL DEFAULT '',
   name TEXT NOT NULL,
   icon TEXT,
   photo_ids TEXT NOT NULL DEFAULT '[]',
@@ -15,9 +22,11 @@ CREATE TABLE IF NOT EXISTS rooms (
   version INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS rooms_updated_at ON rooms(updated_at);
+CREATE INDEX IF NOT EXISTS rooms_family ON rooms(family_id);
 
 CREATE TABLE IF NOT EXISTS areas (
   id TEXT PRIMARY KEY,
+  family_id TEXT NOT NULL DEFAULT '',
   room_id TEXT NOT NULL,
   name TEXT NOT NULL,
   photo_ids TEXT NOT NULL DEFAULT '[]',
@@ -29,9 +38,11 @@ CREATE TABLE IF NOT EXISTS areas (
 );
 CREATE INDEX IF NOT EXISTS areas_updated_at ON areas(updated_at);
 CREATE INDEX IF NOT EXISTS areas_room ON areas(room_id);
+CREATE INDEX IF NOT EXISTS areas_family ON areas(family_id);
 
 CREATE TABLE IF NOT EXISTS items (
   id TEXT PRIMARY KEY,
+  family_id TEXT NOT NULL DEFAULT '',
   area_id TEXT NOT NULL,
   name TEXT NOT NULL,
   qty INTEGER NOT NULL DEFAULT 0,
@@ -43,6 +54,7 @@ CREATE TABLE IF NOT EXISTS items (
   confidence REAL,
   bbox TEXT,
   notes TEXT,
+  enc_blob TEXT,
   updated_at INTEGER NOT NULL,
   updated_by TEXT NOT NULL,
   deleted INTEGER NOT NULL DEFAULT 0,
@@ -51,9 +63,11 @@ CREATE TABLE IF NOT EXISTS items (
 CREATE INDEX IF NOT EXISTS items_updated_at ON items(updated_at);
 CREATE INDEX IF NOT EXISTS items_area ON items(area_id);
 CREATE INDEX IF NOT EXISTS items_name ON items(name);
+CREATE INDEX IF NOT EXISTS items_family ON items(family_id);
 
 CREATE TABLE IF NOT EXISTS photos (
   id TEXT PRIMARY KEY,
+  family_id TEXT NOT NULL DEFAULT '',
   parent_type TEXT NOT NULL,
   parent_id TEXT NOT NULL,
   taken_at INTEGER NOT NULL,
@@ -68,9 +82,11 @@ CREATE TABLE IF NOT EXISTS photos (
 );
 CREATE INDEX IF NOT EXISTS photos_updated_at ON photos(updated_at);
 CREATE INDEX IF NOT EXISTS photos_parent ON photos(parent_type, parent_id);
+CREATE INDEX IF NOT EXISTS photos_family ON photos(family_id);
 
 CREATE TABLE IF NOT EXISTS snapshots (
   id TEXT PRIMARY KEY,
+  family_id TEXT NOT NULL DEFAULT '',
   area_id TEXT NOT NULL,
   taken_at INTEGER NOT NULL,
   item_ids TEXT NOT NULL DEFAULT '[]',
@@ -81,6 +97,7 @@ CREATE TABLE IF NOT EXISTS snapshots (
   version INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS snapshots_updated_at ON snapshots(updated_at);
+CREATE INDEX IF NOT EXISTS snapshots_family ON snapshots(family_id);
 
 -- 键值存储，用于 AI 配置等跨设备设置的服务端持久化
 CREATE TABLE IF NOT EXISTS kv (
@@ -103,12 +120,15 @@ CREATE TABLE IF NOT EXISTS conflict_log (
 -- Blob metadata: tracks uploaded blobs for cross-device sync
 CREATE TABLE IF NOT EXISTS blob_meta (
   id TEXT PRIMARY KEY,
+  family_id TEXT NOT NULL DEFAULT '',
   path TEXT NOT NULL,
   uploaded_at INTEGER NOT NULL
 );
+CREATE INDEX IF NOT EXISTS blob_meta_family ON blob_meta(family_id);
 
 CREATE TABLE IF NOT EXISTS reminders (
   id TEXT PRIMARY KEY,
+  family_id TEXT NOT NULL DEFAULT '',
   item_id TEXT NOT NULL,
   kind TEXT NOT NULL,
   threshold_at INTEGER,
@@ -122,3 +142,20 @@ CREATE TABLE IF NOT EXISTS reminders (
 );
 CREATE INDEX IF NOT EXISTS reminders_updated_at ON reminders(updated_at);
 CREATE INDEX IF NOT EXISTS reminders_item ON reminders(item_id);
+CREATE INDEX IF NOT EXISTS reminders_family ON reminders(family_id);
+
+-- Auth: root secret + device tokens
+CREATE TABLE IF NOT EXISTS auth_config (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS devices (
+  id TEXT PRIMARY KEY,
+  family_id TEXT NOT NULL DEFAULT '',
+  name TEXT NOT NULL DEFAULT 'Unknown Device',
+  token_hash TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  last_seen INTEGER
+);
+CREATE INDEX IF NOT EXISTS devices_family ON devices(family_id);
