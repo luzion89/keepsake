@@ -169,7 +169,7 @@ export function RoomPage() {
                     to={`/areas/${a.id}`}
                     className="flex-1 min-w-0 hover:text-ink-hover transition-colors"
                   >
-                    <div className="text-sm font-medium font-serif text-ink">{a.name}</div>
+                    <div className="text-sm font-medium text-ink">{a.name}</div>
                     <div className="text-xs text-ink-muted">
                       {itemCounts[a.id] != null
                         ? itemCounts[a.id] === 0 ? '暂无物品' : `${itemCounts[a.id]} 种物品`
