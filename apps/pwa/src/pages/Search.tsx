@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Pin, Sparkles } from 'lucide-react';
+import { Pin, Search as SearchIcon, Sparkles } from 'lucide-react';
 import type { Item, Area, Room } from '@keepsake/shared';
 import { db } from '../db/dexie.js';
 import { ItemRepo } from '../db/repos.js';
@@ -125,7 +125,7 @@ export function SearchPage() {
     <div className="space-y-4">
       {toast.node}
 
-      <h1 className="text-2xl font-bold font-serif text-ink">搜索物品</h1>
+      <h1 className="text-2xl font-bold font-serif text-ink flex items-center gap-2"><SearchIcon size={22} strokeWidth={1.5} />搜索物品</h1>
 
       <div className="bg-paper-card border border-ink/10 rounded-[12px] px-4 py-3 text-sm text-ink-muted leading-relaxed">
         直接搜索关键词，也可以用语音输入一段模糊的描述，让 AI 帮忙查找符合描述的物品

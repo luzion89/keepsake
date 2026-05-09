@@ -23,6 +23,8 @@ export function AreaPage() {
   const [name, setName] = useState('');
   const [qty, setQty] = useState(1);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [swipedItemId, setSwipedItemId] = useState<string | null>(null);
+  const touchStartItemX = useRef<number | null>(null);
   const [editItemName, setEditItemName] = useState('');
   const [lightbox, setLightbox] = useState<{ src: string; photoId: string; index: number } | null>(null);
   const [slideKey, setSlideKey] = useState(0);
@@ -80,6 +82,13 @@ export function AreaPage() {
     setEditingItemId(null);
     await reload();
   };
+
+  // Dismiss item swipe when clicking elsewhere
+  useEffect(() => {
+    const close = () => setSwipedItemId(null);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, []);
 
   if (areaState === 'loading') return <p className="text-ink-muted">加载中…</p>;
   if (areaState === 'not-found') {
@@ -179,29 +188,70 @@ export function AreaPage() {
         ) : (
           <ul className="space-y-1.5">
             {items.map(it => (
-              <li key={it.id} className="relative flex items-center gap-2 px-3 py-1.5 bg-paper-card border border-[var(--border-default)] rounded-[12px] shadow-card">
-                <Link to={`/items/${it.id}`} className="flex-1 min-w-0 pr-14">
-                  {editingItemId === it.id ? (
-                    <input
-                      ref={editItemRef}
-                      value={editItemName}
-                      onChange={(e) => setEditItemName(e.target.value)}
-                      onBlur={() => commitRenameItem(it.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') commitRenameItem(it.id);
-                        if (e.key === 'Escape') setEditingItemId(null);
-                      }}
-                      className="w-full bg-paper-dark border border-accent rounded-[8px] px-2 py-1 text-sm outline-none text-ink"
-                      onClick={(e) => e.preventDefault()}
-                    />
-                  ) : (
-                    <div className="text-sm font-medium text-ink truncate">{it.name}</div>
-                  )}
-                  <div className="text-xs text-ink-muted">
-                    {it.source !== 'manual' && <span className="mr-1">{it.source}</span>}
-                    {it.confidence != null && <span>{(it.confidence * 100).toFixed(0)}%</span>}
+              <li
+                key={it.id}
+                className="relative overflow-hidden rounded-[12px]"
+                onClick={(e) => {
+                  if (swipedItemId === it.id && !(e.target as HTMLElement).closest('[data-delete]')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setSwipedItemId(null);
+                  }
+                }}
+              >
+                {/* Delete background */}
+                <div className="absolute inset-y-0 right-0 flex items-center bg-danger px-5 select-none rounded-r-[12px]" aria-hidden="true">
+                  <Trash2 size={18} strokeWidth={1.5} className="text-paper" />
+                  <span className="text-paper text-sm ml-1.5">删除</span>
+                </div>
+                <div
+                  className="relative flex items-center gap-2 px-3 py-1.5 bg-paper-card border border-[var(--border-default)] rounded-[12px] shadow-card transition-transform duration-200 ease-out"
+                  style={{ transform: swipedItemId === it.id ? "translateX(-88px)" : "translateX(0)" }}
+                  onPointerDown={(e) => { touchStartItemX.current = e.clientX; }}
+                  onPointerUp={(e) => {
+                    if (touchStartItemX.current === null) return;
+                    const delta = e.clientX - touchStartItemX.current;
+                    touchStartItemX.current = null;
+                    if (delta < -40) { e.stopPropagation(); setSwipedItemId(it.id); }
+                    else if (delta > 10) setSwipedItemId(null);
+                  }}
+                >
+                  <div className="flex-1 min-w-0 flex items-center gap-1">
+                    <Link
+                      to={`/items/${it.id}`}
+                      className="flex-1 min-w-0"
+                      onClick={(e) => { if (swipedItemId === it.id) e.preventDefault(); }}
+                    >
+                      {editingItemId === it.id ? (
+                        <input
+                          ref={editItemRef}
+                          value={editItemName}
+                          onChange={(e) => setEditItemName(e.target.value)}
+                          onBlur={() => commitRenameItem(it.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') commitRenameItem(it.id);
+                            if (e.key === 'Escape') setEditingItemId(null);
+                          }}
+                          className="w-full bg-paper-dark border border-accent rounded-[8px] px-2 py-1 text-sm outline-none text-ink"
+                          onClick={(e) => e.preventDefault()}
+                        />
+                      ) : (
+                        <div className="text-sm font-medium text-ink truncate">{it.name}</div>
+                      )}
+                      <div className="text-xs text-ink-muted">
+                        {it.source !== 'manual' && <span className="mr-1">{it.source}</span>}
+                        {it.confidence != null && <span>{(it.confidence * 100).toFixed(0)}%</span>}
+                      </div>
+                    </Link>
+                    <button
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); startRenameItem(it); }}
+                      className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-ink-muted hover:text-ink hover:bg-paper-dark transition-all"
+                      aria-label="改名"
+                      title="改名"
+                    >
+                      <Pencil size={14} strokeWidth={1.5} />
+                    </button>
                   </div>
-                </Link>
                 <button
                   onClick={() => ItemRepo.qtyDelta(it.id, -1).then(reload)}
                   className="min-w-[44px] min-h-[44px] rounded-full bg-paper-dark border border-[var(--border-default)] text-ink hover:border-accent text-sm flex items-center justify-center transition-all"
@@ -213,31 +263,22 @@ export function AreaPage() {
                   className="min-w-[44px] min-h-[44px] rounded-full bg-paper-dark border border-[var(--border-default)] text-ink hover:border-accent text-sm flex items-center justify-center transition-all"
                   aria-label="增加数量"
                 >+</button>
-                {/* #187: 替换 DotMenu 为右上角横排双图标（Pencil + Trash2） */}
-                <div className="absolute top-1 right-1 flex items-center gap-0.5">
+                </div>
+                {swipedItemId === it.id && (
                   <button
-                    onClick={(e) => { e.preventDefault(); startRenameItem(it); }}
-                    className="w-8 h-8 flex items-center justify-center rounded-lg text-ink-muted hover:text-ink hover:bg-paper-dark transition-all"
-                    aria-label="改名"
-                    title="改名"
-                  >
-                    <Pencil size={14} strokeWidth={1.5} />
-                  </button>
-                  <button
+                    data-delete="true"
+                    className="absolute inset-y-0 right-0 w-[88px]"
                     onClick={async (e) => {
-                      e.preventDefault();
-                      const ok = await confirm(`删除物品「${it.name}」？`, { danger: true, okText: '删除' });
-                      if (!ok) return;
+                      e.stopPropagation();
+                      const ok = await confirm(`删除物品「${it.name}」？`, { danger: true, okText: "删除" });
+                      if (!ok) { setSwipedItemId(null); return; }
                       await ItemRepo.remove(it.id);
+                      setSwipedItemId(null);
                       await reload();
                     }}
-                    className="w-8 h-8 flex items-center justify-center rounded-lg text-ink-muted hover:text-danger-text hover:bg-danger-bg transition-all"
-                    aria-label="删除"
-                    title="删除"
-                  >
-                    <Trash2 size={14} strokeWidth={1.5} />
-                  </button>
-                </div>
+                    aria-label={`删除 ${it.name}`}
+                  />
+                )}
               </li>
             ))}
           </ul>

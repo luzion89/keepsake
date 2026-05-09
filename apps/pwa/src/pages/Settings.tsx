@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Check, X } from 'lucide-react';
+import { AlertTriangle, Check, Settings as SettingsIcon, X } from 'lucide-react';
 import {
   getAiConfig, setAiConfig,
   DEFAULT_MODEL, DEFAULT_TRANSCRIBE_MODEL,
@@ -183,7 +183,7 @@ export function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-ink">设置</h1>
+      <h1 className="text-2xl font-bold font-serif text-ink flex items-center gap-2"><SettingsIcon size={22} strokeWidth={1.5} />设置</h1>
 
       {/* ── AI 助手 ─────────────────────────────────── */}
       <Section title="AI 助手">
