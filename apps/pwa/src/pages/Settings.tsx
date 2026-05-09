@@ -3,8 +3,31 @@ import { getAiConfig, setAiConfig, DEFAULT_MODEL, DEFAULT_TRANSCRIBE_MODEL, type
 import { db, getDeviceId } from '../db/dexie.js';
 import { syncOnce } from '../sync/client.js';
 
+/** Skeleton 占位块，加载完成前替代真实内容，避免首帧闪烁 */
+function SettingsSkeleton() {
+  return (
+    <div className="space-y-6 animate-pulse">
+      <div className="h-7 w-20 bg-slate-700 rounded" />
+      <div className="space-y-3">
+        <div className="h-4 w-32 bg-slate-700 rounded" />
+        <div className="h-12 bg-slate-800 rounded-lg" />
+        <div className="h-12 bg-slate-800 rounded-lg" />
+        <div className="h-9 w-20 bg-slate-700 rounded-lg" />
+      </div>
+      <div className="space-y-2">
+        <div className="h-4 w-24 bg-slate-700 rounded" />
+        <div className="flex gap-2">
+          <div className="h-9 w-28 bg-slate-700 rounded-lg" />
+          <div className="h-9 w-20 bg-slate-700 rounded-lg" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function SettingsPage() {
   const [cfg, setCfg] = useState<AiConfig>({ mode: 'off' });
+  const [loaded, setLoaded] = useState(false);
   const [deviceId, setDeviceId] = useState('');
   const [stats, setStats] = useState({ rooms: 0, areas: 0, items: 0, photos: 0, outbox: 0 });
   const [serverOk, setServerOk] = useState<boolean | null>(null);
@@ -21,9 +44,12 @@ export function SettingsPage() {
 
   useEffect(() => {
     (async () => {
-      setCfg(await getAiConfig());
-      setDeviceId(await getDeviceId());
-      reloadStats();
+      const [config, did] = await Promise.all([getAiConfig(), getDeviceId()]);
+      setCfg(config);
+      setDeviceId(did);
+      await reloadStats();
+      // 所有异步数据就绪后才渲染完整 UI，避免首帧闪烁 (#172)
+      setLoaded(true);
     })();
   }, []);
 
@@ -60,6 +86,9 @@ export function SettingsPage() {
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  // 加载完成前渲染 skeleton，绝不提前渲染操作性 UI（根治首帧闪烁 #172）
+  if (!loaded) return <SettingsSkeleton />;
 
   return (
     <div className="space-y-6">
