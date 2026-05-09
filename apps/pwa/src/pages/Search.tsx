@@ -28,7 +28,6 @@ export function SearchPage() {
   const [areas, setAreas] = useState<Map<string, Area>>(new Map());
   const [rooms, setRooms] = useState<Map<string, Room>>(new Map());
 
-  // AI answer state
   const [aiEnabled, setAiEnabled] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState<SearchAnswerResult | null>(null);
@@ -36,7 +35,6 @@ export function SearchPage() {
 
   const toast = useToast();
 
-  // Check if AI is available
   useEffect(() => {
     getAiConfig().then(cfg => setAiEnabled(cfg.mode === 'on' && !!getEffectiveApiKey(cfg)));
   }, []);
@@ -50,7 +48,6 @@ export function SearchPage() {
     })();
   }, []);
 
-  // Reset AI result when query changes
   useEffect(() => {
     setAiResult(null);
     setAiError(null);
@@ -74,7 +71,6 @@ export function SearchPage() {
     }
     return Array.from(g.entries());
   }, [items]);
-
 
   const askAi = async () => {
     if (!aiEnabled) {
@@ -108,10 +104,8 @@ export function SearchPage() {
     }
   };
 
-  // Highlight items cited by AI
   const citedSet = useMemo(() => new Set(aiResult?.citedIds ?? []), [aiResult]);
 
-  // Build cited items list for the Pin section
   const citedItems = useMemo(() => {
     if (!aiResult?.citedIds?.length) return [];
     return aiResult.citedIds
@@ -124,18 +118,21 @@ export function SearchPage() {
       });
   }, [aiResult, items, areas, rooms]);
 
+  // #186: when AI result is active, don't show keyword match results
+  const showGrouped = !aiResult && !aiError;
+
   return (
     <div className="space-y-4">
       {toast.node}
 
       <h1 className="text-2xl font-bold font-serif text-ink">搜索物品</h1>
 
-      {/* ── 使用提示卡片 ──────────────────────────────── */}
       <div className="bg-paper-card border border-ink/10 rounded-[12px] px-4 py-3 text-sm text-ink-muted leading-relaxed">
         直接搜索关键词，也可以用语音输入一段模糊的描述，让 AI 帮忙查找符合描述的物品
       </div>
 
       {/* ── 搜索输入框 + AI 按钮 ─────────────────────── */}
+      {/* #188: 调整 letter-spacing + line-height，确保失焦时单行显示不裁字 */}
       <div className="flex gap-2">
         <textarea
           value={q}
@@ -150,15 +147,15 @@ export function SearchPage() {
             e.target.style.height = e.target.scrollHeight + 'px';
           }}
           onBlur={(e) => {
+            // #188: single line height = lineHeight (24px) + paddingTop (12px) + paddingBottom (12px) = 48px
             e.target.style.height = '48px';
             e.target.style.overflow = 'hidden';
           }}
           placeholder="输入关键词…"
           rows={1}
-          className="flex-1 bg-paper-card border border-[var(--border-default)] rounded-[12px] px-4 py-3 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-150 text-ink placeholder:text-ink-muted resize-none overflow-hidden leading-[1.5]"
-          style={{ minHeight: '48px' }}
+          className="flex-1 bg-paper-card border border-[var(--border-default)] rounded-[12px] px-4 py-3 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-150 text-ink placeholder:text-ink-muted resize-none overflow-hidden"
+          style={{ minHeight: '48px', lineHeight: '1.5', letterSpacing: '0.01em' }}
         />
-        {/* AI 按钮 — 始终渲染 */}
         <button
           onClick={askAi}
           disabled={aiLoading}
@@ -179,12 +176,12 @@ export function SearchPage() {
         </button>
       </div>
 
-      {/* ── 搜索结果 ──────────────────────────────────── */}
-      {q.trim() && items.length === 0 && (
+      {/* ── #186: 仅在没有 AI 结果时显示关键词匹配结果 ── */}
+      {showGrouped && q.trim() && items.length === 0 && (
         <p className="text-ink-muted text-sm pt-2">没有找到 "{q}"。</p>
       )}
 
-      {grouped.map(([areaId, list]) => {
+      {showGrouped && grouped.map(([areaId, list]) => {
         const a = areas.get(areaId);
         const r = a ? rooms.get(a.room_id) : undefined;
         return (
@@ -206,12 +203,6 @@ export function SearchPage() {
                   >
                     <span className="text-sm font-medium text-ink">{it.name}</span>
                     <span className="text-ink-muted text-xs ml-2">× {it.qty}</span>
-                    {citedSet.has(it.id) && (
-                      <span className="ml-2 text-xs text-accent inline-flex items-center gap-0.5">
-                        <Sparkles size={10} strokeWidth={1.5} />
-                        AI 引用
-                      </span>
-                    )}
                   </Link>
                 </li>
               ))}

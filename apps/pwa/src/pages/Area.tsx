@@ -1,71 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { Link, useParams } from 'react-router-dom';
 import {
   AlertTriangle, Camera, ChevronLeft, ChevronRight, Download,
-  FileText, MoreHorizontal, Package, Pencil, Trash2, X,
+  FileText, Package, Pencil, Trash2, X,
 } from 'lucide-react';
 import type { Area, Item, Photo, Room } from '@keepsake/shared';
 import { AreaRepo, ItemRepo, PhotoRepo, RoomRepo } from '../db/repos.js';
 import { useConfirm } from '../components/ConfirmDialog.js';
 
 type AreaState = 'loading' | 'not-found' | 'ok';
-
-function DotMenu({ children }: { children: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState({ top: 0, right: 0 });
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: MouseEvent) => {
-      if (
-        !btnRef.current?.contains(e.target as Node) &&
-        !menuRef.current?.contains(e.target as Node)
-      ) setOpen(false);
-    };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, [open]);
-
-  const handleOpen = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!open && btnRef.current) {
-      const rect = btnRef.current.getBoundingClientRect();
-      setPos({
-        top: rect.bottom + 4,
-        right: window.innerWidth - rect.right,
-      });
-    }
-    setOpen(v => !v);
-  };
-
-  return (
-    <div className="relative">
-      <button
-        ref={btnRef}
-        onClick={handleOpen}
-        className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-ink-muted hover:text-ink transition-colors"
-        aria-label="更多操作"
-      >
-        <MoreHorizontal size={18} strokeWidth={1.5} />
-      </button>
-      {open && createPortal(
-        <div
-          ref={menuRef}
-          style={{ position: 'fixed', top: pos.top, right: pos.right, zIndex: 9999 }}
-          className="bg-paper-card border border-[var(--border-default)] rounded-[12px] shadow-lg overflow-hidden min-w-[120px]"
-          onClick={() => setOpen(false)}
-        >
-          {children}
-        </div>,
-        document.body
-      )}
-    </div>
-  );
-}
 
 export function AreaPage() {
   const { areaId = '' } = useParams();
@@ -82,8 +25,10 @@ export function AreaPage() {
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editItemName, setEditItemName] = useState('');
   const [lightbox, setLightbox] = useState<{ src: string; photoId: string; index: number } | null>(null);
-  const [slideDir, setSlideDir] = useState<'left' | 'right' | 'none'>('none');
   const [slideKey, setSlideKey] = useState(0);
+  // #185: real-time touch follow state
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
   const touchStartX = useRef<number | null>(null);
   const editItemRef = useRef<HTMLInputElement>(null);
   const { confirm, dialog } = useConfirm();
@@ -234,8 +179,8 @@ export function AreaPage() {
         ) : (
           <ul className="space-y-1.5">
             {items.map(it => (
-              <li key={it.id} className="flex items-center gap-2 px-3 py-1.5 bg-paper-card border border-[var(--border-default)] rounded-[12px] shadow-card">
-                <Link to={`/items/${it.id}`} className="flex-1 min-w-0">
+              <li key={it.id} className="relative flex items-center gap-2 px-3 py-1.5 bg-paper-card border border-[var(--border-default)] rounded-[12px] shadow-card">
+                <Link to={`/items/${it.id}`} className="flex-1 min-w-0 pr-14">
                   {editingItemId === it.id ? (
                     <input
                       ref={editItemRef}
@@ -268,27 +213,31 @@ export function AreaPage() {
                   className="min-w-[44px] min-h-[44px] rounded-full bg-paper-dark border border-[var(--border-default)] text-ink hover:border-accent text-sm flex items-center justify-center transition-all"
                   aria-label="增加数量"
                 >+</button>
-                <DotMenu>
+                {/* #187: 替换 DotMenu 为右上角横排双图标（Pencil + Trash2） */}
+                <div className="absolute top-1 right-1 flex items-center gap-0.5">
                   <button
-                    className="w-full text-left px-4 py-2.5 text-sm text-ink hover:bg-paper-dark transition-colors flex items-center gap-2"
-                    onClick={() => startRenameItem(it)}
+                    onClick={(e) => { e.preventDefault(); startRenameItem(it); }}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg text-ink-muted hover:text-ink hover:bg-paper-dark transition-all"
+                    aria-label="改名"
+                    title="改名"
                   >
                     <Pencil size={14} strokeWidth={1.5} />
-                    改名
                   </button>
                   <button
-                    className="w-full text-left px-4 py-2.5 text-sm text-danger-text hover:bg-danger-bg transition-colors flex items-center gap-2"
-                    onClick={async () => {
+                    onClick={async (e) => {
+                      e.preventDefault();
                       const ok = await confirm(`删除物品「${it.name}」？`, { danger: true, okText: '删除' });
                       if (!ok) return;
                       await ItemRepo.remove(it.id);
                       await reload();
                     }}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg text-ink-muted hover:text-danger-text hover:bg-danger-bg transition-all"
+                    aria-label="删除"
+                    title="删除"
                   >
                     <Trash2 size={14} strokeWidth={1.5} />
-                    删除
                   </button>
-                </DotMenu>
+                </div>
               </li>
             ))}
           </ul>
@@ -306,7 +255,6 @@ export function AreaPage() {
             已拍照片 ({photos.length})
           </button>
           {showPhotos && (() => {
-            // 按月分组
             const grouped = new Map<string, typeof photos>();
             for (const p of [...photos].sort((a, b) => b.taken_at - a.taken_at)) {
               const d = new Date(p.taken_at);
@@ -334,6 +282,7 @@ export function AreaPage() {
                                   const sortedAll = [...photos].sort((a, b) => b.taken_at - a.taken_at);
                                   const idx = sortedAll.findIndex(x => x.id === p.id);
                                   setLightbox({ src, photoId: p.id, index: idx });
+                                  setDragOffset(0);
                                 }}
                                 className="h-20 w-20 object-cover rounded-[12px] border border-[var(--border-default)] cursor-pointer active:scale-95 transition-transform"
                               />
@@ -357,7 +306,7 @@ export function AreaPage() {
         </section>
       )}
 
-      {/* ── 照片灯箱 ────────────────────────────────── */}
+      {/* ── 照片灯箱 (#185: 实时跟手 touch follow) ── */}
       {lightbox && (() => {
         const sortedPhotos = [...photos].sort((a, b) => b.taken_at - a.taken_at);
         const currentIdx = lightbox.index;
@@ -368,18 +317,40 @@ export function AreaPage() {
           : '';
 
         const goNext = () => {
+          if (total <= 1) return;
           const nextIdx = (currentIdx + 1) % total;
           const np = sortedPhotos[nextIdx];
           if (!np) return;
           const src = photoBlobUrls[np.id];
-          if (src) { setSlideDir('left'); setSlideKey(k => k + 1); setLightbox({ src, photoId: np.id, index: nextIdx }); }
+          if (src) { setSlideKey(k => k + 1); setLightbox({ src, photoId: np.id, index: nextIdx }); setDragOffset(0); }
         };
         const goPrev = () => {
+          if (total <= 1) return;
           const prevIdx = (currentIdx - 1 + total) % total;
           const pp = sortedPhotos[prevIdx];
           if (!pp) return;
           const src = photoBlobUrls[pp.id];
-          if (src) { setSlideDir('right'); setSlideKey(k => k + 1); setLightbox({ src, photoId: pp.id, index: prevIdx }); }
+          if (src) { setSlideKey(k => k + 1); setLightbox({ src, photoId: pp.id, index: prevIdx }); setDragOffset(0); }
+        };
+
+        // #185: pointer event handlers for real-time drag follow
+        const onPointerDown = (e: React.PointerEvent) => {
+          touchStartX.current = e.clientX;
+          setIsDragging(true);
+          (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+        };
+        const onPointerMove = (e: React.PointerEvent) => {
+          if (!isDragging || touchStartX.current === null) return;
+          setDragOffset(e.clientX - touchStartX.current);
+        };
+        const onPointerUp = (e: React.PointerEvent) => {
+          if (!isDragging || touchStartX.current === null) return;
+          const delta = e.clientX - touchStartX.current;
+          setIsDragging(false);
+          setDragOffset(0);
+          touchStartX.current = null;
+          if (Math.abs(delta) < 40) return;
+          if (delta < 0) goNext(); else goPrev();
         };
 
         return (
@@ -396,7 +367,6 @@ export function AreaPage() {
           >
             {/* 顶部工具栏 */}
             <div className="flex items-center justify-between px-4 py-3 shrink-0">
-              {/* 关闭 */}
               <button
                 onClick={() => setLightbox(null)}
                 className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-white/80 hover:text-white transition-colors"
@@ -404,12 +374,10 @@ export function AreaPage() {
               >
                 <X size={22} strokeWidth={1.5} />
               </button>
-              {/* 日期 + 页码 */}
               <span className="text-white/60 text-xs text-center leading-tight">
                 <span className="block">{fullDateStr}</span>
                 {total > 1 && <span>{currentIdx + 1} / {total}</span>}
               </span>
-              {/* 操作按钮 */}
               <div className="flex gap-1">
                 <button
                   onClick={async () => {
@@ -420,7 +388,6 @@ export function AreaPage() {
                   }}
                   className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-white/80 hover:text-white transition-colors"
                   aria-label="下载照片"
-                  title="下载"
                 >
                   <Download size={20} strokeWidth={1.5} />
                 </button>
@@ -434,38 +401,31 @@ export function AreaPage() {
                   }}
                   className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-white/80 hover:text-red-400 transition-colors"
                   aria-label="删除照片"
-                  title="删除"
                 >
                   <Trash2 size={20} strokeWidth={1.5} />
                 </button>
               </div>
             </div>
 
-            {/* 照片主区域（支持触摸滑动） */}
+            {/* #185: 照片主区域 — pointer events 实时跟手，spring 释放翻页 */}
             <div
-              className="flex-1 flex items-center justify-center overflow-hidden px-4 pb-4 relative"
-              onTouchStart={(e) => { touchStartX.current = e.touches[0]?.clientX ?? null; }}
-              onTouchEnd={(e) => {
-                if (touchStartX.current === null) return;
-                const delta = (e.changedTouches[0]?.clientX ?? 0) - touchStartX.current;
-                touchStartX.current = null;
-                if (Math.abs(delta) < 50) return;
-                if (delta < 0) goNext(); else goPrev();
-              }}
+              className="flex-1 flex items-center justify-center overflow-hidden px-4 pb-4 relative select-none"
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              onPointerCancel={onPointerUp}
             >
               <img
                 key={slideKey}
                 src={lightbox.src}
                 alt="照片预览"
-                className={`max-w-full max-h-full object-contain rounded-[8px] ${
-                  slideDir === 'left'
-                    ? 'animate-slide-in-left'
-                    : slideDir === 'right'
-                    ? 'animate-slide-in-right'
-                    : ''
-                }`}
+                draggable={false}
+                className="max-w-full max-h-full object-contain rounded-[8px] pointer-events-none"
+                style={{
+                  transform: `translateX(${dragOffset}px)`,
+                  transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                }}
               />
-              {/* 左右箭头 (仅多张时显示) */}
               {total > 1 && (
                 <>
                   <button

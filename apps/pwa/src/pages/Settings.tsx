@@ -11,7 +11,6 @@ import { db, getDeviceId } from '../db/dexie.js';
 import { syncOnce } from '../sync/client.js';
 import { gcSyncedBlobs } from '../sync/blobs.js';
 
-/** Storage quota info from navigator.storage.estimate(), or null if unsupported. */
 interface StorageQuota {
   usageMB: number;
   quotaMB: number;
@@ -31,7 +30,6 @@ async function getStorageQuota(): Promise<StorageQuota | null> {
   }
 }
 
-/** Section wrapper — paper card + dividers */
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="space-y-1">
@@ -43,7 +41,6 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-/** A row inside a grouped section */
 function SectionRow({ children }: { children: React.ReactNode }) {
   return <div className="px-4 py-3">{children}</div>;
 }
@@ -51,8 +48,8 @@ function SectionRow({ children }: { children: React.ReactNode }) {
 const inputCls = 'w-full bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all placeholder:text-ink-muted';
 
 /**
- * 全页 skeleton 占位：加载完成前替代整个 SettingsPage，
- * 根治首帧"保存设置"按钮（含 sticky bottom bar）提前渲染的闪烁问题 (#172)
+ * #184 fix: SettingsSkeleton now includes a matching inline save button placeholder
+ * to prevent any layout shift when real content loads.
  */
 function SettingsSkeleton() {
   return (
@@ -75,14 +72,14 @@ function SettingsSkeleton() {
           </div>
         </div>
       </div>
+      {/* #184: inline save button placeholder — same height as real button */}
+      <div className="h-12 bg-paper-dark rounded-[12px]" />
     </div>
   );
 }
 
 export function SettingsPage() {
   const [cfg, setCfg] = useState<AiConfig | null>(null);
-  // loaded: 所有异步初始化完成后才置 true，期间渲染 skeleton，
-  // 彻底避免 cfg=null / cfg={mode:'off'} 状态下操作性 UI（含 sticky 保存按钮）提前渲染 (#172)
   const [loaded, setLoaded] = useState(false);
   const [deviceId, setDeviceId] = useState('');
   const [stats, setStats] = useState({ rooms: 0, areas: 0, items: 0, photos: 0, outbox: 0 });
@@ -115,7 +112,6 @@ export function SettingsPage() {
       await reloadStats();
       const q = await getStorageQuota();
       setQuota(q);
-      // 所有数据就绪后一次性翻转，避免分批 setState 引起中间状态渲染 (#172)
       setLoaded(true);
     })();
   }, []);
@@ -182,7 +178,7 @@ export function SettingsPage() {
 
   const btnCls = 'px-3 py-2 rounded-[12px] border border-[var(--border-default)] text-sm text-ink hover:border-accent/60 hover:text-ink-hover transition-all';
 
-  // 加载完成前渲染整页 skeleton，绝不提前渲染任何操作性 UI（根治 #172）
+  // #184: Show skeleton until fully loaded — prevents any flash of sticky save button
   if (!loaded) return <SettingsSkeleton />;
 
   return (
@@ -219,7 +215,6 @@ export function SettingsPage() {
 
         {cfg?.mode === 'on' && (
           <>
-            {/* Provider selector */}
             <SectionRow>
               <p className="text-xs text-ink-muted mb-2">AI 服务商</p>
               <div className="flex gap-2">
@@ -239,7 +234,6 @@ export function SettingsPage() {
               </div>
             </SectionRow>
 
-            {/* DeepSeek fields */}
             {effectiveProvider === 'deepseek' && (
               <SectionRow>
                 <div className="space-y-3">
@@ -259,7 +253,6 @@ export function SettingsPage() {
               </SectionRow>
             )}
 
-            {/* OpenRouter fields */}
             {effectiveProvider === 'openrouter' && (
               <SectionRow>
                 <div className="space-y-3">
@@ -284,7 +277,6 @@ export function SettingsPage() {
               </SectionRow>
             )}
 
-            {/* Test connection */}
             <SectionRow>
               <div className="flex items-center gap-2">
                 <button
@@ -308,31 +300,6 @@ export function SettingsPage() {
           </>
         )}
       </Section>
-
-      {/* ── 保存按钮（sticky bottom）────────────────── */}
-      <div className="sticky bottom-0 pb-safe pt-3 bg-paper/95 backdrop-blur-sm border-t border-ink-faint -mx-4 px-4">
-        <button
-          onClick={save}
-          className="w-full py-3.5 rounded-[12px] bg-accent hover:bg-accent-hover active:scale-[0.98] text-paper font-semibold text-base shadow-card transition-all"
-        >
-          保存设置
-        </button>
-        {savedAt && !saveError && (
-          <span className="flex items-center justify-center gap-1 text-xs text-ok-text mt-1.5">
-            <Check size={12} strokeWidth={2} />
-            已保存
-          </span>
-        )}
-        {savedAt && saveError && (
-          <span className="block text-xs text-danger-text mt-1.5 text-center">
-            已保存到本地，服务端推送失败：{saveError}
-            {!saveError.includes('混合内容') && !saveError.includes('TLS') && (
-              <span className="block mt-0.5 text-ink-muted">（重新打开应用会重试；若持续失败请检查服务端是否在线）</span>
-            )}
-          </span>
-        )}
-      </div>
-
 
       {/* ── 本地服务器 ─────────────────────────────── */}
       <Section title="本地服务器">
@@ -366,7 +333,6 @@ export function SettingsPage() {
           </p>
         </SectionRow>
 
-        {/* Storage bar */}
         {quota !== 'unsupported' && quota !== null && (
           <SectionRow>
             <div className="space-y-1.5">
@@ -410,6 +376,30 @@ export function SettingsPage() {
           </div>
         </SectionRow>
       </Section>
+
+      {/* ── #184 fix: 保存按钮改为 inline 正常文档流，不再 sticky ── */}
+      <div className="pt-2 pb-6">
+        <button
+          onClick={save}
+          className="w-full py-3.5 rounded-[12px] bg-accent hover:bg-accent-hover active:scale-[0.98] text-paper font-semibold text-base shadow-card transition-all"
+        >
+          保存设置
+        </button>
+        {savedAt && !saveError && (
+          <span className="flex items-center justify-center gap-1 text-xs text-ok-text mt-1.5">
+            <Check size={12} strokeWidth={2} />
+            已保存
+          </span>
+        )}
+        {savedAt && saveError && (
+          <span className="block text-xs text-danger-text mt-1.5 text-center">
+            已保存到本地，服务端推送失败：{saveError}
+            {!saveError.includes('混合内容') && !saveError.includes('TLS') && (
+              <span className="block mt-0.5 text-ink-muted">（重新打开应用会重试；若持续失败请检查服务端是否在线）</span>
+            )}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
