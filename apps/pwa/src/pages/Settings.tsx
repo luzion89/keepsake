@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useInstallPrompt } from '../pwa/useInstallPrompt.js';
 import { AlertTriangle, Check, Download, Settings as SettingsIcon, X } from 'lucide-react';
 import {
@@ -8,7 +8,7 @@ import {
   pingProvider,
   type AiConfig, type AiProvider,
 } from '../ai/router.js';
-import { db, getDeviceId } from '../db/dexie.js';
+import { db, getDeviceId, kvGet, kvSet } from '../db/dexie.js';
 import { syncOnce } from '../sync/client.js';
 import { gcSyncedBlobs } from '../sync/blobs.js';
 
@@ -425,6 +425,10 @@ export function SettingsPage() {
         </SectionRow>
       </Section>
 
+
+      {/* ── Spike-A: 我的设备 ─────────────────────────────── */}
+      <DevicesSection />
+
       {/* ── #184 fix: 保存按钮改为 inline 正常文档流，不再 sticky ── */}
       <div className="pt-2 pb-6">
         <button
@@ -451,3 +455,124 @@ export function SettingsPage() {
     </div>
   );
 }
+
+// ── Spike-A: DevicesSection ───────────────────────────────────────────────
+
+interface DeviceInfo {
+  id: string;
+  name: string;
+  created_at: number;
+  last_seen: number | null;
+}
+
+function DevicesSection() {
+  const [devices, setDevices] = useState<DeviceInfo[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [inviteQr, setInviteQr] = useState<string | null>(null);
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [serverUrl, setServerUrl] = useState<string>('');
+  const [myDeviceId, setMyDeviceId] = useState<string>('');
+
+  useEffect(() => {
+    kvGet<string>('server_url').then((u) => setServerUrl(u ?? ''));
+    getDeviceId().then((id) => setMyDeviceId(id));
+    loadDevices();
+  }, []);
+
+  const loadDevices = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch('/auth/devices');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setDevices(data);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const revokeDevice = async (id: string) => {
+    await fetch(`/auth/devices/${id}`, { method: 'DELETE' });
+    loadDevices();
+  };
+
+  const generateInvite = async () => {
+    setInviteLoading(true);
+    setInviteQr(null);
+    try {
+      const res = await fetch('/auth/invite', { method: 'POST' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const { invite_token } = await res.json();
+      const payload = JSON.stringify({
+        server: serverUrl || window.location.origin,
+        invite_token,
+        v: 1,
+      });
+      // Generate a simple QR via server endpoint by encoding in URL
+      setInviteQr(payload);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setInviteLoading(false);
+    }
+  };
+
+  const fmt = (ts: number | null) => ts ? new Date(ts).toLocaleDateString('zh-CN') : '未知';
+
+  return (
+    <section className="space-y-1">
+      <h2 className="text-xs font-semibold text-ink-muted uppercase tracking-wide px-1 mb-1">我的设备</h2>
+      <div className="bg-paper rounded-[14px] shadow-card divide-y divide-ink-hairline overflow-hidden">
+        {loading && (
+          <div className="px-4 py-3 text-xs text-ink-muted">加载中…</div>
+        )}
+        {error && (
+          <div className="px-4 py-3 text-xs text-danger-text">{error}</div>
+        )}
+        {!loading && devices.map((d) => (
+          <div key={d.id} className="flex items-center justify-between px-4 py-3">
+            <div>
+              <p className="text-sm font-medium text-ink-base">
+                {d.name}
+                {d.id === myDeviceId && (
+                  <span className="ml-2 text-xs text-ok-text font-normal">（本机）</span>
+                )}
+              </p>
+              <p className="text-xs text-ink-muted">
+                注册 {fmt(d.created_at)} · 最近活跃 {fmt(d.last_seen)}
+              </p>
+            </div>
+            {d.id !== myDeviceId && (
+              <button
+                onClick={() => revokeDevice(d.id)}
+                className="text-xs text-danger-text hover:underline"
+              >
+                撤销
+              </button>
+            )}
+          </div>
+        ))}
+        <div className="px-4 py-3">
+          <button
+            onClick={generateInvite}
+            disabled={inviteLoading}
+            className="text-sm text-accent hover:underline"
+          >
+            {inviteLoading ? '生成中…' : '+ 邀请新设备（生成邀请码）'}
+          </button>
+          {inviteQr && (
+            <div className="mt-2 p-2 bg-ink-hairline rounded text-xs font-mono break-all">
+              <p className="text-ink-muted mb-1">Payload（让对方扫描或手动粘贴）：</p>
+              {inviteQr}
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
