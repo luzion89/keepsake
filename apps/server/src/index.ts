@@ -11,11 +11,18 @@ import { blobRoutes } from './routes/blobs.js';
 import { aiRoutes } from './routes/ai.js';
 import { healthRoutes } from './routes/health.js';
 import { logsRoutes } from './routes/logs.js';
+import { authRoutes } from './routes/auth.js';
+import { registerAuthMiddleware } from './auth/middleware.js';
+import { startTunnel } from './tunnel/cloudflared.js';
+import { getLocalIp } from './auth/localip.js';
+import { buildPairPayload } from './auth/qrcode.js';
+import { authState } from './auth/state.js';
 import type Database from 'better-sqlite3';
 
 declare module 'fastify' {
   interface FastifyInstance {
     db: Database.Database;
+    tunnelUrl?: string;
   }
 }
 
@@ -49,9 +56,16 @@ export async function buildServer() {
   });
   const { db } = openDb();
   fastify.decorate('db', db);
+  fastify.decorate('tunnelUrl', undefined as unknown as string);
 
   await fastify.register(cors, { origin: true, credentials: true });
   await fastify.register(multipart, { limits: { fileSize: 20 * 1024 * 1024 } });
+
+  // Auth routes first — they initialize authState.rootSecret / jwtSecret
+  await fastify.register(authRoutes);
+
+  // Global auth middleware — must be registered AFTER authRoutes so authState is populated
+  registerAuthMiddleware(fastify, () => authState);
 
   await fastify.register(healthRoutes);
   await fastify.register(syncRoutes);
@@ -60,12 +74,10 @@ export async function buildServer() {
   await fastify.register(logsRoutes);
 
   // Serve PWA static build (if present after `pnpm build`)
-  const __dirname = __dirnameForTls;
-  const pwaDist = resolve(__dirname, '../../pwa/dist');
+  const pwaDist = resolve(__dirnameForTls, '../../pwa/dist');
   if (existsSync(pwaDist)) {
     await fastify.register(staticPlugin, { root: pwaDist, prefix: '/', wildcard: false });
     fastify.setNotFoundHandler((req, reply) => {
-      // SPA fallback
       if (req.method === 'GET' && req.headers.accept?.includes('text/html')) {
         return reply.sendFile('index.html');
       }
@@ -78,10 +90,36 @@ export async function buildServer() {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const port = Number(process.env.PORT ?? 8443);
-  buildServer().then((app) => {
-    app.listen({ host: '0.0.0.0', port }).then(() => {
-      const proto = process.env.KEEPSAKE_TLS ? 'https' : 'http';
-      app.log.info(`Keepsake server on ${proto}://0.0.0.0:${port}`);
+  buildServer().then(async (app) => {
+    // Start CF Tunnel if requested (before listen so URL is in QR)
+    if (process.env.KEEPSAKE_TUNNEL === '1') {
+      try {
+        const tunnelUrl = await startTunnel(port);
+        app.tunnelUrl = tunnelUrl;
+        console.log(`\n[CF Tunnel] ✅ Public URL: ${tunnelUrl}\n`);
+      } catch (e) {
+        console.error('[CF Tunnel] Failed to start:', e);
+      }
+    }
+
+    await app.listen({ host: '0.0.0.0', port });
+    const proto = process.env.KEEPSAKE_TLS ? 'https' : 'http';
+    const localIp = getLocalIp();
+    app.log.info(`Keepsake server on ${proto}://0.0.0.0:${port}`);
+
+    // Print pair QR info
+    const payload = buildPairPayload({
+      host: localIp,
+      port,
+      rootSecret: authState.rootSecret,
+      tunnelUrl: app.tunnelUrl,
     });
+    console.log('\n──────────────────────────────────────────────────────');
+    console.log('  📱 Pair your device — scan QR or visit:');
+    console.log(`  Local:  http://${localIp}:${port}/auth/qrcode`);
+    if (app.tunnelUrl) {
+      console.log(`  Public: ${app.tunnelUrl}/auth/qrcode`);
+    }
+    console.log('──────────────────────────────────────────────────────\n');
   });
 }

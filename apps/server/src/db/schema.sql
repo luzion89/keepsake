@@ -122,3 +122,17 @@ CREATE TABLE IF NOT EXISTS reminders (
 );
 CREATE INDEX IF NOT EXISTS reminders_updated_at ON reminders(updated_at);
 CREATE INDEX IF NOT EXISTS reminders_item ON reminders(item_id);
+
+-- Auth: root secret + device tokens
+CREATE TABLE IF NOT EXISTS auth_config (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS devices (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL DEFAULT 'Unknown Device',
+  token_hash TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  last_seen INTEGER
+);
