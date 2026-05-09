@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Home as HomeIcon, MoreHorizontal, Package, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Home as HomeIcon, Package, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { Area, Room } from '@keepsake/shared';
 import { AreaRepo, ItemRepo, RoomRepo } from '../db/repos.js';
 import { useConfirm } from '../components/ConfirmDialog.js';
@@ -9,53 +9,6 @@ const PRESETS = ['厨房', '客厅', '阳台', '主卧', '次卧', '卫生间', 
 
 interface RoomMeta { room: Room; areaCount: number }
 
-/** Three-dot dropdown menu — fixed 定位，自动向上/下翻转，避免被 overflow 裁剪 */
-function DotMenu({ children }: { children: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
-  const btnRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: MouseEvent) => { setOpen(false); };
-    document.addEventListener('mousedown', close, { once: true });
-    return () => document.removeEventListener('mousedown', close);
-  }, [open]);
-  const toggle = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!open && btnRef.current) {
-      const rect = btnRef.current.getBoundingClientRect();
-      const menuH = 92;
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const top = spaceBelow >= menuH ? rect.bottom + 4 : rect.top - menuH - 4;
-      setPos({ top, right: window.innerWidth - rect.right });
-    }
-    setOpen(v => !v);
-  };
-  return (
-    <>
-      <button
-        ref={btnRef}
-        onClick={toggle}
-        className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-ink-muted hover:text-ink transition-colors"
-        aria-label="更多操作"
-      >
-        <MoreHorizontal size={18} strokeWidth={1.5} />
-      </button>
-      {open && pos && (
-        <div
-          className="fixed z-50 bg-paper-card border border-[var(--border-default)] rounded-[12px] shadow-lg overflow-hidden min-w-[120px]"
-          style={{ top: pos.top, right: pos.right }}
-          onMouseDown={e => e.stopPropagation()}
-          onClick={() => setOpen(false)}
-        >
-          {children}
-        </div>
-      )}
-    </>
-  );
-}
-
 export function HomePage() {
   const [metas, setMetas] = useState<RoomMeta[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,6 +16,8 @@ export function HomePage() {
   const [name, setName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+  const [swipedId, setSwipedId] = useState<string | null>(null);
+  const touchStartX = useRef<number | null>(null);
   const editRef = useRef<HTMLInputElement>(null);
   const { confirm, dialog } = useConfirm();
 
@@ -115,12 +70,26 @@ export function HomePage() {
       await AreaRepo.remove(a.id);
     }
     await RoomRepo.remove(r.id);
+    setSwipedId(null);
     await reload();
   };
+
+  // Close swipe when clicking elsewhere
+  useEffect(() => {
+    const close = () => setSwipedId(null);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, []);
 
   return (
     <div className="space-y-4">
       {dialog}
+
+      {/* ── 页面标题 (#190 #191) ─────────────────────── */}
+      <h1 className="text-2xl font-bold font-serif text-ink flex items-center gap-2">
+        <HomeIcon size={22} strokeWidth={1.5} />
+        房间
+      </h1>
 
       {/* ── 房间列表 ──────────────────────────────────── */}
       <section>
@@ -140,54 +109,88 @@ export function HomePage() {
         ) : (
           <ul className="bg-paper-card border border-[var(--border-default)] rounded-[12px] overflow-hidden divide-y divide-[var(--border-subtle)]">
             {metas.map(({ room: r, areaCount }) => (
-              <li key={r.id} className="flex items-center px-4 min-h-[52px]">
-                <HomeIcon size={18} strokeWidth={1.5} className="text-ink-muted mr-3 shrink-0" />
-                {editingId === r.id ? (
-                  <input
-                    ref={editRef}
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    onBlur={() => commitRename(r.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') commitRename(r.id);
-                      if (e.key === 'Escape') setEditingId(null);
-                    }}
-                    className="flex-1 bg-paper-dark border border-accent rounded-[8px] px-2 py-1 text-sm outline-none text-ink"
+              <li
+                key={r.id}
+                className="relative overflow-hidden"
+                onClick={(e) => {
+                  // Collapse swipe if open (but not if clicking delete button)
+                  if (swipedId === r.id && !(e.target as HTMLElement).closest('[data-delete]')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setSwipedId(null);
+                  }
+                }}
+              >
+                {/* Delete background */}
+                <div className="absolute inset-y-0 right-0 flex items-center bg-danger px-5 select-none" aria-hidden="true">
+                  <Trash2 size={18} strokeWidth={1.5} className="text-paper" />
+                  <span className="text-paper text-sm ml-1.5">删除</span>
+                </div>
+
+                {/* Swipeable row */}
+                <div
+                  className="relative flex items-center px-4 min-h-[52px] bg-paper-card transition-transform duration-200 ease-out"
+                  style={{ transform: swipedId === r.id ? 'translateX(-88px)' : 'translateX(0)' }}
+                  onPointerDown={(e) => { touchStartX.current = e.clientX; }}
+                  onPointerUp={(e) => {
+                    if (touchStartX.current === null) return;
+                    const delta = e.clientX - touchStartX.current;
+                    touchStartX.current = null;
+                    if (delta < -40) { e.stopPropagation(); setSwipedId(r.id); }
+                    else if (delta > 10) setSwipedId(null);
+                  }}
+                >
+                  <HomeIcon size={18} strokeWidth={1.5} className="text-ink-muted mr-3 shrink-0" />
+                  {editingId === r.id ? (
+                    <input
+                      ref={editRef}
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      onBlur={() => commitRename(r.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') commitRename(r.id);
+                        if (e.key === 'Escape') setEditingId(null);
+                      }}
+                      className="flex-1 bg-paper-dark border border-accent rounded-[8px] px-2 py-1 text-sm outline-none text-ink"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  ) : (
+                    <Link
+                      to={`/rooms/${r.id}`}
+                      className="flex-1 font-serif text-base text-ink hover:text-ink-hover transition-colors"
+                      onClick={(e) => { if (swipedId === r.id) e.preventDefault(); }}
+                    >
+                      {r.name}
+                    </Link>
+                  )}
+                  <span className="text-xs text-ink-muted mr-2">{areaCount} 个区域</span>
+                  {/* #192: 改名图标直接在名称右边 */}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); startRename(r); }}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg text-ink-muted hover:text-ink hover:bg-paper-dark transition-all"
+                    aria-label="改名"
+                    title="改名"
+                  >
+                    <Pencil size={16} strokeWidth={1.5} />
+                  </button>
+                </div>
+
+                {/* Invisible delete tap target over the red area */}
+                {swipedId === r.id && (
+                  <button
+                    data-delete="true"
+                    className="absolute inset-y-0 right-0 w-[88px]"
+                    onClick={(e) => { e.stopPropagation(); deleteRoom(r); }}
+                    aria-label={`删除 ${r.name}`}
                   />
-                ) : (
-                  <Link
-                    to={`/rooms/${r.id}`}
-                    className="flex-1 font-serif text-base text-ink hover:text-ink-hover transition-colors"
-                  >
-                    {r.name}
-                  </Link>
                 )}
-                <span className="text-xs text-ink-muted mr-1">{areaCount} 个区域</span>
-                <DotMenu>
-                  <button
-                    className="w-full text-left px-4 py-2.5 text-sm text-ink hover:bg-paper-dark transition-colors flex items-center gap-2"
-                    onClick={() => startRename(r)}
-                  >
-                    <Pencil size={14} strokeWidth={1.5} />
-                    改名
-                  </button>
-                  <button
-                    className="w-full text-left px-4 py-2.5 text-sm text-danger-text hover:bg-danger-bg transition-colors flex items-center gap-2"
-                    onClick={() => deleteRoom(r)}
-                  >
-                    <Trash2 size={14} strokeWidth={1.5} />
-                    删除
-                  </button>
-                </DotMenu>
               </li>
             ))}
           </ul>
         )}
       </section>
 
-      {/* ── FAB 添加房间 (#154 重做) ──────────────────
-           规格：圆形加号 → 点击后上移 + 输入框从下 slide-in
-                 按钮图标 Plus→X(rotate 45°)；backdrop 点击关闭  */}
+      {/* ── FAB 添加房间 ──────────────────────────────── */}
       {fabOpen && (
         <div
           className="fixed inset-0 z-20"
@@ -199,8 +202,6 @@ export function HomePage() {
         className="fixed z-30 flex flex-col items-end"
         style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 72px)', right: '20px' }}
       >
-        {/* FAB 圆形按钮：始终在容器顶部；容器底部固定，开启时面板从下方展开，
-            容器整体向上增长，按钮自然上移至输入框右上角 (#168) */}
         <button
           onClick={() => setFabOpen(v => !v)}
           className="w-14 h-14 rounded-full bg-accent hover:bg-accent-hover text-paper shadow-lg flex items-center justify-center transition-all duration-300 active:scale-[0.95]"
@@ -213,7 +214,6 @@ export function HomePage() {
             <Plus size={24} strokeWidth={1.5} />
           </span>
         </button>
-        {/* 输入面板：在按钮下方 slide-in，容器底部固定故整体上移 */}
         <div
           className="overflow-hidden transition-all duration-300 ease-out"
           style={{

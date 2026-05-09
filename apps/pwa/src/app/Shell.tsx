@@ -4,7 +4,6 @@ import { Bell, Home, Search, Settings, AlertTriangle } from 'lucide-react';
 import { db, type ConflictRow } from '../db/dexie.js';
 import { syncOnce } from '../sync/client.js';
 import { scanReminders, type TriggeredReminder } from '../notifications/scanner.js';
-import { ReminderRepo } from '../db/repos.js';
 
 function ConflictBanner() {
   const [count, setCount] = useState(0);
@@ -134,66 +133,45 @@ function ConflictBanner() {
 }
 
 /**
- * #182 / #183: NotificationBanner — 超过 3 条折叠，点击跳转提醒页面
+ * #193: NotificationBanner 简化 — 仅显示"你有 N 条提醒 · 查看"，点击跳 /reminders
  */
-const MAX_VISIBLE = 3;
-
 function NotificationBanner() {
-  const [triggered, setTriggered] = useState<TriggeredReminder[]>([]);
+  const [count, setCount] = useState(0);
+  const [dismissed, setDismissed] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
+    setDismissed(false);
     const run = async () => {
       const t = await scanReminders();
-      setTriggered(t);
+      setCount(t.length);
     };
     run();
     const id = setInterval(run, 60_000);
     return () => clearInterval(id);
   }, []);
 
-  if (triggered.length === 0) return null;
-
-  const dismiss = async (t: TriggeredReminder) => {
-    await ReminderRepo.updateFired(t.rule.id);
-    setTriggered(prev => prev.filter(x => x.rule.id !== t.rule.id));
-  };
-
-  const visible = triggered.slice(0, MAX_VISIBLE);
-  const overflow = triggered.length - MAX_VISIBLE;
+  if (count === 0 || dismissed) return null;
 
   return (
-    <div className="bg-warn-bg border-b border-warn/30 px-4 py-1.5 text-xs space-y-1">
-      <p className="text-warn-text font-medium flex items-center gap-1.5">
-        <Bell size={14} strokeWidth={1.5} className="shrink-0" />
-        {triggered.length} 条提醒待处理
-      </p>
-      {visible.map(t => (
-        <div key={t.rule.id} className="flex items-center gap-2 text-warn-text">
-          <span className="flex-1 truncate">{t.reason}</span>
-          <button
-            onClick={() => navigate(`/items/${t.item.id}`)}
-            className="underline underline-offset-2 hover:text-ink transition-colors shrink-0"
-          >
-            查看
-          </button>
-          <button
-            onClick={() => dismiss(t)}
-            className="hover:text-ink transition-colors shrink-0"
-          >
-            知道了
-          </button>
-        </div>
-      ))}
-      {/* #182: 超过 3 条折叠，点击跳提醒页 */}
-      {overflow > 0 && (
-        <button
-          onClick={() => navigate('/reminders')}
-          className="text-warn-text/80 underline underline-offset-2 hover:text-warn-text transition-colors"
-        >
-          还有 {overflow} 条提醒，点击查看全部 →
-        </button>
-      )}
+    <div className="bg-warn-bg border-b border-warn/30 px-4 py-2 text-xs flex items-center gap-2">
+      <Bell size={14} strokeWidth={1.5} className="shrink-0 text-warn-text" />
+      <span className="text-warn-text font-medium flex-1">
+        🔔 你有 {count} 条提醒
+      </span>
+      <button
+        onClick={() => navigate('/reminders')}
+        className="text-warn-text underline underline-offset-2 hover:text-ink transition-colors shrink-0"
+      >
+        查看
+      </button>
+      <button
+        onClick={() => setDismissed(true)}
+        className="text-warn-text/60 hover:text-warn-text transition-colors shrink-0 ml-1"
+        aria-label="关闭"
+      >
+        ✕
+      </button>
     </div>
   );
 }
