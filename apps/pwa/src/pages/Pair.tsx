@@ -42,29 +42,35 @@ export function PairPage() {
   const navigate = useNavigate();
   const scannerDivId = 'keepsake-qr-scanner';
 
+  const startedRef = useRef(false);
+
   useEffect(() => {
-    let stopped = false;
     const scanner = new Html5Qrcode(scannerDivId, { verbose: false });
     scannerRef.current = scanner;
+    startedRef.current = false;
 
     scanner.start(
       { facingMode: 'environment' },
       { fps: 10, qrbox: { width: 240, height: 240 } },
-      (decodedText) => {
-        if (stopped) return;
-        stopped = true;
-        scanner.stop().catch(() => {});
+      async (decodedText) => {
+        if (!startedRef.current) return;
+        startedRef.current = false;
+        await scanner.stop().catch(() => {});
         handlePayload(decodedText);
       },
       () => { /* scan error: ignore, keep scanning */ },
-    ).catch((err) => {
+    ).then(() => {
+      startedRef.current = true;
+    }).catch((err) => {
       // Camera not available — user can use manual input
       console.warn('[Pair] Camera unavailable:', err);
     });
 
     return () => {
-      stopped = true;
-      scanner.stop().catch(() => {});
+      if (startedRef.current) {
+        startedRef.current = false;
+        scanner.stop().catch(() => {});
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -183,6 +189,7 @@ async function doPair(payload: QrPayload) {
     const data = await res.json();
     deviceToken = data.device_token;
     deviceId = data.device_id;
+    if (data.family_id) await kvSet('family_id', data.family_id);
   } else if (root_secret) {
     // Direct pair via root_secret
     const res = await fetch(`${server}/auth/pair`, {
@@ -197,6 +204,7 @@ async function doPair(payload: QrPayload) {
     const data = await res.json();
     deviceToken = data.device_token;
     deviceId = data.device_id;
+    if (data.family_id) await kvSet('family_id', data.family_id);
   } else {
     throw new Error('QR 码格式错误：缺少 root_secret 或 invite_token');
   }

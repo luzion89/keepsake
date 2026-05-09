@@ -2,12 +2,14 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { buildServer } from './index.js';
 import { rmSync, mkdirSync } from 'node:fs';
 import type { FastifyInstance } from 'fastify';
+import { getTestAuthHeader } from './test-helpers.js';
 
 const TEST_DB = './data/test-blobs.sqlite';
 const TEST_BLOB_DIR = './data/test-blobs-store';
 
 describe('blobs routes', () => {
   let app: FastifyInstance;
+  let auth: string;
 
   beforeAll(async () => {
     process.env.KEEPSAKE_DB = TEST_DB;
@@ -17,6 +19,7 @@ describe('blobs routes', () => {
     mkdirSync(TEST_BLOB_DIR, { recursive: true });
     app = await buildServer();
     await app.ready();
+    auth = await getTestAuthHeader(app);
   });
 
   afterAll(async () => {
@@ -34,6 +37,7 @@ describe('blobs routes', () => {
     const res = await app.inject({
       method: 'PUT',
       url: '/blobs/test-blob-id',
+      headers: { authorization: auth },
       payload: form,
     });
     expect(res.statusCode).toBe(200);
@@ -44,6 +48,7 @@ describe('blobs routes', () => {
     const res = await app.inject({
       method: 'GET',
       url: '/blobs/id/test-blob-id',
+      headers: { authorization: auth },
     });
     expect(res.statusCode).toBe(200);
     expect(res.body).toBe('hello blob content');
@@ -53,6 +58,7 @@ describe('blobs routes', () => {
     const res = await app.inject({
       method: 'GET',
       url: '/blobs/list?since=0',
+      headers: { authorization: auth },
     });
     expect(res.statusCode).toBe(200);
     const body = res.json();
@@ -63,6 +69,7 @@ describe('blobs routes', () => {
     const res = await app.inject({
       method: 'GET',
       url: `/blobs/list?since=${Date.now() + 10000}`,
+      headers: { authorization: auth },
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().ids).toEqual([]);

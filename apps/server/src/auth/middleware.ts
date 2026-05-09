@@ -2,6 +2,7 @@
  * Global auth middleware for Fastify.
  * Skips: /auth/pair, /auth/join, /health, /auth/qrcode
  * All other routes require: Authorization: Bearer <device_token>
+ * Sets req.jwtPayload (including family_id) for downstream route handlers.
  */
 import type { FastifyInstance } from 'fastify';
 import { verifyToken } from './jwt.js';
@@ -51,6 +52,9 @@ export function registerAuthMiddleware(
     if (!payload || payload.type !== 'device') {
       return reply.code(401).send({ error: 'Invalid or expired token' });
     }
+
+    // Attach JWT payload (including family_id) to request for downstream use
+    (req as any).jwtPayload = payload;
 
     // Update last_seen (best-effort)
     try {

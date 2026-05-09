@@ -34,13 +34,19 @@ function verify(token: string, secret: string): Record<string, unknown> | null {
   }
 }
 
-export function issueDeviceToken(deviceId: string, jwtSecret: string): string {
-  return sign({ sub: deviceId, type: 'device', iat: Math.floor(Date.now() / 1000) }, jwtSecret);
+export function issueDeviceToken(deviceId: string, familyId: string, jwtSecret: string): string {
+  return sign({
+    sub: deviceId,
+    family_id: familyId,
+    type: 'device',
+    iat: Math.floor(Date.now() / 1000),
+  }, jwtSecret);
 }
 
-export function issueInviteToken(jwtSecret: string): string {
+export function issueInviteToken(familyId: string, jwtSecret: string): string {
   return sign({
     type: 'invite',
+    family_id: familyId,
     iat: Math.floor(Date.now() / 1000),
     exp: Math.floor(Date.now() / 1000) + 5 * 60, // 5 minutes
   }, jwtSecret);

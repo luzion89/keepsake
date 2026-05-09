@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { readFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, mkdirSync, unlinkSync, existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -11,52 +11,43 @@ export interface DbHandle {
 }
 
 /**
- * Ensure the items table has the notes and expires_at columns.
- * Uses PRAGMA table_info to check, then ALTER TABLE ADD COLUMN if missing.
- * Safe to run on both new and legacy databases.
+ * Drop and recreate the database if the schema is outdated (spike: family_id era).
+ * This is acceptable because spike branch data is not production data.
  */
-function ensureItemsColumns(db: Database.Database): void {
-  const cols = (db.prepare('PRAGMA table_info(items)').all() as Array<{ name: string }>)
-    .map(c => c.name);
-
-  if (!cols.includes('notes')) {
-    try {
-      db.exec('ALTER TABLE items ADD COLUMN notes TEXT');
-    } catch (e) {
-      // Column may have been added concurrently; ignore duplicate-column errors.
-      const msg = e instanceof Error ? e.message : String(e);
-      if (!msg.includes('duplicate column')) throw e;
-    }
-  }
-
-  if (!cols.includes('enc_blob')) {
-    try {
-      db.exec('ALTER TABLE items ADD COLUMN enc_blob TEXT');
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (!msg.includes('duplicate column')) throw e;
-    }
-  }
-
-  if (!cols.includes('expires_at')) {
-    try {
-      db.exec('ALTER TABLE items ADD COLUMN expires_at INTEGER');
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (!msg.includes('duplicate column')) throw e;
-    }
+function needsRebuild(db: Database.Database): boolean {
+  try {
+    const cols = (db.prepare('PRAGMA table_info(devices)').all() as Array<{ name: string }>)
+      .map(c => c.name);
+    return !cols.includes('family_id');
+  } catch {
+    return true;
   }
 }
 
 export function openDb(path = process.env.KEEPSAKE_DB ?? './data/keepsake.sqlite'): DbHandle {
-  mkdirSync(dirname(resolve(path)), { recursive: true });
-  const db = new Database(path);
+  const absPath = resolve(path);
+  mkdirSync(dirname(absPath), { recursive: true });
+
+  // Check if existing DB needs rebuild (pre-family_id schema)
+  if (existsSync(absPath)) {
+    const probe = new Database(absPath);
+    const rebuild = needsRebuild(probe);
+    probe.close();
+    if (rebuild) {
+      console.warn('[db] Detected pre-family_id schema — dropping and rebuilding (spike data is ephemeral)');
+      unlinkSync(absPath);
+      // Also remove WAL/SHM files if present
+      for (const ext of ['-wal', '-shm']) {
+        const f = absPath + ext;
+        if (existsSync(f)) unlinkSync(f);
+      }
+    }
+  }
+
+  const db = new Database(absPath);
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
   const schema = readFileSync(resolve(__dirname, './schema.sql'), 'utf-8');
   db.exec(schema);
-  // Runtime migration: ensure notes / expires_at columns exist on legacy databases
-  // (CREATE TABLE IF NOT EXISTS won't add columns to pre-existing tables).
-  ensureItemsColumns(db);
   return { db, close: () => db.close() };
 }
