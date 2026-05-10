@@ -12,6 +12,7 @@ import { aiRoutes } from './routes/ai.js';
 import { healthRoutes } from './routes/health.js';
 import { logsRoutes } from './routes/logs.js';
 import type Database from 'better-sqlite3';
+import { startBackupScheduler } from './backup.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -82,6 +83,14 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     app.listen({ host: '0.0.0.0', port }).then(() => {
       const proto = process.env.KEEPSAKE_TLS ? 'https' : 'http';
       app.log.info(`Keepsake server on ${proto}://0.0.0.0:${port}`);
+
+      // 启动自动备份调度
+      const dbPath = process.env.KEEPSAKE_DB ?? './data/keepsake.sqlite';
+      const backupDir = resolve(dbPath, '../backups');
+      const intervalDays = Number(process.env.KEEPSAKE_BACKUP_INTERVAL_DAYS ?? 7);
+      const keep = Number(process.env.KEEPSAKE_BACKUP_KEEP ?? 4);
+      const intervalMs = intervalDays * 24 * 60 * 60 * 1000;
+      startBackupScheduler(app.db, { dbPath, backupDir, intervalMs, keep });
     });
   });
 }
