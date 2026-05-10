@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import staticPlugin from '@fastify/static';
 import { resolve, dirname } from 'node:path';
+import { networkInterfaces } from 'node:os';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { openDb } from './db/open.js';
@@ -38,6 +39,38 @@ function buildHttpsOptions(serverRoot: string): { key: Buffer; cert: Buffer } | 
   }
 
   return { key: readFileSync(keyPath), cert: readFileSync(certPath) };
+}
+
+
+function getLanIp(): string {
+  const nets = networkInterfaces();
+  for (const iface of Object.values(nets)) {
+    if (!iface) continue;
+    for (const net of iface) {
+      if (net.family === 'IPv4' && !net.internal) {
+        return net.address;
+      }
+    }
+  }
+  return 'N/A';
+}
+
+function printBanner(proto: string, port: number): void {
+  const lanIp = getLanIp();
+  const lanUrl = lanIp === 'N/A' ? 'N/A' : `${proto}://${lanIp}:${port}`;
+  const localUrl = `${proto}://localhost:${port}`;
+  const w = 50;
+  const pad = (s: string) => ` ${s}${' '.repeat(Math.max(0, w - 2 - s.length))}`;
+  const line = '═'.repeat(w - 2);
+  console.log(`╔${line}╗`);
+  console.log(`║${pad('🗝  Keepsake Server 已启动')}║`);
+  console.log(`╠${line}╣`);
+  console.log(`║${pad(`LAN      ${lanUrl}`)}║`);
+  console.log(`║${pad(`本机     ${localUrl}`)}║`);
+  console.log(`╠${line}╣`);
+  console.log(`║${pad('手机/平板请使用 LAN URL')}║`);
+  console.log(`║${pad('浏览器红屏点"高级 → 继续"即可访问')}║`);
+  console.log(`╚${line}╝`);
 }
 
 export async function buildServer() {
@@ -83,6 +116,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     app.listen({ host: '0.0.0.0', port }).then(() => {
       const proto = process.env.KEEPSAKE_TLS ? 'https' : 'http';
       app.log.info(`Keepsake server on ${proto}://0.0.0.0:${port}`);
+      printBanner(proto, port);
 
       // 启动自动备份调度
       const dbPath = process.env.KEEPSAKE_DB ?? './data/keepsake.sqlite';
