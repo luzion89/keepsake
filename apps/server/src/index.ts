@@ -92,8 +92,15 @@ export async function buildServer() {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const port = Number(process.env.PORT ?? 8443);
   buildServer().then(async (app) => {
-    // Start CF Tunnel if requested (before listen so URL is in QR)
-    // Supports: KEEPSAKE_TUNNEL=quick | named | 1 (legacy)
+    // 1. Listen first — cloudflared quick tunnel probes the origin on startup,
+    //    so the server must be accepting connections before cloudflared launches.
+    await app.listen({ host: '0.0.0.0', port });
+    const proto = process.env.KEEPSAKE_TLS ? 'https' : 'http';
+    const localIp = getLocalIp();
+    app.log.info(`Keepsake server on ${proto}://0.0.0.0:${port}`);
+
+    // 2. Start CF Tunnel after the server is ready.
+    //    Supports: KEEPSAKE_TUNNEL=quick | named | 1 (legacy)
     const tunnelMode = process.env.KEEPSAKE_TUNNEL ?? '';
     if (['quick', 'named', '1'].includes(tunnelMode)) {
       try {
@@ -103,16 +110,12 @@ if (import.meta.url === `file://${process.argv[1]}`) {
           console.log(`\n[CF Tunnel] ✅ Public URL: ${tunnelUrl}\n`);
         }
       } catch (e) {
+        // Tunnel failure is non-fatal — server continues in LAN-only mode
         console.error('[CF Tunnel] ❌ Failed to start tunnel — continuing in LAN-only mode:', (e as Error).message);
       }
     }
 
-    await app.listen({ host: '0.0.0.0', port });
-    const proto = process.env.KEEPSAKE_TLS ? 'https' : 'http';
-    const localIp = getLocalIp();
-    app.log.info(`Keepsake server on ${proto}://0.0.0.0:${port}`);
-
-    // === Pair Info ===
+    // 3. Print Pair Info block after tunnel result is known
     const payload = buildPairPayload({
       host: localIp,
       port,

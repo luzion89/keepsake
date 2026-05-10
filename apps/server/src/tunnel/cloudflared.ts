@@ -61,6 +61,9 @@ function startQuickTunnel(port: number): Promise<string> {
         clearTimeout(timeout);
         console.log(`[CF Tunnel] Quick tunnel URL: ${match[0]}`);
         resolve(match[0]);
+      } else {
+        // Always forward cloudflared stderr so errors are visible
+        process.stderr.write(`[cloudflared] ${text}`);
       }
     };
 
@@ -102,12 +105,14 @@ function startNamedTunnel(token: string): Promise<string> {
     const onData = (chunk: Buffer): void => {
       const text = chunk.toString();
       const sanitized = text.replace(token, '<REDACTED>');
-      process.stdout.write(`[CF Named Tunnel] ${sanitized}`);
       const match = text.match(urlRegex);
       if (match) {
         clearTimeout(timeout);
         console.log(`[CF Tunnel] Named tunnel URL: ${match[0]}`);
         resolve(match[0]);
+      } else {
+        // Always forward cloudflared output so errors are visible (token redacted)
+        process.stderr.write(`[cloudflared] ${sanitized}`);
       }
     };
 
