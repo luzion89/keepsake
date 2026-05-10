@@ -53,10 +53,14 @@ export function pruneBackups(backupDir: string, keep: number): void {
   }
 }
 
-/** 执行一次备份，返回备份文件路径 */
+/** 执行一次备份，返回备份文件路径；若今日备份已存在则跳过并返回已有路径 */
 export function runBackup(db: Database.Database, backupDir: string): string {
   mkdirSync(backupDir, { recursive: true });
   const dest = resolve(backupDir, `keepsake-${today()}.sqlite`);
+  if (existsSync(dest)) {
+    console.log('[backup] 今日备份已存在，跳过');
+    return dest;
+  }
   db.exec(`VACUUM INTO '${dest.replace(/'/g, "''")}'`);
   return dest;
 }
@@ -71,7 +75,7 @@ export function runBackup(db: Database.Database, backupDir: string): string {
 export function startBackupScheduler(
   db: Database.Database,
   opts: BackupOptions,
-): ReturnType<typeof setInterval> {
+): ReturnType<typeof setInterval> | null {
   const { backupDir, intervalMs, keep } = opts;
 
   mkdirSync(backupDir, { recursive: true });
@@ -84,15 +88,6 @@ export function startBackupScheduler(
     console.log(`[backup] 上次备份：${lastDate}`);
   }
 
-  // 判断是否需要立即备份
-  const shouldRunNow = (): boolean => {
-    const files = listBackups(backupDir);
-    if (files.length === 0) return true;
-    const lastFile = files[files.length - 1]!;
-    const lastMtime = statSync(lastFile).mtimeMs;
-    return Date.now() - lastMtime >= intervalMs;
-  };
-
   const doBackup = () => {
     try {
       const dest = runBackup(db, backupDir);
@@ -101,6 +96,21 @@ export function startBackupScheduler(
     } catch (err) {
       console.error('[backup] 备份失败：', err);
     }
+  };
+
+  // intervalMs <= 0：只触发一次立即备份，不启动 setInterval
+  if (intervalMs <= 0) {
+    doBackup();
+    return null;
+  }
+
+  // 判断是否需要立即备份
+  const shouldRunNow = (): boolean => {
+    const files = listBackups(backupDir);
+    if (files.length === 0) return true;
+    const lastFile = files[files.length - 1]!;
+    const lastMtime = statSync(lastFile).mtimeMs;
+    return Date.now() - lastMtime >= intervalMs;
   };
 
   if (shouldRunNow()) {

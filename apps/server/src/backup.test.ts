@@ -36,6 +36,17 @@ describe('runBackup', () => {
     bak.close();
     expect(tables.map((t) => t.name)).toContain('items');
   });
+
+  it('目标文件已存在时静默跳过，不抛异常', () => {
+    // 先备份一次，生成今日文件
+    const dest1 = runBackup(db, backupDir);
+    // 再次备份，目标文件已存在，应不抛异常，返回同路径
+    let dest2: string | undefined;
+    expect(() => {
+      dest2 = runBackup(db, backupDir);
+    }).not.toThrow();
+    expect(dest2).toBe(dest1);
+  });
 });
 
 describe('pruneBackups', () => {
@@ -63,7 +74,7 @@ describe('startBackupScheduler', () => {
       intervalMs: 24 * 60 * 60 * 1000,
       keep: 4,
     });
-    clearInterval(timer);
+    if (timer) clearInterval(timer);
     const files = listBackups(backupDir);
     expect(files.length).toBeGreaterThanOrEqual(1);
   });
@@ -83,8 +94,22 @@ describe('startBackupScheduler', () => {
       intervalMs: 1, // 1ms，立即触发
       keep,
     });
-    clearInterval(timer);
+    if (timer) clearInterval(timer);
     const files = listBackups(backupDir);
     expect(files.length).toBeLessThanOrEqual(keep);
+  });
+
+  it('intervalMs=0 时只触发一次备份，不启动 setInterval（返回 null）', () => {
+    const timer = startBackupScheduler(db, {
+      dbPath,
+      backupDir,
+      intervalMs: 0,
+      keep: 4,
+    });
+    // intervalMs<=0 时应返回 null，不启动周期调度
+    expect(timer).toBeNull();
+    // 备份文件应存在（执行了一次）
+    const files = listBackups(backupDir);
+    expect(files.length).toBeGreaterThanOrEqual(1);
   });
 });
