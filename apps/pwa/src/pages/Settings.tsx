@@ -10,6 +10,7 @@ import {
 } from '../ai/router.js';
 import { db, getDeviceId } from '../db/dexie.js';
 import { syncOnce } from '../sync/client.js';
+import { ServerStatusBadge } from '../components/ServerStatusBadge.js';
 import { gcSyncedBlobs } from '../sync/blobs.js';
 
 interface StorageQuota {
@@ -188,6 +189,9 @@ export function SettingsPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold font-serif text-ink flex items-center gap-2"><SettingsIcon size={22} strokeWidth={1.5} />设置</h1>
+
+      {/* ── Server 连接状态 (#215) ─────────────────── */}
+      <ServerStatusBadge />
 
       {/* ── AI 助手 ─────────────────────────────────── */}
       <Section title="AI 助手">
