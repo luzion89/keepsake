@@ -4,6 +4,7 @@ import { Home as HomeIcon, Package, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { Area, Room } from '@keepsake/shared';
 import { AreaRepo, ItemRepo, RoomRepo } from '../db/repos.js';
 import { useConfirm } from '../components/ConfirmDialog.js';
+import { ServerStatusDot } from '../components/ServerStatusBadge.js';
 
 const PRESETS = ['厨房', '客厅', '阳台', '主卧', '次卧', '卫生间', '储物间', '玄关'];
 
@@ -89,6 +90,7 @@ export function HomePage() {
       <h1 className="text-2xl font-bold font-serif text-ink flex items-center gap-2">
         <HomeIcon size={22} strokeWidth={1.5} />
         房间
+        <span className="ml-auto"><ServerStatusDot /></span>
       </h1>
 
       {/* ── 房间列表 ──────────────────────────────────── */}
