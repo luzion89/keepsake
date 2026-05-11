@@ -51,7 +51,7 @@ export default defineConfig({
       },
       workbox: {
         // 确保 SW 有 fetch handler（installability 准入条件）
-        globPatterns: ['**/*.{js,css,html,svg,png,webmanifest}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,webmanifest,woff2}'],
         runtimeCaching: [
           {
             urlPattern: ({ url }) => url.pathname.startsWith('/blobs/'),

@@ -98,6 +98,46 @@ export async function buildServer() {
   const pwaDist = resolve(__dirname, '../../pwa/dist');
   if (existsSync(pwaDist)) {
     await fastify.register(staticPlugin, { root: pwaDist, prefix: '/', wildcard: false });
+
+    // Block localhost access to SPA HTML entry points (issue #221).
+    // API paths (/sync /blobs /ai /health /logs) are not blocked so that
+    // the Vite dev proxy (which points localhost:8443) keeps working.
+    // Set KEEPSAKE_ALLOW_LOCALHOST=1 to bypass (dev back-door).
+    const LOCALHOST_BLOCK_HTML = `<!doctype html>
+<html lang="zh-CN"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>请使用局域网 IP 访问</title>
+<style>body{font-family:system-ui,sans-serif;max-width:600px;margin:10vh auto;padding:1rem;line-height:1.7}</style>
+</head><body>
+<h1>请使用局域网 IP 访问</h1>
+<p>本应用已不再支持 localhost 访问入口。</p>
+<p>请使用启动日志中显示的 LAN IP（如 <code>https://192.168.x.x:8443</code>）访问。</p>
+<p>如果你之前在 localhost 上装过 PWA，请到浏览器 DevTools → Application → Storage 清除站点数据后，改用 LAN IP 重新打开。</p>
+</body></html>`;
+
+    const API_PREFIXES = ['/sync', '/blobs', '/ai', '/health', '/logs', '/settings'];
+
+    fastify.addHook('onRequest', (req, reply, done) => {
+      if (process.env.KEEPSAKE_ALLOW_LOCALHOST === '1') return done();
+      if (req.method !== 'GET') return done();
+
+      const host = (req.headers.host ?? '').split(':')[0];
+      const isLocalhost = host === 'localhost' || host === '127.0.0.1';
+      if (!isLocalhost) return done();
+
+      const path = (req.url ?? '/').split('?')[0];
+      const isApiPath = API_PREFIXES.some(p => path!.startsWith(p));
+      if (isApiPath) return done();
+
+      // SPA HTML entry: either '/' or any path that would serve index.html
+      const accept = req.headers.accept ?? '';
+      if (accept.includes('text/html') || path === '/' || !path!.includes('.')) {
+        reply.code(410).header('Content-Type', 'text/html; charset=utf-8').send(LOCALHOST_BLOCK_HTML);
+        return;
+      }
+      done();
+    });
+
     fastify.setNotFoundHandler((req, reply) => {
       // SPA fallback
       if (req.method === 'GET' && req.headers.accept?.includes('text/html')) {
