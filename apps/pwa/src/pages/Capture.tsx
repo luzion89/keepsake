@@ -8,11 +8,12 @@ import { AlertTriangle, Camera, ChevronLeft, X } from 'lucide-react';
 import { AreaRepo, PhotoRepo } from '../db/repos.js';
 import type { Area } from '@keepsake/shared';
 import { useT } from '../i18n/I18nContext.js';
+import { PRESET_NAMES } from '../i18n/dict.js';
 
 type AreaState = 'loading' | 'not-found' | 'ok';
 
 export function CapturePage() {
-  const { t } = useT();
+  const { t, lang } = useT();
   const { areaId = '' } = useParams();
   const nav = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -99,12 +100,12 @@ export function CapturePage() {
       <div className="text-sm text-ink-muted">
         <Link to={`/areas/${areaId}`} className="hover:text-ink flex items-center gap-1">
           <ChevronLeft size={14} strokeWidth={1.5} />
-          {t('common.back')} {area!.name}
+          {t('common.back')} {(lang === 'en' && PRESET_NAMES[area!.name]) ? PRESET_NAMES[area!.name] : area!.name}
         </Link>
       </div>
       <h1 className="text-xl font-semibold flex items-center gap-2">
         <Camera size={20} strokeWidth={1.5} className="text-ink-muted" />
-        {t('capture.title')} · {area!.name}
+        {t('capture.title')} · {(lang === 'en' && PRESET_NAMES[area!.name]) ? PRESET_NAMES[area!.name] : area!.name}
       </h1>
 
       <input

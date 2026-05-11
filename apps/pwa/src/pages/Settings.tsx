@@ -166,7 +166,7 @@ export function SettingsPage() {
     }
   };
 
-  const btnCls = 'px-3 py-2 rounded-[12px] border border-[var(--border-default)] text-sm text-ink hover:border-accent/60 hover:text-ink-hover transition-all';
+  const btnCls = 'flex-1 px-3 py-2 rounded-[12px] border border-[var(--border-default)] text-sm text-ink hover:border-accent/60 hover:text-ink-hover transition-all';
 
   if (!loaded) return <SettingsSkeleton />;
 
@@ -351,7 +351,7 @@ export function SettingsPage() {
         )}
 
         <SectionRow>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
             <button onClick={exportJson} className={btnCls}>
               {t('settings.exportJson')}
             </button>
