@@ -12,7 +12,7 @@
 | **Firefox** | 磁盘剩余空间的 50%，单 origin 上限为该池的 1/5 | 通常 **数 GB** |
 | **Safari** | 硬限 **1 GB**（iOS/macOS 均如此）；超过需弹权限对话框 | **1 GB**（注意：iOS Safari 实测更保守，约 500 MB～1 GB） |
 
-**结论**：Safari 是短板，1 GB 硬限需认真对待。
+**结论**：Safari 是短板，1 GB 硬限需认真对待；用户需保证定期访问以避免 ITP 清理。
 
 ---
 
@@ -31,13 +31,11 @@
 
 Safari 的 **Intelligent Tracking Prevention (ITP)** 规则：
 - 若用户 **7 天内未主动访问** 该 origin，Safari 可能将 IndexedDB 数据标记为可清除（在低磁盘压力下实际清除）。
-- PWA 以 Add to Home Screen 安装后，ITP 限制**更宽松**（被视作 app），但非安装情况下风险仍存在。
 
 **缓解方案（行动项）**：
-1. 引导用户「添加到主屏幕」（PWA 安装后绕过 ITP）。
-2. 每次 sync 成功后立即 push 所有关键数据到服务器（当前已有 sync 机制）。
-3. 在 Settings 页提示用户定期打开 App（至少 7 天一次）。
-4. 将照片 blob 同步到服务器后，本地标记 `remote_url` 并可 GC 本地 blob（见第 5 节）。
+1. 每次 sync 成功后立即 push 所有关键数据到服务器（当前已有 sync 机制）。
+2. 在 Settings 页提示用户定期打开 App（至少 7 天一次）。
+3. 将照片 blob 同步到服务器后，本地标记 `remote_url` 并可 GC 本地 blob（见第 5 节）。
 
 ---
 
@@ -87,6 +85,6 @@ if (usagePct > 0.8) showQuotaWarning(usage, quota);
 ## 核心结论
 
 1. **短期无风险**：100 张/月用量 1 年仅 240 MB，不会撑爆任何浏览器。
-2. **Safari 是最大威胁**：1 GB 上限 + ITP 7 天清理，必须引导用户安装 PWA + 保证定期同步。
+2. **Safari 是最大威胁**：1 GB 上限 + ITP 7 天清理，必须保证定期访问 + 定期同步。
 3. **立即可行**：实现 `gcSyncedBlobs()`（已同步 blob 本地删除），加配额展示到 Settings。
 4. **中期**：加 zip 导出（含 blob）；服务端加每日 SQLite 备份脚本。

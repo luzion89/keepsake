@@ -15,7 +15,6 @@
 | 样式 | Tailwind CSS 3 |
 | 本地存储 | Dexie 4（IndexedDB 封装） |
 | 路由 | react-router-dom 6 |
-| Service Worker | Workbox（vite-plugin-pwa） |
 | 图标 | lucide-react |
 | 图片压缩 | browser-image-compression |
 | i18n | 自手搓（`apps/pwa/src/i18n/`，无第三方库） |
@@ -28,7 +27,7 @@
 | 服务框架 | Fastify 5 |
 | 数据库 | better-sqlite3（单文件 SQLite） |
 | Schema 校验 | zod |
-| 静态文件 | @fastify/static（托管 PWA 构建产物） |
+| 静态文件 | @fastify/static（托管前端构建产物） |
 
 ### 共享（`packages/shared`）
 
@@ -50,7 +49,7 @@ Keepsake/
 │   │   │   ├── fonts/                    # 自托管 Noto Serif SC woff2
 │   │   │   │   ├── noto-serif-sc-400.woff2
 │   │   │   │   └── noto-serif-sc-700.woff2
-│   │   │   └── icons/                    # PWA 图标（192、512、maskable）
+│   │   │   └── icons/                    # 应用图标（192、512、maskable）
 │   │   ├── src/
 │   │   │   ├── main.tsx
 │   │   │   ├── app/                      # 路由配置
@@ -71,7 +70,7 @@ Keepsake/
 │   │   │   ├── notifications/
 │   │   │   │   └── scanner.ts            # 启动时扫描 expires_at 提醒
 │   │   │   ├── pwa/
-│   │   │   │   └── useInstallPrompt.ts   # PWA 安装提示 hook
+│   │   │   │   └── useInstallPrompt.ts   # 安装提示 hook（已弃用，保留备查）
 │   │   │   ├── logging/
 │   │   │   │   └── logger.ts
 │   │   │   └── index.css
@@ -185,16 +184,9 @@ AI 配置通过 `PUT /settings/ai` 同步到服务端，其他设备启动时通
 - API 路径（`/sync`、`/blobs`、`/ai`、`/health`、`/logs`、`/settings`）不受屏蔽，确保 Vite 开发代理正常工作；
 - `KEEPSAKE_ALLOW_LOCALHOST=1` 可跳过屏蔽（开发调试用）。
 
-此设计保证 Service Worker 和 IndexedDB 始终注册在 LAN IP origin 下，避免 `localhost` 与 LAN IP 产生两套独立的 IDB 数据。
+此设计保证 IndexedDB 始终注册在 LAN IP origin 下，避免 `localhost` 与 LAN IP 产生两套独立的 IDB 数据。
 
-### 3.6 PWA 配置（`apps/pwa/vite.config.ts`）
-
-- `registerType: 'autoUpdate'`：检测到新 SW 时自动更新；
-- Workbox `globPatterns`：预缓存所有 `js/css/html/svg/png/webmanifest/woff2`；
-- 运行时缓存：`/blobs/*` → CacheFirst（30 天，最多 200 条）；`/sync/*` → NetworkFirst（5s 超时）；
-- Manifest：`display: 'standalone'`，主题色 `#F1EDE6`（暖白 Editorial），含 192、512、maskable 图标及截图（满足 Chrome 安装横幅条件）。
-
-### 3.7 字体
+### 3.6 字体
 
 `apps/pwa/public/fonts/` 下存放 `noto-serif-sc-400.woff2` 和 `noto-serif-sc-700.woff2`，在 `src/index.css` 中通过 `@font-face` 引入，不依赖外部 CDN，离线可用。
 
@@ -213,10 +205,10 @@ pnpm dev
 # 生产构建
 pnpm build
 
-# 生产运行（服务端托管 PWA 静态资源）
+# 生产运行（服务端托管前端静态资源）
 pnpm start
 # 或启用 HTTPS（需先生成 mkcert 证书，见 docs/HTTPS-SETUP.md）
 KEEPSAKE_TLS=1 pnpm start
 ```
 
-手机访问：打开服务端启动日志中显示的 LAN URL（如 `https://192.168.x.x:8443`），在 Android Chrome 或 iOS Safari 中选择"添加到主屏"完成安装。
+手机访问：打开服务端启动日志中显示的 LAN URL（如 `https://192.168.x.x:8443`），在浏览器地址栏直接访问即可。
