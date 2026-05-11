@@ -138,20 +138,28 @@ export function SearchPage() {
             e.target.style.height = e.target.scrollHeight + 'px';
           }}
           onFocus={(e) => {
+            // 编辑时使用正常行高，允许多行展开
+            e.target.style.lineHeight = '24px';
+            e.target.style.paddingTop = '12px';
+            e.target.style.paddingBottom = '12px';
             e.target.style.overflow = 'hidden';
             e.target.style.height = 'auto';
             e.target.style.height = e.target.scrollHeight + 'px';
           }}
           onBlur={(e) => {
+            // 失焦：固定 48px 高 + lineHeight 48px，让单行字垂直居中、
+            // 多余行被 padding 0 + overflow hidden 完全截掉
             e.target.style.height = '48px';
+            e.target.style.lineHeight = '48px';
+            e.target.style.paddingTop = '0px';
+            e.target.style.paddingBottom = '0px';
             e.target.style.overflow = 'hidden';
-            // #233: reset internal scroll so the second line is never half-visible
             e.target.scrollTop = 0;
           }}
           placeholder={aiEnabled ? t('search.aiPlaceholder') : t('search.placeholder')}
           rows={1}
-          className="flex-1 bg-paper-card border border-[var(--border-default)] rounded-[12px] px-4 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-150 text-ink placeholder:text-ink-muted resize-none overflow-hidden leading-4 py-4"
-          style={{ minHeight: '48px', boxSizing: 'border-box' }}
+          className="flex-1 bg-paper-card border border-[var(--border-default)] rounded-[12px] px-4 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-150 text-ink placeholder:text-ink-muted resize-none overflow-hidden"
+          style={{ minHeight: '48px', height: '48px', boxSizing: 'border-box', lineHeight: '48px', paddingTop: '0px', paddingBottom: '0px' }}
         />
         <button
           onClick={askAi}
