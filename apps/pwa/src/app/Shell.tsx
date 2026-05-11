@@ -261,12 +261,14 @@ export function Shell() {
       <NotificationBanner />
 
       {/* ── Main content ──────────────────────────────────────────────────────── */}
-      <main className="flex-1 px-4 py-4 max-w-3xl w-full mx-auto pb-6">
+      <main className="flex-1 px-4 py-4 max-w-3xl w-full mx-auto pb-[calc(4rem+env(safe-area-inset-bottom)+1rem)]">
         <Outlet />
       </main>
 
       {/* ── Bottom nav (4 tabs) ───────────────────────── */}
-      <nav className="sticky bottom-0 z-10 h-16 pb-safe bg-paper/95 backdrop-blur-sm border-t border-ink-faint grid grid-cols-4">
+      {/* #233: fixed instead of sticky so nav stays pinned on short-content pages
+          and when iOS Safari address bar resizes the viewport */}
+      <nav className="fixed bottom-0 inset-x-0 z-20 h-16 pb-safe bg-paper/95 backdrop-blur-sm border-t border-ink-faint grid grid-cols-4">
         {tabs.map(({ to, label, Icon }) => (
           <NavLink
             key={to}

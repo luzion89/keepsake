@@ -145,10 +145,12 @@ export function SearchPage() {
           onBlur={(e) => {
             e.target.style.height = '48px';
             e.target.style.overflow = 'hidden';
+            // #233: reset internal scroll so the second line is never half-visible
+            e.target.scrollTop = 0;
           }}
           placeholder={aiEnabled ? t('search.aiPlaceholder') : t('search.placeholder')}
           rows={1}
-          className="flex-1 bg-paper-card border border-[var(--border-default)] rounded-[12px] px-4 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-150 text-ink placeholder:text-ink-muted resize-none overflow-hidden leading-[24px] py-3"
+          className="flex-1 bg-paper-card border border-[var(--border-default)] rounded-[12px] px-4 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-150 text-ink placeholder:text-ink-muted resize-none overflow-hidden leading-4 py-4"
           style={{ minHeight: '48px', boxSizing: 'border-box' }}
         />
         <button
