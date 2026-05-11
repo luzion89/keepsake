@@ -186,7 +186,7 @@ export const zh = {
   // ── search ──────────────────────────────────────────────────────────
   'search.title':          '搜索',
   'search.placeholder':    '搜索物品…',
-  'search.aiPlaceholder':  'AI 搜索，如"厨房里有什么调料"',
+  'search.aiPlaceholder':  '请输入查询内容',
   'search.empty':          '没有找到「{q}」',
   'search.emptyHint':      '尝试搜索物品名称、标签或备注',
   'search.aiAnswer':       'AI 回答',
@@ -439,7 +439,7 @@ export const en: Record<Key, string> = {
   // ── search ──────────────────────────────────────────────────────────
   'search.title':          'Search',
   'search.placeholder':    'Search items…',
-  'search.aiPlaceholder':  'AI search, e.g. "what spices are in the kitchen"',
+  'search.aiPlaceholder':  'Enter your query',
   'search.empty':          'No results for "{q}"',
   'search.emptyHint':      'Try searching item name, tags or notes',
   'search.aiAnswer':       'AI Answer',
@@ -483,7 +483,7 @@ export const en: Record<Key, string> = {
   'settings.storageLabel':        'Storage {usage} MB / {quota} MB ({pct}%)',
   'settings.storageTight':        'Low space',
   'settings.exportJson':          'Export',
-  'settings.gc':                  'Clean cache',
+  'settings.gc':                  'Cleanup',
   'settings.gcRunning':           'Clearing…',
   'settings.gcDone':              'Released {n} synced blob(s)',
   'settings.gcNone':              'Nothing to clear',
