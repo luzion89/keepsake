@@ -43,6 +43,28 @@ export const syncRoutes: FastifyPluginAsync = async (fastify) => {
             mergeUpsert(fastify.db, 'item', local);
             accepted.push(op.itemId);
           }
+        } else if (op.kind === 'patch') {
+          const local = getRow(fastify.db, op.table, op.id);
+          if (!local) {
+            // Row not found: ignore patch (upsert should arrive first via outbox ordering)
+            console.warn(`[sync/patch] unknown id=${op.id} table=${op.table} — skipping`);
+            continue;
+          }
+          const synthetic = {
+            ...local,
+            ...op.fields,
+            updated_at: op.updated_at,
+            updated_by: op.updated_by,
+            version: local.version + 1,
+          };
+          const { conflicts: c } = mergeUpsert(fastify.db, op.table, synthetic);
+          for (const conflict of c) {
+            if ((op.fields as any)[conflict.field] !== undefined) {
+              logConflict(fastify.db, op.table, op.id, deviceId, conflict);
+              conflicts.push({ id: op.id, table: op.table, field: conflict.field, client: conflict.client, server: conflict.server });
+            }
+          }
+          accepted.push(op.id);
         }
       }
     });
