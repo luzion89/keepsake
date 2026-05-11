@@ -148,8 +148,8 @@ export function SearchPage() {
           }}
           placeholder={aiEnabled ? t('search.aiPlaceholder') : t('search.placeholder')}
           rows={1}
-          className="flex-1 bg-paper-card border border-[var(--border-default)] rounded-[12px] px-4 py-3 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-150 text-ink placeholder:text-ink-muted resize-none overflow-hidden"
-          style={{ minHeight: '48px', lineHeight: '1.5', letterSpacing: '0.01em' }}
+          className="flex-1 bg-paper-card border border-[var(--border-default)] rounded-[12px] px-4 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-150 text-ink placeholder:text-ink-muted resize-none overflow-hidden leading-[24px] py-3"
+          style={{ minHeight: '48px', boxSizing: 'border-box' }}
         />
         <button
           onClick={askAi}
@@ -168,6 +168,13 @@ export function SearchPage() {
           )}
         </button>
       </div>
+
+      {/* Search tip — shown only when query is empty */}
+      {q.trim() === '' && (
+        <p className="text-ink-muted text-sm px-1">
+          {aiEnabled ? t('search.tipAi') : t('search.tipKeyword')}
+        </p>
+      )}
 
       {showGrouped && q.trim() && items.length === 0 && (
         <p className="text-ink-muted text-sm pt-2">{t('search.empty', { q })}</p>

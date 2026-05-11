@@ -81,7 +81,6 @@ export function SettingsPage() {
   const [loaded, setLoaded] = useState(false);
   const [deviceId, setDeviceId] = useState('');
   const [stats, setStats] = useState({ rooms: 0, areas: 0, items: 0, photos: 0, outbox: 0 });
-  const [serverOk, setServerOk] = useState<boolean | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [aiPingState, setAiPingState] = useState<'idle' | 'pinging'>('idle');
@@ -136,13 +135,6 @@ export function SettingsPage() {
     const result = await pingProvider(effectiveProvider, key);
     setAiPingState('idle');
     setAiPingResult(result);
-  };
-
-  const ping = async () => {
-    try {
-      const r = await fetch('/health');
-      setServerOk(r.ok);
-    } catch { setServerOk(false); }
   };
 
   const exportJson = async () => {
@@ -316,28 +308,6 @@ export function SettingsPage() {
         )}
       </Section>
 
-      {/* ── Local server ──────────────────────────────────────── */}
-      <Section title={t('settings.serverSection')}>
-        <SectionRow>
-          <div className="flex items-center gap-2 flex-wrap">
-            <button onClick={ping} className={btnCls}>
-              {t('settings.pingServer')}
-            </button>
-            {serverOk === true && <span className="text-ok-text text-sm">{t('settings.serverOnline')}</span>}
-            {serverOk === false && <span className="text-danger-text text-sm">{t('settings.serverOffline')}</span>}
-            <button
-              onClick={() => syncOnce().then(r => alert(r
-                ? t('settings.syncResult', { pushed: String(r.pushed), pulled: String(r.pulled), conflicts: String(r.conflicts) })
-                : t('settings.serverUnreachable')
-              ))}
-              className={btnCls}
-            >
-              {t('settings.syncOnce')}
-            </button>
-          </div>
-        </SectionRow>
-      </Section>
-
       {/* ── Local data ────────────────────────────────────────── */}
       <Section title={t('settings.dataSection')}>
         <SectionRow>
@@ -391,6 +361,15 @@ export function SettingsPage() {
               className={btnCls + ' disabled:opacity-50'}
             >
               {gcRunning ? t('settings.gcRunning') : t('settings.gc')}
+            </button>
+            <button
+              onClick={() => syncOnce().then(r => alert(r
+                ? t('settings.syncResult', { pushed: String(r.pushed), pulled: String(r.pulled), conflicts: String(r.conflicts) })
+                : t('settings.serverUnreachable')
+              ))}
+              className={btnCls}
+            >
+              {t('settings.syncOnce')}
             </button>
             {gcResult !== null && (
               <span className="text-xs text-ok-text">

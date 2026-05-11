@@ -239,12 +239,18 @@ Below is the relevant item list (format: name qty location notes, with item id a
 ${contextBlock || '(no matching items)'}
 
 Answer the user's question concisely in English, mentioning item names and locations. Do NOT include any id or [bracket markers] in the answer. Put all mentioned item ids separately in the citedIds array.
+Only cite items from the list above. If the user's question is not about items (e.g. greetings, chit-chat, unrelated topics), set \`answer\` to "No matching items found" and leave \`citedIds\` as an empty array.
+Do NOT fabricate item names, quantities, or locations that are not in the list.
+If the list is empty, set \`answer\` to "No items available to search" and \`citedIds\` to [].
 Return only JSON: {"answer": string, "citedIds": string[]}`
     : `你是家庭仓储助手。用户查询他们家里存放的物品。
 以下是相关物品列表（格式：名称 数量 位置 备注，行末括号内为物品 id）：
 ${contextBlock || '（无匹配物品）'}
 
 请用中文自然语言简洁回答用户问题，提及具体物品名称和位置即可，不要在回答中包含任何 id 或 [括号标记]。所有被提及的物品 id 单独放在 citedIds 数组里。
+仅从上面列表中引用物品；如果用户的问题不是物品查询（如问候、闲聊、与物品无关），\`answer\` 回答「没有找到相关物品」，\`citedIds\` 留空数组。
+禁止编造未在列表中出现的物品名称、数量、位置。
+如果列表为空，直接回答「没有可查询的物品」，不要编造。
 仅返回 JSON：{"answer": string, "citedIds": string[]}`;
 
   const url = getEffectiveBaseUrl(cfg);
