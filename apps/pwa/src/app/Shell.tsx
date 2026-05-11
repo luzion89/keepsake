@@ -189,6 +189,12 @@ export function Shell() {
   const [pending, setPending] = useState(0);
   const [online, setOnline] = useState<boolean>(navigator.onLine);
 
+  // #233: Reset scroll position on route change so the bottom nav stays
+  // anchored to the viewport after navigating away from a long page.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [loc.pathname]);
+
   useEffect(() => {
     const tick = async () => {
       setPending(await db.outbox.count());

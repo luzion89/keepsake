@@ -311,4 +311,51 @@ describe('searchAnswer() #89 — system prompt 不要求 AI 在 answer 中使用
       expect(res.result.answer).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}/i);
     }
   });
+
+  // #233 — prompt guard: 非物品查询 / 空列表约束
+  it('#233 zh prompt 含「没有找到相关物品」约束', async () => {
+    const { kvGet } = await import('../db/dexie.js');
+    (kvGet as ReturnType<typeof vi.fn>).mockResolvedValue({
+      mode: 'on', provider: 'openrouter', apiKey: 'sk-or-test',
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: JSON.stringify({ answer: '没有找到相关物品', citedIds: [] }) } }],
+      }),
+    }));
+
+    const { searchAnswer } = await import('./router.js');
+    await searchAnswer('你好', []);
+
+    const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body as string);
+    const sysPrompt: string = body.messages[0].content;
+    expect(sysPrompt).toContain('没有找到相关物品');
+    expect(sysPrompt).toContain('没有可查询的物品');
+    expect(sysPrompt).toContain('禁止编造');
+  });
+
+  it('#233 en prompt 含 "No matching items found" guard', async () => {
+    vi.stubGlobal('location', { origin: 'https://example.com' });
+    const { kvGet } = await import('../db/dexie.js');
+    (kvGet as ReturnType<typeof vi.fn>).mockResolvedValue({
+      mode: 'on', provider: 'openrouter', apiKey: 'sk-or-test',
+    });
+    // Stub getCurrentLang to return 'en'
+    vi.doMock('../i18n/I18nContext.js', () => ({ getCurrentLang: () => 'en' }));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: JSON.stringify({ answer: 'No matching items found', citedIds: [] }) } }],
+      }),
+    }));
+
+    const { searchAnswer } = await import('./router.js');
+    await searchAnswer('hello', []);
+
+    const body = JSON.parse((fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body as string);
+    const sysPrompt: string = body.messages[0].content;
+    expect(sysPrompt).toContain('No matching items found');
+    expect(sysPrompt).toContain('Do NOT fabricate');
+  });
 });

@@ -195,6 +195,9 @@ export const zh = {
   'search.items':          '物品',
   'search.itemLocation':   '{room} / {area}',
 
+  'search.tipAi':          '输入关键词或自然语言描述（例如"厨房有没有创可贴？"），AI 会从所有物品中找答案。',
+  'search.tipKeyword':     '输入关键词搜索物品名称、备注、标签。',
+
   // ── settings ────────────────────────────────────────────────────────
   'settings.title':               '设置',
   'settings.langSection':         '语言 / Language',
@@ -217,10 +220,6 @@ export const zh = {
   'settings.testOk':              '连通（{ms} ms）',
   'settings.testFail':            '失败：{error}',
   'settings.needApiKey':          '请先填写 API Key',
-  'settings.serverSection':       '本地服务器',
-  'settings.pingServer':          '检测连通性',
-  'settings.serverOnline':        '● 在线',
-  'settings.serverOffline':       '● 离线',
   'settings.syncOnce':            '立即同步',
   'settings.syncResult':          '已同步 推 {pushed} / 拉 {pulled} / 冲突 {conflicts}',
   'settings.serverUnreachable':   '服务器不可达',
@@ -448,6 +447,9 @@ export const en: Record<Key, string> = {
   'search.items':          'Items',
   'search.itemLocation':   '{room} / {area}',
 
+  'search.tipAi':          'Enter keywords or natural language (e.g. "Do we have band-aids in the kitchen?") and AI will search all items.',
+  'search.tipKeyword':     'Enter keywords to search item names, notes and tags.',
+
   // ── settings ────────────────────────────────────────────────────────
   'settings.title':               'Settings',
   'settings.langSection':         'Language / 语言',
@@ -470,10 +472,6 @@ export const en: Record<Key, string> = {
   'settings.testOk':              'Connected ({ms} ms)',
   'settings.testFail':            'Failed: {error}',
   'settings.needApiKey':          'Please enter an API Key first',
-  'settings.serverSection':       'Local Server',
-  'settings.pingServer':          'Check connectivity',
-  'settings.serverOnline':        '● Online',
-  'settings.serverOffline':       '● Offline',
   'settings.syncOnce':            'Sync now',
   'settings.syncResult':          'Synced — pushed {pushed} / pulled {pulled} / conflicts {conflicts}',
   'settings.serverUnreachable':   'Server unreachable',
