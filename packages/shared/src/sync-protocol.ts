@@ -20,6 +20,15 @@ export const OpSchema = z.discriminatedUnion('kind', [
     delta: z.number().int(),
     updated_at: z.number().int().nonnegative(),
   }),
+  z.object({
+    kind: z.literal('patch'),
+    table: TableNameSchema,
+    id: z.string().uuid(),
+    fields: z.record(z.unknown()),
+    updated_at: z.number().int().nonnegative(),
+    updated_by: z.string().min(1),
+    base_version: z.number().int().nonnegative(),
+  }),
 ]);
 export type Op = z.infer<typeof OpSchema>;
 

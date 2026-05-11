@@ -18,6 +18,46 @@ async function enqueue(table: TableName, row: any) {
   } as any);
 }
 
+// Array fields per table — if any changed field is in this set, fallback to upsert
+const ARRAY_FIELDS: Record<TableName, Set<string>> = {
+  room: new Set(['photo_ids']),
+  area: new Set(['photo_ids']),
+  item: new Set(['tags', 'photo_ids', 'bbox']),
+  photo: new Set([]),
+  snapshot: new Set(['item_ids']),
+  reminder_rule: new Set([]),
+};
+
+/** Returns only the keys that actually changed (array fields: always considered changed if present) */
+function diffPatch<T extends object>(cur: T, input: Partial<T>): Partial<T> {
+  const out: any = {};
+  for (const k of Object.keys(input) as (keyof T)[]) {
+    const v = input[k];
+    if (Array.isArray(cur[k]) || Array.isArray(v)) {
+      // For arrays use JSON comparison to detect real changes
+      if (JSON.stringify(cur[k]) !== JSON.stringify(v)) out[k] = v;
+    } else if (cur[k] !== v) {
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
+async function enqueuePatch(table: TableName, cur: any, changed: Record<string, unknown>, updated_at: number, updated_by: string) {
+  // Check if any changed field is an array field → fallback upsert
+  const arrayFields = ARRAY_FIELDS[table];
+  const hasArray = Object.keys(changed).some(k => arrayFields.has(k));
+  if (hasArray) {
+    // fallback: caller should enqueue upsert
+    return false;
+  }
+  await db.outbox.add({
+    enqueued_at: Date.now(),
+    op: { kind: 'patch', table, id: cur.id, fields: changed, updated_at, updated_by, base_version: cur.version },
+  } as any);
+  return true;
+}
+
 async function enqueueDelete(table: TableName, id: string, updated_at: number) {
   await db.outbox.add({
     enqueued_at: Date.now(),
@@ -40,9 +80,13 @@ export const RoomRepo = {
   },
   async update(id: string, patch: Partial<Pick<Room, 'name' | 'icon' | 'note'>>) {
     const cur = await db.rooms.get(id); if (!cur) return;
-    const next: Room = { ...cur, ...patch, ...(await meta()), version: cur.version + 1 };
+    const m = await meta();
+    const next: Room = { ...cur, ...patch, ...m, version: cur.version + 1 };
     await db.rooms.put(next);
-    await enqueue('room', next);
+    const changed = diffPatch(cur, patch as Partial<Room>);
+    if (Object.keys(changed).length === 0) return;
+    const patched = await enqueuePatch('room', cur, changed as Record<string, unknown>, m.updated_at, m.updated_by);
+    if (!patched) await enqueue('room', next);
   },
   async remove(id: string) {
     const cur = await db.rooms.get(id); if (!cur) return;
@@ -67,9 +111,13 @@ export const AreaRepo = {
   },
   async update(id: string, patch: Partial<Pick<Area, 'name' | 'note'>>) {
     const cur = await db.areas.get(id); if (!cur) return;
-    const next: Area = { ...cur, ...patch, ...(await meta()), version: cur.version + 1 };
+    const m = await meta();
+    const next: Area = { ...cur, ...patch, ...m, version: cur.version + 1 };
     await db.areas.put(next);
-    await enqueue('area', next);
+    const changed = diffPatch(cur, patch as Partial<Area>);
+    if (Object.keys(changed).length === 0) return;
+    const patched = await enqueuePatch('area', cur, changed as Record<string, unknown>, m.updated_at, m.updated_by);
+    if (!patched) await enqueue('area', next);
   },
   async remove(id: string) {
     const cur = await db.areas.get(id); if (!cur) return;
@@ -117,9 +165,13 @@ export const ItemRepo = {
   },
   async update(id: string, patch: Partial<Item>) {
     const cur = await db.items.get(id); if (!cur) return;
-    const next: Item = { ...cur, ...patch, ...(await meta()), version: cur.version + 1 };
+    const m = await meta();
+    const next: Item = { ...cur, ...patch, ...m, version: cur.version + 1 };
     await db.items.put(next);
-    await enqueue('item', next);
+    const changed = diffPatch(cur, patch);
+    if (Object.keys(changed).length === 0) return;
+    const patched = await enqueuePatch('item', cur, changed as Record<string, unknown>, m.updated_at, m.updated_by);
+    if (!patched) await enqueue('item', next);
   },
   async qtyDelta(id: string, delta: number) {
     const cur = await db.items.get(id); if (!cur) return;
@@ -165,9 +217,14 @@ export const PhotoRepo = {
   },
   async setRecognition(id: string, status: Photo['recognition_status'], result?: unknown) {
     const cur = await db.photos.get(id); if (!cur) return;
-    const next: Photo = { ...cur, recognition_status: status, recognition_result: result, ...(await meta()), version: cur.version + 1 };
+    const m = await meta();
+    const next: Photo = { ...cur, recognition_status: status, recognition_result: result, ...m, version: cur.version + 1 };
     await db.photos.put(next);
-    await enqueue('photo', next);
+    const patch: Partial<Photo> = { recognition_status: status, recognition_result: result };
+    const changed = diffPatch(cur, patch);
+    if (Object.keys(changed).length === 0) return;
+    const patched = await enqueuePatch('photo', cur, changed as Record<string, unknown>, m.updated_at, m.updated_by);
+    if (!patched) await enqueue('photo', next);
   },
   async remove(id: string) {
     const cur = await db.photos.get(id); if (!cur) return;
@@ -216,9 +273,14 @@ export const ReminderRepo = {
   },
   async updateFired(id: string) {
     const cur = await db.reminders.get(id); if (!cur) return;
-    const next: ReminderRule = { ...cur, last_fired_at: Date.now(), ...(await meta()), version: cur.version + 1 };
+    const m = await meta();
+    const last_fired_at = Date.now();
+    const next: ReminderRule = { ...cur, last_fired_at, ...m, version: cur.version + 1 };
     await db.reminders.put(next);
-    await enqueue('reminder_rule', next);
+    const changed = diffPatch(cur, { last_fired_at });
+    if (Object.keys(changed).length === 0) return;
+    const patched = await enqueuePatch('reminder_rule', cur, changed as Record<string, unknown>, m.updated_at, m.updated_by);
+    if (!patched) await enqueue('reminder_rule', next);
   },
   async remove(id: string) {
     const cur = await db.reminders.get(id); if (!cur) return;

@@ -81,13 +81,15 @@ describe('PhotoRepo.setRecognition — pending → done 状态切换', () => {
     expect(dbPhotos['photo-001'].version).toBe(before + 1);
   });
 
-  it('状态切换后向 outbox 推入一条 upsert 记录', async () => {
+  it('状态切换后向 outbox 推入一条记录（patch op，#225）', async () => {
     expect(outboxEntries.length).toBe(0);
     await PhotoRepo.setRecognition('photo-001', 'done', {});
     expect(outboxEntries.length).toBe(1);
     const entry = outboxEntries[0] as any;
-    expect(entry.op.kind).toBe('upsert');
+    // #225: setRecognition now emits a patch op (scalar fields only → no fallback)
+    expect(entry.op.kind).toBe('patch');
     expect(entry.op.table).toBe('photo');
+    expect(entry.op.fields).toHaveProperty('recognition_status', 'done');
   });
 
   it('photo 不存在时不 throw、不写 outbox', async () => {
