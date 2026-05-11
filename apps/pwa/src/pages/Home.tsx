@@ -220,7 +220,7 @@ export function HomePage() {
           </span>
         </button>
         <div
-          className="overflow-hidden transition-all duration-300 ease-out"
+          className="overflow-hidden rounded-[12px] transition-all duration-300 ease-out"
           style={{
             maxHeight: fabOpen ? '320px' : '0px',
             opacity: fabOpen ? 1 : 0,
