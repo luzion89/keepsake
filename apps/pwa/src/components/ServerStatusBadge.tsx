@@ -17,15 +17,3 @@ export function ServerStatusBadge() {
     </div>
   );
 }
-
-/** 主页 header 右侧小圆点（仅颜色，不显示文字） */
-export function ServerStatusDot() {
-  const status = useServerStatus();
-  const { color } = CONFIG[status];
-  return (
-    <span
-      className={`inline-block w-2.5 h-2.5 rounded-full flex-shrink-0 ${color}`}
-      title={CONFIG[status].label}
-    />
-  );
-}

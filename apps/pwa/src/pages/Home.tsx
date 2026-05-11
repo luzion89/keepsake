@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Home as HomeIcon, Package, Pencil, Plus, Trash2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Home as HomeIcon, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { Area, Room } from '@keepsake/shared';
 import { AreaRepo, ItemRepo, RoomRepo } from '../db/repos.js';
 import { useConfirm } from '../components/ConfirmDialog.js';
-import { ServerStatusDot } from '../components/ServerStatusBadge.js';
 
 const PRESETS = ['厨房', '客厅', '阳台', '主卧', '次卧', '卫生间', '储物间', '玄关'];
 
@@ -21,6 +20,7 @@ export function HomePage() {
   const touchStartX = useRef<number | null>(null);
   const editRef = useRef<HTMLInputElement>(null);
   const { confirm, dialog } = useConfirm();
+  const navigate = useNavigate();
 
   const reload = async () => {
     const rooms = await RoomRepo.list();
@@ -90,7 +90,6 @@ export function HomePage() {
       <h1 className="text-2xl font-bold font-serif text-ink flex items-center gap-2">
         <HomeIcon size={22} strokeWidth={1.5} />
         房间
-        <span className="ml-auto"><ServerStatusDot /></span>
       </h1>
 
       {/* ── 房间列表 ──────────────────────────────────── */}
@@ -115,12 +114,18 @@ export function HomePage() {
                 key={r.id}
                 className="relative overflow-hidden"
                 onClick={(e) => {
-                  // Collapse swipe if open (but not if clicking delete button)
+                  // 如已展开滑动状态，点击空白只收起（点删除按钮除外）
                   if (swipedId === r.id && !(e.target as HTMLElement).closest('[data-delete]')) {
                     e.preventDefault();
                     e.stopPropagation();
                     setSwipedId(null);
+                    return;
                   }
+                  // 编辑态不跳转
+                  if (editingId === r.id) return;
+                  // 按钮区不跳转（Pencil/Delete 按钮有 stopPropagation，此处兜底）
+                  if ((e.target as HTMLElement).closest('button')) return;
+                  navigate(`/rooms/${r.id}`);
                 }}
               >
                 {/* Delete background */}
@@ -158,13 +163,9 @@ export function HomePage() {
                     />
                   ) : (
                     <div className="flex-1 min-w-0 flex items-center gap-0">
-                      <Link
-                        to={`/rooms/${r.id}`}
-                        className="min-w-0 text-sm font-medium text-ink hover:text-ink-hover transition-colors truncate"
-                        onClick={(e) => { if (swipedId === r.id) e.preventDefault(); }}
-                      >
+                      <span className="min-w-0 text-sm font-medium text-ink truncate">
                         {r.name}
-                      </Link>
+                      </span>
                       {/* #192: 改名图标紧贴名称右侧 */}
                       <button
                         onClick={(e) => { e.stopPropagation(); startRename(r); }}
