@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ChevronLeft, Minus, Plus, X } from 'lucide-react';
+import { ChevronLeft, Minus, Plus, X, MapPin } from 'lucide-react';
 import type { Area, Item, Room, ReminderRule } from '@keepsake/shared';
 import { AreaRepo, ItemRepo, ReminderRepo, RoomRepo } from '../db/repos.js';
 import { db } from '../db/dexie.js';
@@ -339,7 +339,7 @@ export function ItemPage() {
         </Link>
         {(room || area) && (
           <div className="flex items-center gap-1 text-ink-muted">
-            <span className="text-xs">📍</span>
+            <MapPin size={12} strokeWidth={1.5} className="shrink-0" />
             {room ? (
               <Link to={`/rooms/${room.id}`} className="hover:text-ink transition-colors">{room.name}</Link>
             ) : null}

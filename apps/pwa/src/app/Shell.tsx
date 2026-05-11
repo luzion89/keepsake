@@ -1,6 +1,6 @@
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
-import { Bell, Home, Search, Settings, AlertTriangle } from 'lucide-react';
+import { Bell, Home, Search, Settings, AlertTriangle, X } from 'lucide-react';
 import { db, type ConflictRow } from '../db/dexie.js';
 import { syncOnce } from '../sync/client.js';
 import { scanReminders, type TriggeredReminder } from '../notifications/scanner.js';
@@ -157,7 +157,7 @@ function NotificationBanner() {
     <div className="bg-warn-bg border-b border-warn/30 px-4 py-2 text-xs flex items-center gap-2">
       <Bell size={14} strokeWidth={1.5} className="shrink-0 text-warn-text" />
       <span className="text-warn-text font-medium flex-1">
-        🔔 你有 {count} 条提醒
+        你有 {count} 条提醒
       </span>
       <button
         onClick={() => navigate('/reminders')}
@@ -170,7 +170,7 @@ function NotificationBanner() {
         className="text-warn-text/60 hover:text-warn-text transition-colors shrink-0 ml-1"
         aria-label="关闭"
       >
-        ✕
+        <X size={14} strokeWidth={1.5} />
       </button>
     </div>
   );
