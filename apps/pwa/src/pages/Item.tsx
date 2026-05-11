@@ -5,6 +5,7 @@ import type { Area, Item, Room, ReminderRule } from '@keepsake/shared';
 import { AreaRepo, ItemRepo, ReminderRepo, RoomRepo } from '../db/repos.js';
 import { db } from '../db/dexie.js';
 import { useConfirm } from '../components/ConfirmDialog.js';
+import { useT } from '../i18n/I18nContext.js';
 
 /** Calculate remaining days from now to a UTC ms timestamp, using local-date arithmetic. */
 function calcRemainingDays(expiresAtMs: number): number {
@@ -16,28 +17,28 @@ function calcRemainingDays(expiresAtMs: number): number {
 }
 
 function ExpiryBadge({ expiresAt }: { expiresAt: number }) {
+  const { t } = useT();
   const days = calcRemainingDays(expiresAt);
   if (days < 0) {
-    return <span className="ml-2 text-xs font-medium px-2 py-0.5 rounded-full bg-danger-bg text-danger-text">已过期</span>;
+    return <span className="ml-2 text-xs font-medium px-2 py-0.5 rounded-full bg-danger-bg text-danger-text">{t('item.expired')}</span>;
   }
   if (days < 7) {
-    return <span className="ml-2 text-xs font-medium px-2 py-0.5 rounded-full bg-danger-bg text-danger-text">剩 {days} 天</span>;
+    return <span className="ml-2 text-xs font-medium px-2 py-0.5 rounded-full bg-danger-bg text-danger-text">{t('item.daysLeft', { n: days })}</span>;
   }
   if (days <= 30) {
-    return <span className="ml-2 text-xs font-medium px-2 py-0.5 rounded-full bg-warn-bg text-warn-text">剩 {days} 天</span>;
+    return <span className="ml-2 text-xs font-medium px-2 py-0.5 rounded-full bg-warn-bg text-warn-text">{t('item.daysLeft', { n: days })}</span>;
   }
-  return <span className="ml-2 text-xs font-medium px-2 py-0.5 rounded-full bg-ok-bg text-ok-text">剩 {days} 天</span>;
+  return <span className="ml-2 text-xs font-medium px-2 py-0.5 rounded-full bg-ok-bg text-ok-text">{t('item.daysLeft', { n: days })}</span>;
 }
 
-// #181 fix: use string state for thresholdQtyStr so user can freely edit/clear
 function ReminderSection({ itemId }: { itemId: string }) {
+  const { t } = useT();
   const [rules, setRules] = useState<ReminderRule[]>([]);
   const [adding, setAdding] = useState(false);
   const [mainType, setMainType] = useState<'expiry_group' | 'low_stock'>('expiry_group');
   const [expirySubType, setExpirySubType] = useState<'expiry' | 'recheck'>('recheck');
   const [expiryDaysStr, setExpiryDaysStr] = useState('7');
   const [recheckDaysStr, setRecheckDaysStr] = useState('30');
-  // #181: string state allows clearing without auto-converting to 0
   const [thresholdQtyStr, setThresholdQtyStr] = useState('1');
   const [note, setNote] = useState('');
 
@@ -77,13 +78,13 @@ function ReminderSection({ itemId }: { itemId: string }) {
   };
 
   const kindLabel = (r: ReminderRule): string => {
-    if (r.kind === 'low_stock') return `库存不足（≤${r.threshold_qty ?? '?'}）`;
+    if (r.kind === 'low_stock') return t('reminder.kindLowStock', { threshold: String(r.threshold_qty ?? '?') });
     if (r.kind === 'expiry') {
       const days = r.threshold_at != null ? Math.round(r.threshold_at / 86400000) : 7;
-      return `过期提醒 · 有效期前 ${days} 天`;
+      return t('reminder.kindExpiry', { n: days });
     }
     const days = r.threshold_at != null ? Math.round(r.threshold_at / 86400000) : 30;
-    return `过期提醒 · 每隔 ${days} 天复查`;
+    return t('reminder.kindRecheck', { n: days });
   };
 
   const mainBtnCls = (active: boolean) =>
@@ -103,46 +104,46 @@ function ReminderSection({ itemId }: { itemId: string }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between px-4 py-2">
-        <span className="text-sm font-medium text-ink">提醒规则</span>
+        <span className="text-sm font-medium text-ink">{t('reminder.rules')}</span>
         <button
           onClick={() => setAdding(v => !v)}
           className="text-xs text-accent hover:text-accent-hover transition-colors flex items-center gap-1"
         >
           <Plus size={12} strokeWidth={2} />
-          添加提醒
+          {t('reminder.add')}
         </button>
       </div>
 
       {adding && (
         <div className="mx-4 mb-2 bg-paper-dark border border-[var(--border-default)] rounded-[12px] p-3 space-y-3 text-sm">
-          <p className="text-xs text-ink-muted">提醒方式：打开 App 时页面横幅提示（暂不支持系统推送）</p>
+          <p className="text-xs text-ink-muted">{t('reminder.method')}</p>
 
           <div>
-            <p className="text-xs text-ink-muted mb-1.5">提醒类型</p>
+            <p className="text-xs text-ink-muted mb-1.5">{t('reminder.type')}</p>
             <div className="flex gap-2">
               <button onClick={() => setMainType('expiry_group')} className={mainBtnCls(mainType === 'expiry_group')}>
-                过期提醒
+                {t('reminder.expiry')}
               </button>
               <button onClick={() => setMainType('low_stock')} className={mainBtnCls(mainType === 'low_stock')}>
-                库存不足
+                {t('reminder.lowStock')}
               </button>
             </div>
           </div>
 
           {mainType === 'expiry_group' && (
             <div className="space-y-2">
-              <p className="text-xs text-ink-muted">提醒策略</p>
+              <p className="text-xs text-ink-muted">{t('reminder.strategy')}</p>
 
               <button onClick={() => setExpirySubType('recheck')} className={subBtnCls(expirySubType === 'recheck')}>
                 <span className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${expirySubType === 'recheck' ? 'border-accent' : 'border-[var(--border-default)]'}`}>
                   {expirySubType === 'recheck' && <span className="w-2 h-2 rounded-full bg-accent" />}
                 </span>
                 <span className="flex-1 text-left">
-                  <span className={`font-medium ${expirySubType === 'recheck' ? 'text-accent' : 'text-ink'}`}>每隔 N 天复查</span>
-                  <span className="block text-xs text-ink-muted mt-0.5">无需设置有效期，定期提醒重新检查物品</span>
+                  <span className={`font-medium ${expirySubType === 'recheck' ? 'text-accent' : 'text-ink'}`}>{t('reminder.recheck')}</span>
+                  <span className="block text-xs text-ink-muted mt-0.5">{t('reminder.recheckDesc')}</span>
                   {expirySubType === 'recheck' && (
                     <div className="flex items-center gap-2 mt-2" onClick={e => e.stopPropagation()}>
-                      <span className="text-xs text-ink-muted">间隔天数</span>
+                      <span className="text-xs text-ink-muted">{t('reminder.intervalDays')}</span>
                       <input
                         type="number"
                         min={1}
@@ -154,7 +155,7 @@ function ReminderSection({ itemId }: { itemId: string }) {
                         }}
                         className="w-16 bg-paper-card border border-[var(--border-default)] rounded-[8px] px-2 py-1 text-xs outline-none focus:border-accent transition-all text-ink"
                       />
-                      <span className="text-xs text-ink-muted">天</span>
+                      <span className="text-xs text-ink-muted">{t('reminder.days')}</span>
                     </div>
                   )}
                 </span>
@@ -165,11 +166,11 @@ function ReminderSection({ itemId }: { itemId: string }) {
                   {expirySubType === 'expiry' && <span className="w-2 h-2 rounded-full bg-accent" />}
                 </span>
                 <span className="flex-1 text-left">
-                  <span className={`font-medium ${expirySubType === 'expiry' ? 'text-accent' : 'text-ink'}`}>过期前 N 天提醒</span>
-                  <span className="block text-xs text-ink-muted mt-0.5">需为物品设置有效期，在截止日前触发</span>
+                  <span className={`font-medium ${expirySubType === 'expiry' ? 'text-accent' : 'text-ink'}`}>{t('reminder.expiryBefore')}</span>
+                  <span className="block text-xs text-ink-muted mt-0.5">{t('reminder.expiryDesc')}</span>
                   {expirySubType === 'expiry' && (
                     <div className="flex items-center gap-2 mt-2" onClick={e => e.stopPropagation()}>
-                      <span className="text-xs text-ink-muted">提前天数</span>
+                      <span className="text-xs text-ink-muted">{t('reminder.advanceDays')}</span>
                       <input
                         type="number"
                         min={1}
@@ -181,7 +182,7 @@ function ReminderSection({ itemId }: { itemId: string }) {
                         }}
                         className="w-16 bg-paper-card border border-[var(--border-default)] rounded-[8px] px-2 py-1 text-xs outline-none focus:border-accent transition-all text-ink"
                       />
-                      <span className="text-xs text-ink-muted">天</span>
+                      <span className="text-xs text-ink-muted">{t('reminder.days')}</span>
                     </div>
                   )}
                 </span>
@@ -189,10 +190,9 @@ function ReminderSection({ itemId }: { itemId: string }) {
             </div>
           )}
 
-          {/* #181 fix: thresholdQtyStr string state, blur 时校验 */}
           {mainType === 'low_stock' && (
             <div className="flex items-center gap-2">
-              <span className="text-ink-muted text-xs">库存阈值</span>
+              <span className="text-ink-muted text-xs">{t('reminder.stockThreshold')}</span>
               <input
                 type="number"
                 min={0}
@@ -204,19 +204,19 @@ function ReminderSection({ itemId }: { itemId: string }) {
                 }}
                 className="w-20 bg-paper-card border border-[var(--border-default)] rounded-[12px] px-3 py-1.5 outline-none focus:border-accent transition-all text-ink"
               />
-              <span className="text-xs text-ink-muted">（数量 ≤ 此值时提醒）</span>
+              <span className="text-xs text-ink-muted">{t('reminder.thresholdHint')}</span>
             </div>
           )}
 
           <input
             value={note}
             onChange={e => setNote(e.target.value)}
-            placeholder="备注（可选）"
+            placeholder={t('reminder.noteLabel')}
             className="w-full bg-paper-card border border-[var(--border-default)] rounded-[12px] px-3 py-2 outline-none focus:border-accent transition-all text-ink placeholder:text-ink-muted"
           />
           <div className="flex gap-2">
-            <button onClick={save} className="flex-1 px-3 py-2 rounded-[12px] bg-accent hover:bg-accent-hover text-paper font-medium transition-all">保存</button>
-            <button onClick={() => setAdding(false)} className="px-3 py-2 rounded-[12px] border border-[var(--border-default)] text-ink-muted hover:text-ink transition-all">取消</button>
+            <button onClick={save} className="flex-1 px-3 py-2 rounded-[12px] bg-accent hover:bg-accent-hover text-paper font-medium transition-all">{t('common.save')}</button>
+            <button onClick={() => setAdding(false)} className="px-3 py-2 rounded-[12px] border border-[var(--border-default)] text-ink-muted hover:text-ink transition-all">{t('common.cancel')}</button>
           </div>
         </div>
       )}
@@ -232,7 +232,7 @@ function ReminderSection({ itemId }: { itemId: string }) {
               <button
                 onClick={() => remove(r.id)}
                 className="min-w-[44px] min-h-[44px] text-ink-muted hover:text-danger-text transition-colors flex items-center justify-center"
-                aria-label="删除提醒"
+                aria-label={t('reminder.deleteLabel')}
               >
                 <X size={16} strokeWidth={1.5} />
               </button>
@@ -267,6 +267,7 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
 }
 
 export function ItemPage() {
+  const { t, lang } = useT();
   const { itemId = '' } = useParams();
   const [item, setItem] = useState<Item | undefined>();
   const [area, setArea] = useState<Area | undefined>();
@@ -297,7 +298,7 @@ export function ItemPage() {
   };
   useEffect(() => { reload(); }, [itemId]);
 
-  if (!item) return <p className="text-ink-muted">加载中…</p>;
+  if (!item) return <p className="text-ink-muted">{t('item.notFound')}</p>;
 
   const save = async () => {
     const expires_at = draft.expiresDate
@@ -317,17 +318,18 @@ export function ItemPage() {
   };
 
   const remove = async () => {
-    if (!await confirm(`删除 "${item.name}"?`, { danger: true, okText: '删除' })) return;
+    if (!await confirm(t('item.deleteConfirm', { name: item.name }), { danger: true, okText: t('common.delete') })) return;
     await ItemRepo.remove(item.id);
     history.back();
   };
 
-  // #180: quick adjust qty from view mode
   const adjustQty = async (delta: number) => {
     const newQty = Math.max(0, item.qty + delta);
     await ItemRepo.update(item.id, { qty: newQty });
     await reload();
   };
+
+  const locale = lang === 'en' ? 'en-US' : 'zh-CN';
 
   return (
     <div className="space-y-5">
@@ -335,7 +337,7 @@ export function ItemPage() {
       <nav className="text-xs text-ink-muted space-y-1">
         <Link to={`/areas/${item.area_id}`} className="hover:text-ink transition-colors flex items-center gap-1">
           <ChevronLeft size={14} strokeWidth={1.5} />
-          返回区域
+          {t('item.backToArea')}
         </Link>
         {(room || area) && (
           <div className="flex items-center gap-1 text-ink-muted">
@@ -353,15 +355,15 @@ export function ItemPage() {
 
       {editing ? (
         <div className="space-y-4">
-          <SectionCard label="基本信息">
-            <FieldRow label="名称">
+          <SectionCard label={t('item.basicInfo')}>
+            <FieldRow label={t('item.name')}>
               <input
                 value={draft.name}
                 onChange={(e) => setDraft({ ...draft, name: e.target.value })}
                 className="w-full bg-transparent text-sm text-ink outline-none py-1"
               />
             </FieldRow>
-            <FieldRow label="数量">
+            <FieldRow label={t('item.qty')}>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
@@ -372,15 +374,15 @@ export function ItemPage() {
                 <input
                   value={draft.unit}
                   onChange={(e) => setDraft({ ...draft, unit: e.target.value })}
-                  placeholder="单位"
+                  placeholder={t('item.unitPlaceholder')}
                   className="w-20 bg-paper-dark border border-[var(--border-default)] rounded-[8px] px-3 py-1.5 text-sm outline-none focus:border-accent transition-all text-ink placeholder:text-ink-muted"
                 />
               </div>
             </FieldRow>
           </SectionCard>
 
-          <SectionCard label="时间">
-            <FieldRow label="过期时间">
+          <SectionCard label={t('item.time')}>
+            <FieldRow label={t('item.expiresAt')}>
               <div className="flex items-center gap-2">
                 <input
                   type="date"
@@ -393,42 +395,42 @@ export function ItemPage() {
                 )}
               </div>
             </FieldRow>
-            <FieldRow label="创建于">
+            <FieldRow label={t('item.createdAt')}>
               <span className="text-sm text-ink-muted">
-                {new Date(item.updated_at).toLocaleDateString('zh-CN')}
+                {new Date(item.updated_at).toLocaleDateString(locale)}
               </span>
             </FieldRow>
           </SectionCard>
 
-          <SectionCard label="描述">
+          <SectionCard label={t('item.description')}>
             <div className="px-4 py-3">
-              <label className="text-xs text-ink-muted block mb-1.5">备注</label>
+              <label className="text-xs text-ink-muted block mb-1.5">{t('item.notes')}</label>
               <textarea
                 value={draft.notes}
                 onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
-                placeholder="备注"
+                placeholder={t('item.notesPlaceholder')}
                 rows={3}
                 className="w-full bg-paper-dark border border-[var(--border-default)] rounded-[8px] px-3 py-2 text-sm resize-none outline-none focus:border-accent transition-all text-ink placeholder:text-ink-muted"
               />
             </div>
             <div className="px-4 py-3 border-t border-[var(--border-subtle)]">
-              <label className="text-xs text-ink-muted block mb-1.5">标签（逗号分隔）</label>
+              <label className="text-xs text-ink-muted block mb-1.5">{t('item.tags')}</label>
               <input
                 value={draft.tags}
                 onChange={(e) => setDraft({ ...draft, tags: e.target.value })}
-                placeholder="如 清洁用品, 备用"
+                placeholder={t('item.tagsPlaceholder')}
                 className="w-full bg-paper-dark border border-[var(--border-default)] rounded-[8px] px-3 py-2 text-sm outline-none focus:border-accent transition-all text-ink placeholder:text-ink-muted"
               />
             </div>
           </SectionCard>
 
-          <SectionCard label="提醒">
+          <SectionCard label={t('item.reminders')}>
             <ReminderSection itemId={itemId} />
           </SectionCard>
 
           <div className="flex gap-2">
-            <button onClick={save} className="flex-1 py-2.5 rounded-[12px] bg-accent hover:bg-accent-hover text-paper font-medium shadow-card transition-all active:scale-[0.97]">保存</button>
-            <button onClick={() => setEditing(false)} className="px-4 py-2.5 rounded-[12px] border border-[var(--border-default)] text-ink-muted hover:text-ink hover:border-ink/30 transition-all">取消</button>
+            <button onClick={save} className="flex-1 py-2.5 rounded-[12px] bg-accent hover:bg-accent-hover text-paper font-medium shadow-card transition-all active:scale-[0.97]">{t('common.save')}</button>
+            <button onClick={() => setEditing(false)} className="px-4 py-2.5 rounded-[12px] border border-[var(--border-default)] text-ink-muted hover:text-ink hover:border-ink/30 transition-all">{t('common.cancel')}</button>
           </div>
         </div>
       ) : (
@@ -438,24 +440,24 @@ export function ItemPage() {
             {item.expires_at != null && <ExpiryBadge expiresAt={item.expires_at} />}
           </div>
 
-          {/* #180: 数量大字 + 快速加减按钮 */}
+          {/* Quick qty adjust */}
           <div className="flex items-center gap-3">
             <button
               onClick={() => adjustQty(-1)}
               disabled={item.qty <= 0}
               className="w-9 h-9 flex items-center justify-center rounded-full border border-[var(--border-default)] text-ink-muted hover:border-accent hover:text-ink disabled:opacity-30 transition-all active:scale-95"
-              aria-label="减少数量"
+              aria-label={t('item.decreaseQty')}
             >
               <Minus size={16} strokeWidth={1.5} />
             </button>
             <div className="flex items-baseline gap-1.5">
               <span className="text-3xl font-bold font-serif text-ink">{item.qty}</span>
-              <span className="text-ink-muted text-sm">{item.unit || '个'}</span>
+              <span className="text-ink-muted text-sm">{item.unit || t('common.unit.default')}</span>
             </div>
             <button
               onClick={() => adjustQty(+1)}
               className="w-9 h-9 flex items-center justify-center rounded-full border border-[var(--border-default)] text-ink-muted hover:border-accent hover:text-ink transition-all active:scale-95"
-              aria-label="增加数量"
+              aria-label={t('item.increaseQty')}
             >
               <Plus size={16} strokeWidth={1.5} />
             </button>
@@ -463,13 +465,13 @@ export function ItemPage() {
 
           <div className="space-y-1 text-xs text-ink-muted">
             {item.created_at != null && (
-              <p>创建于：{new Date(item.created_at).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</p>
+              <p>{t('item.createdAtLabel', { date: new Date(item.created_at).toLocaleString(locale, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) })}</p>
             )}
             {item.expires_at != null && (
-              <p>过期时间：{new Date(item.expires_at).toLocaleDateString('zh-CN')}</p>
+              <p>{t('item.expiresAtLabel', { date: new Date(item.expires_at).toLocaleDateString(locale) })}</p>
             )}
             {item.source !== 'manual' && (
-              <p>来源：{item.source}{item.confidence != null && ` · 置信度 ${(item.confidence * 100).toFixed(0)}%`}</p>
+              <p>{t('item.source', { source: item.source })}{item.confidence != null && t('item.confidence', { pct: (item.confidence * 100).toFixed(0) })}</p>
             )}
           </div>
 
@@ -479,8 +481,8 @@ export function ItemPage() {
 
           {item.tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
-              {item.tags.map(t => (
-                <span key={t} className="text-xs px-2.5 py-1 rounded-full bg-paper-card border border-[var(--border-default)] text-ink-muted">{t}</span>
+              {item.tags.map(tag => (
+                <span key={tag} className="text-xs px-2.5 py-1 rounded-full bg-paper-card border border-[var(--border-default)] text-ink-muted">{tag}</span>
               ))}
             </div>
           )}
@@ -490,13 +492,13 @@ export function ItemPage() {
               onClick={() => setEditing(true)}
               className="flex-1 py-2.5 rounded-[12px] border border-[var(--border-default)] hover:border-accent text-ink text-sm font-medium transition-all"
             >
-              编辑
+              {t('common.edit')}
             </button>
             <button
               onClick={remove}
               className="px-4 py-2.5 rounded-[12px] border border-danger/30 text-danger-text hover:bg-danger-bg text-sm transition-all"
             >
-              删除
+              {t('common.delete')}
             </button>
           </div>
 

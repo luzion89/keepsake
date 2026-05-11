@@ -6,6 +6,7 @@ import { db } from '../db/dexie.js';
 import { ItemRepo } from '../db/repos.js';
 import { getAiConfig, getEffectiveApiKey, searchAnswer } from '../ai/router.js';
 import type { SearchContext, SearchAnswerResult } from '../ai/router.js';
+import { useT } from '../i18n/I18nContext.js';
 
 /** Simple in-app toast (auto-dismisses after 2.5 s) */
 function useToast() {
@@ -23,6 +24,7 @@ function useToast() {
 }
 
 export function SearchPage() {
+  const { t } = useT();
   const [q, setQ] = useState('');
   const [items, setItems] = useState<Item[]>([]);
   const [areas, setAreas] = useState<Map<string, Area>>(new Map());
@@ -74,7 +76,7 @@ export function SearchPage() {
 
   const askAi = async () => {
     if (!aiEnabled) {
-      toast.show('请先在设置里启用 AI 功能');
+      toast.show(t('settings.needApiKey'));
       return;
     }
     if (!q.trim()) return;
@@ -118,21 +120,15 @@ export function SearchPage() {
       });
   }, [aiResult, items, areas, rooms]);
 
-  // #186: when AI result is active, don't show keyword match results
   const showGrouped = !aiResult && !aiError;
 
   return (
     <div className="space-y-4">
       {toast.node}
 
-      <h1 className="text-2xl font-bold font-serif text-ink flex items-center gap-2"><SearchIcon size={22} strokeWidth={1.5} />搜索物品</h1>
+      <h1 className="text-2xl font-bold font-serif text-ink flex items-center gap-2"><SearchIcon size={22} strokeWidth={1.5} />{t('search.title')}</h1>
 
-      <div className="bg-paper-card border border-ink/10 rounded-[12px] px-4 py-3 text-sm text-ink-muted leading-relaxed">
-        直接搜索关键词，也可以用语音输入一段模糊的描述，让 AI 帮忙查找符合描述的物品
-      </div>
-
-      {/* ── 搜索输入框 + AI 按钮 ─────────────────────── */}
-      {/* #188: 调整 letter-spacing + line-height，确保失焦时单行显示不裁字 */}
+      {/* Search input + AI button */}
       <div className="flex gap-2">
         <textarea
           value={q}
@@ -147,11 +143,10 @@ export function SearchPage() {
             e.target.style.height = e.target.scrollHeight + 'px';
           }}
           onBlur={(e) => {
-            // #188: single line height = lineHeight (24px) + paddingTop (12px) + paddingBottom (12px) = 48px
             e.target.style.height = '48px';
             e.target.style.overflow = 'hidden';
           }}
-          placeholder="输入关键词…"
+          placeholder={aiEnabled ? t('search.aiPlaceholder') : t('search.placeholder')}
           rows={1}
           className="flex-1 bg-paper-card border border-[var(--border-default)] rounded-[12px] px-4 py-3 text-base outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-150 text-ink placeholder:text-ink-muted resize-none overflow-hidden"
           style={{ minHeight: '48px', lineHeight: '1.5', letterSpacing: '0.01em' }}
@@ -165,9 +160,7 @@ export function SearchPage() {
               : 'border border-[var(--border-default)] text-ink-muted opacity-60'
           }`}
         >
-          {aiLoading ? (
-            '思考中…'
-          ) : (
+          {aiLoading ? t('search.aiSearching') : (
             <>
               <Sparkles size={16} strokeWidth={1.5} />
               AI
@@ -176,9 +169,8 @@ export function SearchPage() {
         </button>
       </div>
 
-      {/* ── #186: 仅在没有 AI 结果时显示关键词匹配结果 ── */}
       {showGrouped && q.trim() && items.length === 0 && (
-        <p className="text-ink-muted text-sm pt-2">没有找到 "{q}"。</p>
+        <p className="text-ink-muted text-sm pt-2">{t('search.empty', { q })}</p>
       )}
 
       {showGrouped && grouped.map(([areaId, list]) => {
@@ -211,15 +203,15 @@ export function SearchPage() {
         );
       })}
 
-      {/* ── AI Answer 卡片 ────────────────────────────── */}
+      {/* AI Answer card */}
       {(aiResult || aiError) && (
         <section className="mt-2 p-4 rounded-[12px] bg-paper-card border border-accent/30 space-y-2">
           <div className="flex items-center gap-2 text-sm font-semibold text-accent">
             <Sparkles size={16} strokeWidth={1.5} />
-            AI 回答
+            {t('search.aiAnswer')}
           </div>
           {aiError && (
-            <p className="text-danger-text text-sm">{aiError}</p>
+            <p className="text-danger-text text-sm">{t('search.aiError', { error: aiError })}</p>
           )}
           {aiResult && (
             <p className="text-ink text-sm leading-relaxed whitespace-pre-wrap">{aiResult.answer}</p>
@@ -227,12 +219,11 @@ export function SearchPage() {
         </section>
       )}
 
-      {/* ── AI 提到的物品 ──────────────────────────── */}
       {citedItems.length > 0 && (
         <section className="mt-2">
           <p className="text-xs text-ink-muted font-medium mb-2 flex items-center gap-1">
             <Pin size={12} strokeWidth={1.5} />
-            AI 提到的物品
+            {t('search.items')}
           </p>
           <div className="flex flex-wrap gap-2">
             {citedItems.map(it => (

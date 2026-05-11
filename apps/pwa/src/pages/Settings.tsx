@@ -11,6 +11,7 @@ import { db, getDeviceId } from '../db/dexie.js';
 import { syncOnce } from '../sync/client.js';
 import { ServerStatusBadge } from '../components/ServerStatusBadge.js';
 import { gcSyncedBlobs } from '../sync/blobs.js';
+import { useT } from '../i18n/I18nContext.js';
 
 interface StorageQuota {
   usageMB: number;
@@ -48,10 +49,6 @@ function SectionRow({ children }: { children: React.ReactNode }) {
 
 const inputCls = 'w-full bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all placeholder:text-ink-muted';
 
-/**
- * #184 fix: SettingsSkeleton now includes a matching inline save button placeholder
- * to prevent any layout shift when real content loads.
- */
 function SettingsSkeleton() {
   return (
     <div className="space-y-6 animate-pulse">
@@ -73,13 +70,13 @@ function SettingsSkeleton() {
           </div>
         </div>
       </div>
-      {/* #184: inline save button placeholder — same height as real button */}
       <div className="h-12 bg-paper-dark rounded-[12px]" />
     </div>
   );
 }
 
 export function SettingsPage() {
+  const { t, lang, setLang } = useT();
   const [cfg, setCfg] = useState<AiConfig | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [deviceId, setDeviceId] = useState('');
@@ -126,14 +123,14 @@ export function SettingsPage() {
     if (result.ok) {
       setSaveError(null);
     } else {
-      setSaveError(result.error ?? '未知错误');
+      setSaveError(result.error ?? t('settings.unknownError'));
     }
   };
 
   const pingAi = async () => {
     if (!cfg) return;
     const key = effectiveProvider === 'deepseek' ? cfg.deepseekApiKey?.trim() : cfg.apiKey?.trim();
-    if (!key) { setAiPingResult({ ok: false, error: '请先填写 API Key' }); return; }
+    if (!key) { setAiPingResult({ ok: false, error: t('settings.needApiKey') }); return; }
     setAiPingState('pinging');
     setAiPingResult(null);
     const result = await pingProvider(effectiveProvider, key);
@@ -179,22 +176,40 @@ export function SettingsPage() {
 
   const btnCls = 'px-3 py-2 rounded-[12px] border border-[var(--border-default)] text-sm text-ink hover:border-accent/60 hover:text-ink-hover transition-all';
 
-  // #184: Show skeleton until fully loaded — prevents any flash of sticky save button
   if (!loaded) return <SettingsSkeleton />;
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold font-serif text-ink flex items-center gap-2"><SettingsIcon size={22} strokeWidth={1.5} />设置</h1>
+      <h1 className="text-2xl font-bold font-serif text-ink flex items-center gap-2"><SettingsIcon size={22} strokeWidth={1.5} />{t('settings.title')}</h1>
 
-      {/* ── Server 连接状态 (#215) ─────────────────── */}
+      {/* ── Server status ─────────────────────────────────────── */}
       <ServerStatusBadge />
 
-      {/* ── AI 助手 ─────────────────────────────────── */}
-      <Section title="AI 助手">
+      {/* ── Language ──────────────────────────────────────────── */}
+      <Section title={t('settings.langSection')}>
         <SectionRow>
-          <p className="text-xs text-ink-muted mb-3">
-            Key 保存到本地 IndexedDB；保存时立即推送到本地服务器（需服务器在线），其它设备启动时拉取，更新时间最新者胜。
-          </p>
+          <div className="flex gap-2">
+            {(['zh', 'en'] as const).map(l => (
+              <label
+                key={l}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-[12px] border cursor-pointer text-sm transition-all ${
+                  lang === l
+                    ? 'border-accent/60 bg-accent-light text-accent'
+                    : 'border-[var(--border-default)] text-ink-muted hover:border-accent/30'
+                }`}
+              >
+                <input type="radio" className="sr-only" checked={lang === l} onChange={() => setLang(l)} />
+                {l === 'zh' ? t('settings.langZh') : t('settings.langEn')}
+              </label>
+            ))}
+          </div>
+        </SectionRow>
+      </Section>
+
+      {/* ── AI assistant ──────────────────────────────────────── */}
+      <Section title={t('settings.aiSection')}>
+        <SectionRow>
+          <p className="text-xs text-ink-muted mb-3">{t('settings.aiKeyHint')}</p>
           <div className="space-y-2 text-sm">
             {(['on','off'] as const).map(m => (
               <label key={m} className={`flex items-center justify-between px-3 py-2.5 rounded-[12px] border cursor-pointer transition-all ${
@@ -203,8 +218,8 @@ export function SettingsPage() {
                   : 'border-[var(--border-default)] hover:border-accent/30'
               }`}>
                 <span className="text-sm text-ink">
-                  {m === 'on' && '启用 AI（语音输入 / 自然语言搜索）'}
-                  {m === 'off' && '关闭 AI（仅手动管理）'}
+                  {m === 'on' && t('settings.aiOn')}
+                  {m === 'off' && t('settings.aiOff')}
                 </span>
                 <input
                   type="radio"
@@ -220,7 +235,7 @@ export function SettingsPage() {
         {cfg?.mode === 'on' && (
           <>
             <SectionRow>
-              <p className="text-xs text-ink-muted mb-2">AI 服务商</p>
+              <p className="text-xs text-ink-muted mb-2">{t('settings.aiProvider')}</p>
               <div className="flex gap-2">
                 {(['deepseek', 'openrouter'] as const).map(p => (
                   <label
@@ -232,7 +247,7 @@ export function SettingsPage() {
                     }`}
                   >
                     <input type="radio" className="sr-only" checked={effectiveProvider === p} onChange={() => setCfg({ ...cfg!, provider: p })} />
-                    {p === 'deepseek' ? 'DeepSeek（推荐）' : 'OpenRouter'}
+                    {p === 'deepseek' ? t('settings.deepseekRecommended') : 'OpenRouter'}
                   </label>
                 ))}
               </div>
@@ -243,14 +258,14 @@ export function SettingsPage() {
                 <div className="space-y-3">
                   <div>
                     <label className="block text-xs text-ink-muted mb-1.5">
-                      DeepSeek API Key{' '}
-                      <a href="https://platform.deepseek.com" target="_blank" rel="noreferrer" className="text-accent underline hover:text-accent-hover">申请 →</a>
+                      {t('settings.deepseekKeyLabel')}{' '}
+                      <a href="https://platform.deepseek.com" target="_blank" rel="noreferrer" className="text-accent underline hover:text-accent-hover">{t('settings.deepseekApply')}</a>
                     </label>
                     <input type="password" value={cfg!.deepseekApiKey ?? ''} onChange={(e) => setCfg({ ...cfg!, deepseekApiKey: e.target.value })} placeholder="sk-..." className={`${inputCls} font-mono`} autoComplete="off" />
-                    <p className="text-xs text-ink-muted mt-1.5">DeepSeek 不支持图像识别；如需 AI 拍照存档请切换到 OpenRouter。</p>
+                    <p className="text-xs text-ink-muted mt-1.5">{t('settings.deepseekNoVision')}</p>
                   </div>
                   <div>
-                    <label className="block text-xs text-ink-muted mb-1.5">模型（默认 {DEFAULT_DEEPSEEK_MODEL}）</label>
+                    <label className="block text-xs text-ink-muted mb-1.5">{t('settings.modelLabel', { model: DEFAULT_DEEPSEEK_MODEL })}</label>
                     <input value={cfg!.model ?? ''} onChange={(e) => setCfg({ ...cfg!, model: e.target.value })} placeholder={DEFAULT_DEEPSEEK_MODEL} className={inputCls} />
                   </div>
                 </div>
@@ -261,11 +276,11 @@ export function SettingsPage() {
               <SectionRow>
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-xs text-ink-muted mb-1.5">OpenRouter API Key</label>
+                    <label className="block text-xs text-ink-muted mb-1.5">{t('settings.openrouterKeyLabel')}</label>
                     <input type="password" value={cfg!.apiKey ?? ''} onChange={(e) => setCfg({ ...cfg!, apiKey: e.target.value })} placeholder="sk-or-v1-..." className={`${inputCls} font-mono`} autoComplete="off" />
                   </div>
                   <div>
-                    <label className="block text-xs text-ink-muted mb-1.5">视觉模型（默认 {DEFAULT_MODEL}）</label>
+                    <label className="block text-xs text-ink-muted mb-1.5">{t('settings.visionModelLabel', { model: DEFAULT_MODEL })}</label>
                     <input
                       value={cfg!.model === DEFAULT_DEEPSEEK_MODEL ? '' : (cfg!.model ?? '')}
                       onChange={(e) => setCfg({ ...cfg!, model: e.target.value })}
@@ -274,7 +289,7 @@ export function SettingsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-ink-muted mb-1.5">语音转写模型（需支持 audio 输入，默认同上）</label>
+                    <label className="block text-xs text-ink-muted mb-1.5">{t('settings.transcribeModelLabel')}</label>
                     <input value={cfg!.transcribeModel ?? ''} onChange={(e) => setCfg({ ...cfg!, transcribeModel: e.target.value })} placeholder={DEFAULT_TRANSCRIBE_MODEL} className={inputCls} />
                   </div>
                 </div>
@@ -288,16 +303,16 @@ export function SettingsPage() {
                   disabled={aiPingState === 'pinging'}
                   className={btnCls + ' disabled:opacity-50'}
                 >
-                  {aiPingState === 'pinging' ? '测试中…' : '测试连通性'}
+                  {aiPingState === 'pinging' ? t('settings.testing') : t('settings.testBtn')}
                 </button>
                 {aiPingResult?.ok === true && (
                   <span className="text-ok-text text-xs flex items-center gap-1">
                     <Check size={12} strokeWidth={2} />
-                    连通（{aiPingResult.latencyMs} ms）
+                    {t('settings.testOk', { ms: String(aiPingResult.latencyMs) })}
                   </span>
                 )}
                 {aiPingResult?.ok === false && (
-                  <span className="text-danger-text text-xs flex items-center gap-1"><X size={12} strokeWidth={2} />失败：{aiPingResult.error}</span>
+                  <span className="text-danger-text text-xs flex items-center gap-1"><X size={12} strokeWidth={2} />{t('settings.testFail', { error: aiPingResult.error ?? '' })}</span>
                 )}
               </div>
             </SectionRow>
@@ -305,35 +320,44 @@ export function SettingsPage() {
         )}
       </Section>
 
-      {/* ── 本地服务器 ─────────────────────────────── */}
-      <Section title="本地服务器">
+      {/* ── Local server ──────────────────────────────────────── */}
+      <Section title={t('settings.serverSection')}>
         <SectionRow>
           <div className="flex items-center gap-2 flex-wrap">
             <button onClick={ping} className={btnCls}>
-              检测连通性
+              {t('settings.pingServer')}
             </button>
-            {serverOk === true && <span className="text-ok-text text-sm">● 在线</span>}
-            {serverOk === false && <span className="text-danger-text text-sm">● 离线</span>}
+            {serverOk === true && <span className="text-ok-text text-sm">{t('settings.serverOnline')}</span>}
+            {serverOk === false && <span className="text-danger-text text-sm">{t('settings.serverOffline')}</span>}
             <button
-              onClick={() => syncOnce().then(r => alert(r ? `已同步 推 ${r.pushed} / 拉 ${r.pulled} / 冲突 ${r.conflicts}` : '服务器不可达'))}
+              onClick={() => syncOnce().then(r => alert(r
+                ? t('settings.syncResult', { pushed: String(r.pushed), pulled: String(r.pulled), conflicts: String(r.conflicts) })
+                : t('settings.serverUnreachable')
+              ))}
               className={btnCls}
             >
-              立即同步
+              {t('settings.syncOnce')}
             </button>
           </div>
         </SectionRow>
       </Section>
 
-      {/* ── 本机数据 ──────────────────────────────── */}
-      <Section title="本机数据">
+      {/* ── Local data ────────────────────────────────────────── */}
+      <Section title={t('settings.dataSection')}>
         <SectionRow>
-          <p className="text-xs text-ink-muted mb-1">设备 ID</p>
+          <p className="text-xs text-ink-muted mb-1">{t('settings.deviceId')}</p>
           <p className="font-mono text-xs text-ink">{deviceId}</p>
         </SectionRow>
         <SectionRow>
-          <p className="text-xs text-ink-muted mb-1">统计</p>
+          <p className="text-xs text-ink-muted mb-1">{t('settings.stats')}</p>
           <p className="text-xs text-ink">
-            房间 {stats.rooms} · 区域 {stats.areas} · 物品 {stats.items} · 照片 {stats.photos} · 待同步 {stats.outbox}
+            {t('settings.statsValue', {
+              rooms: stats.rooms,
+              areas: stats.areas,
+              items: stats.items,
+              photos: stats.photos,
+              outbox: stats.outbox,
+            })}
           </p>
         </SectionRow>
 
@@ -341,12 +365,12 @@ export function SettingsPage() {
           <SectionRow>
             <div className="space-y-1.5">
               <p className={`text-xs flex items-center gap-1 ${quota.pct > 80 ? 'text-danger-text font-medium' : 'text-ink-muted'}`}>
-                本地存储 {quota.usageMB.toFixed(1)} MB / {quota.quotaMB.toFixed(0)} MB（{quota.pct}%）
+                {t('settings.storageLabel', { usage: quota.usageMB.toFixed(1), quota: quota.quotaMB.toFixed(0), pct: String(quota.pct) })}
                 {quota.pct > 80 && (
                   <>
                     {' '}
                     <AlertTriangle size={12} strokeWidth={1.5} className="shrink-0" />
-                    空间紧张
+                    {t('settings.storageTight')}
                   </>
                 )}
               </p>
@@ -363,43 +387,43 @@ export function SettingsPage() {
         <SectionRow>
           <div className="flex items-center gap-2 flex-wrap">
             <button onClick={exportJson} className={btnCls}>
-              导出 JSON 备份
+              {t('settings.exportJson')}
             </button>
             <button
               onClick={runGc}
               disabled={gcRunning}
               className={btnCls + ' disabled:opacity-50'}
             >
-              {gcRunning ? '清理中…' : '清理本地缓存'}
+              {gcRunning ? t('settings.gcRunning') : t('settings.gc')}
             </button>
             {gcResult !== null && (
               <span className="text-xs text-ok-text">
-                {gcResult > 0 ? `已释放 ${gcResult} 个已同步 blob` : '无可清理项'}
+                {gcResult > 0 ? t('settings.gcDone', { n: gcResult }) : t('settings.gcNone')}
               </span>
             )}
           </div>
         </SectionRow>
       </Section>
 
-      {/* ── #184 fix: 保存按钮改为 inline 正常文档流，不再 sticky ── */}
+      {/* ── Save button ───────────────────────────────────────── */}
       <div className="pt-2 pb-6">
         <button
           onClick={save}
           className="w-full py-3.5 rounded-[12px] bg-accent hover:bg-accent-hover active:scale-[0.98] text-paper font-semibold text-base shadow-card transition-all"
         >
-          保存设置
+          {t('settings.saveBtn')}
         </button>
         {savedAt && !saveError && (
           <span className="flex items-center justify-center gap-1 text-xs text-ok-text mt-1.5">
             <Check size={12} strokeWidth={2} />
-            已保存
+            {t('settings.saved')}
           </span>
         )}
         {savedAt && saveError && (
           <span className="block text-xs text-danger-text mt-1.5 text-center">
-            已保存到本地，服务端推送失败：{saveError}
-            {!saveError.includes('混合内容') && !saveError.includes('TLS') && (
-              <span className="block mt-0.5 text-ink-muted">（重新打开应用会重试；若持续失败请检查服务端是否在线）</span>
+            {t('settings.saveErrorLocal', { error: saveError })}
+            {!saveError.includes('混合内容') && !saveError.includes('TLS') && !saveError.includes('mixed content') && (
+              <span className="block mt-0.5 text-ink-muted">{t('settings.saveErrorHint')}</span>
             )}
           </span>
         )}

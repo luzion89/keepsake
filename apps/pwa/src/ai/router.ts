@@ -5,6 +5,8 @@
 import { kvGet, kvSet } from '../db/dexie.js';
 import { logger } from '../logging/logger.js';
 import type { AiConfig } from '@keepsake/shared';
+import { getCurrentLang } from '../i18n/I18nContext.js';
+import type { Lang } from '../i18n/dict.js';
 
 export type { AiConfig };
 export type AiMode = 'on' | 'off';
@@ -235,7 +237,7 @@ export async function transcribe(audio: Blob): Promise<{ text: string }> {
       messages: [{
         role: 'user',
         content: [
-          { type: 'text', text: '请把这段音频准确转写成中文文本，只返回转写结果，不要其他说明。' },
+          { type: 'text', text: 'Transcribe the audio to text. Output text in the same language as the speaker. Return only the transcript, no explanations.' },
           { type: 'input_audio', input_audio: { data: base64, format } },
         ],
       }],
@@ -273,8 +275,10 @@ export async function searchAnswer(
   const apiKey = getEffectiveApiKey(cfg);
 
   if (cfg.mode !== 'on' || !isValidKey(apiKey)) {
-    return { ok: false, error: 'AI 未启用' };
+    return { ok: false, error: 'AI not enabled' };
   }
+
+  const lang: Lang = getCurrentLang();
 
   const contextBlock = contextItems
     .map(it => {
@@ -285,7 +289,14 @@ export async function searchAnswer(
     })
     .join('\n');
 
-  const systemPrompt = `你是家庭仓储助手。用户查询他们家里存放的物品。
+  const systemPrompt = lang === 'en'
+    ? `You are a home inventory assistant. The user is querying items stored at home.
+Below is the relevant item list (format: name qty location notes, with item id at end of line):
+${contextBlock || '(no matching items)'}
+
+Answer the user's question concisely in English, mentioning item names and locations. Do NOT include any id or [bracket markers] in the answer. Put all mentioned item ids separately in the citedIds array.
+Return only JSON: {"answer": string, "citedIds": string[]}`
+    : `你是家庭仓储助手。用户查询他们家里存放的物品。
 以下是相关物品列表（格式：名称 数量 位置 备注，行末括号内为物品 id）：
 ${contextBlock || '（无匹配物品）'}
 
@@ -321,13 +332,12 @@ ${contextBlock || '（无匹配物品）'}
     });
     if (!res.ok) {
       const text = await res.text();
-      return { ok: false, error: `AI 服务错误 (${res.status})：${text.slice(0, 200)}` };
+      return { ok: false, error: `AI error (${res.status}): ${text.slice(0, 200)}` };
     }
     const j = await res.json();
     const raw = j.choices?.[0]?.message?.content ?? '{}';
     const parsed = JSON.parse(raw);
-    // 防御性清理：即使 AI 不遵守 prompt 约定，也剥除 answer 中的 [id] 标记
-    const rawAnswer = typeof parsed.answer === 'string' ? parsed.answer : '（无回答）';
+    const rawAnswer = typeof parsed.answer === 'string' ? parsed.answer : '(no answer)';
     const cleanAnswer = rawAnswer.replace(/\[[^\]]{8,}\]/g, '').replace(/\s{2,}/g, ' ').trim();
     return {
       ok: true,
@@ -338,20 +348,49 @@ ${contextBlock || '（无匹配物品）'}
     };
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
-    return { ok: false, error: `请求失败：${msg}` };
+    return { ok: false, error: `Request failed: ${msg}` };
   }
 }
 
-const PARSE_ITEMS_SYSTEM_PROMPT = `从用户的中文描述中抽取家庭物品清单。每个物品输出 { name, qty, unit, expires_at, notes }：
+const PARSE_ITEMS_SYSTEM_PROMPT_ZH = `从用户的中文描述中抽取家庭物品清单。每个物品输出 { name, qty, unit, expires_at, notes }：
 - qty: 纯数字，用户没说默认 1；中文数字转阿拉伯数字（一→1，两/二→2，三→3，半→0.5，以此类推）
 - unit: 量词单位（如 盒、瓶、包、个、根、张、套、组、卷、袋、罐、块……），从描述中单独提取；无法识别则输出 null
 - 示例："一盒创可贴" → qty:1, unit:"盒", name:"创可贴"；"三瓶洗发水" → qty:3, unit:"瓶", name:"洗发水"
 - expires_at: 如果用户提到"过期"、"保质期到"、"X 月前买的可以放 X 个月"等可推断的，输出 ISO 日期字符串（YYYY-MM-DD）；不确定就 null
 - notes: 用户对这个物品的额外描述（品牌、型号、用途等）；qty/unit 已结构化的数量词不要放入 notes
+- Output \`name\` in the same language as user input
 仅返回 JSON：{"items":[{"name":string,"qty":number,"unit":string|null,"expires_at":string|null,"notes":string?}]}`;
+
+const PARSE_ITEMS_SYSTEM_PROMPT_EN = `Extract a household item list from the user's description. For each item output { name, qty, unit, expires_at, notes }:
+- qty: number only, default 1 if not mentioned
+- unit: unit word (e.g. box, bottle, pack, piece, roll, bag, can…); null if not identifiable
+- expires_at: ISO date string (YYYY-MM-DD) if user mentions expiry/best-before; otherwise null
+- notes: extra description (brand, model, purpose); do not repeat qty/unit info here
+- Output \`name\` in the same language as user input
+Return only JSON: {"items":[{"name":string,"qty":number,"unit":string|null,"expires_at":string|null,"notes":string?}]}`;
+
+function getParseItemsPrompt(): string {
+  return getCurrentLang() === 'en' ? PARSE_ITEMS_SYSTEM_PROMPT_EN : PARSE_ITEMS_SYSTEM_PROMPT_ZH;
+}
 
 function buildMergeSystemPrompt(existingItems: ExistingItem[]): string {
   const existingJson = JSON.stringify(existingItems, null, 2);
+  if (getCurrentLang() === 'en') {
+    return `You are a home inventory assistant. Below is the existing item list for this area (JSON):
+${existingJson}
+
+Combine with the user's new input and output the **final complete item list** (unchanged + new + updated).
+Merge rules:
+- If a mentioned item matches an existing name (ignore spaces/case), update its qty, unit, expires_at, notes
+- New items are added to the list
+- Existing items not mentioned stay unchanged
+- qty: number only, default 1; accumulate if user says "add more"
+- unit: unit word; null if not identifiable
+- expires_at: ISO date (YYYY-MM-DD) or null
+- notes: merge meaningful notes, remove duplicates
+- Output \`name\` in the same language as user input
+Return only JSON: {"items":[{"name":string,"qty":number,"unit":string|null,"expires_at":string|null,"notes":string?}]}`;
+  }
   return `你是家庭仓储助手。以下是该区域现有物品列表（JSON）：
 ${existingJson}
 
@@ -364,6 +403,7 @@ ${existingJson}
 - unit: 量词单位（盒、瓶、包、个……）；无法识别则 null
 - expires_at: ISO 日期字符串（YYYY-MM-DD）或 null
 - notes: 合并有意义的备注，重复的去掉
+- Output \`name\` in the same language as user input
 仅返回 JSON：{"items":[{"name":string,"qty":number,"unit":string|null,"expires_at":string|null,"notes":string?}]}`;
 }
 
@@ -395,9 +435,7 @@ export async function parseItemsFromText(
   const apiKey = getEffectiveApiKey(cfg);
 
   if (cfg.mode !== 'on' || !isValidKey(apiKey)) {
-    throw new Error(provider === 'deepseek'
-      ? 'AI 未启用或未配置 DeepSeek Key'
-      : 'AI 未启用或未配置 OpenRouter Key');
+    throw new Error('AI not enabled or API key not configured');
   }
 
   const url = getEffectiveBaseUrl(cfg);
@@ -416,7 +454,7 @@ export async function parseItemsFromText(
 
   const systemPrompt = (mode === 'merge' && existingItems && existingItems.length > 0)
     ? buildMergeSystemPrompt(existingItems)
-    : PARSE_ITEMS_SYSTEM_PROMPT;
+    : getParseItemsPrompt();
 
   const res = await fetch(url, {
     method: 'POST',

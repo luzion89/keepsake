@@ -7,10 +7,13 @@ import {
 import type { Area, Item, Photo, Room } from '@keepsake/shared';
 import { AreaRepo, ItemRepo, PhotoRepo, RoomRepo } from '../db/repos.js';
 import { useConfirm } from '../components/ConfirmDialog.js';
+import { useT } from '../i18n/I18nContext.js';
+import { PRESET_NAMES } from '../i18n/dict.js';
 
 type AreaState = 'loading' | 'not-found' | 'ok';
 
 export function AreaPage() {
+  const { t, lang } = useT();
   const { areaId = '' } = useParams();
   const [areaState, setAreaState] = useState<AreaState>('loading');
   const [area, setArea] = useState<Area | undefined>();
@@ -28,7 +31,6 @@ export function AreaPage() {
   const [editItemName, setEditItemName] = useState('');
   const [lightbox, setLightbox] = useState<{ src: string; photoId: string; index: number } | null>(null);
   const [slideKey, setSlideKey] = useState(0);
-  // #185: real-time touch follow state
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const touchStartX = useRef<number | null>(null);
@@ -91,17 +93,20 @@ export function AreaPage() {
     return () => document.removeEventListener('click', close);
   }, []);
 
-  if (areaState === 'loading') return <p className="text-ink-muted">加载中…</p>;
+  const displayAreaName = (name: string) =>
+    lang === 'en' && PRESET_NAMES[name] ? PRESET_NAMES[name] : name;
+
+  if (areaState === 'loading') return <p className="text-ink-muted">{t('common.loading')}</p>;
   if (areaState === 'not-found') {
     return (
       <div className="space-y-3">
         <p className="text-danger-text flex items-center gap-1.5">
           <AlertTriangle size={14} strokeWidth={1.5} className="shrink-0" />
-          找不到该区域（可能已被删除）。
+          {t('area.notFound')}
         </p>
         <Link to="/" className="text-accent hover:text-accent-hover text-sm flex items-center gap-1">
           <ChevronLeft size={14} strokeWidth={1.5} />
-          返回首页
+          {t('common.back')}
         </Link>
       </div>
     );
@@ -111,45 +116,47 @@ export function AreaPage() {
     <div className="space-y-4">
       {dialog}
 
-      {/* ── 面包屑兼标题 ──────────────────────────────── */}
+      {/* ── Breadcrumb ──────────────────────────────── */}
       <nav className="flex items-center gap-1 text-xl font-bold font-serif text-ink flex-wrap">
-        <Link to="/" className="text-ink-muted hover:text-ink transition-colors text-sm font-normal font-sans">房间</Link>
+        <Link to="/" className="text-ink-muted hover:text-ink transition-colors text-sm font-normal font-sans">{t('nav.rooms')}</Link>
         <span className="text-ink-faint text-sm font-normal mx-1">›</span>
         {room && (
           <>
-            <Link to={`/rooms/${room.id}`} className="text-ink-muted hover:text-ink transition-colors text-sm font-normal font-sans">{room.name}</Link>
+            <Link to={`/rooms/${room.id}`} className="text-ink-muted hover:text-ink transition-colors text-sm font-normal font-sans">
+              {displayAreaName(room.name)}
+            </Link>
             <span className="text-ink-faint text-sm font-normal mx-1">›</span>
           </>
         )}
-        <span>{area!.name}</span>
+        <span>{displayAreaName(area!.name)}</span>
       </nav>
 
-      {/* ── 紧凑 CTA 行 ───────────────────────────────── */}
+      {/* ── CTA row ───────────────────────────────────── */}
       <div className="flex gap-2">
         <Link
           to={`/areas/${area!.id}/text`}
           className="flex-1 h-10 flex items-center justify-center gap-1.5 rounded-[12px] bg-accent hover:bg-accent-hover active:scale-[0.98] text-paper font-medium text-sm shadow-card transition-all duration-150"
         >
           <FileText size={16} strokeWidth={1.5} />
-          录入物品
+          {t('area.textInput')}
         </Link>
         <Link
           to={`/areas/${area!.id}/capture`}
           className="flex-1 h-10 flex items-center justify-center gap-1.5 rounded-[12px] bg-paper-card border border-[var(--border-default)] hover:border-accent/40 text-ink font-medium text-sm transition-all duration-150"
         >
           <Camera size={16} strokeWidth={1.5} />
-          区域照片
+          {t('area.capture')}
         </Link>
       </div>
 
-      {/* ── 手动添加（折叠） ──────────────────────────── */}
+      {/* ── Manual add (collapsed) ────────────────────── */}
       <section>
         <button
           onClick={() => setShowManual(s => !s)}
           className="flex items-center gap-1 text-xs text-ink-muted hover:text-ink transition-colors"
         >
           <span className={`inline-block transition-transform duration-150 ${showManual ? 'rotate-90' : ''}`}>›</span>
-          手动添加单个物品
+          {t('area.addItem')}
         </button>
         {showManual && (
           <div className="mt-2 bg-paper-card border border-[var(--border-default)] rounded-[12px] p-3">
@@ -157,7 +164,7 @@ export function AreaPage() {
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="物品名"
+                placeholder={t('area.itemNamePlaceholder')}
                 className="flex-1 min-w-0 bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all text-ink placeholder:text-ink-muted"
               />
               <input
@@ -168,23 +175,23 @@ export function AreaPage() {
                 className="w-20 shrink-0 bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-2 text-sm outline-none focus:border-accent transition-all text-ink"
               />
               <button onClick={add} className="shrink-0 px-4 py-2 rounded-[12px] bg-paper-dark border border-[var(--border-default)] hover:border-accent text-ink font-medium text-sm transition-all">
-                添加
+                {t('common.add')}
               </button>
             </div>
           </div>
         )}
       </section>
 
-      {/* ── 物品列表 ──────────────────────────────────── */}
+      {/* ── Items list ────────────────────────────────── */}
       <section>
         <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted mb-3">
-          物品 {items.length > 0 && `(${items.length})`}
+          {t('area.items')} {items.length > 0 && `(${items.length})`}
         </h2>
         {items.length === 0 ? (
           <div className="flex flex-col items-center py-10 text-center">
             <Package size={40} strokeWidth={1.5} className="text-ink-muted/40 mb-3" />
-            <p className="text-ink-muted text-sm">这个区域还没有物品</p>
-            <p className="text-ink-muted/70 text-xs mt-1">点上面的「录入物品」开始</p>
+            <p className="text-ink-muted text-sm">{t('area.empty')}</p>
+            <p className="text-ink-muted/70 text-xs mt-1">{t('area.emptyHint')}</p>
           </div>
         ) : (
           <ul className="space-y-1.5">
@@ -200,13 +207,11 @@ export function AreaPage() {
                   }
                 }}
               >
-                {/* Delete background — #201: square right edge, li overflow-hidden clips */}
+                {/* Delete background */}
                 <div className="absolute inset-y-0 right-0 flex items-center bg-danger px-5 select-none" aria-hidden="true">
                   <Trash2 size={18} strokeWidth={1.5} className="text-paper" />
-                  <span className="text-paper text-sm ml-1.5">删除</span>
+                  <span className="text-paper text-sm ml-1.5">{t('common.delete')}</span>
                 </div>
-                {/* #198: whole card is clickable for navigation; #199: py-1 reduces height ~40%;
-                    #201: right border-radius removed when swiped so card flush-meets delete bg */}
                 <div
                   className="relative flex items-center gap-2 px-3 py-1 min-h-[44px] bg-paper-card border border-[var(--border-default)] shadow-card transition-all duration-200 ease-out"
                   style={{
@@ -223,14 +228,12 @@ export function AreaPage() {
                     else if (delta > 10) setSwipedItemId(null);
                   }}
                   onClick={(e) => {
-                    // #198: clicking anywhere on card (not a button/input) navigates to detail
                     if (swipedItemId === it.id) return;
                     if (editingItemId === it.id) return;
                     if ((e.target as HTMLElement).closest('button,input,a[href]')) return;
                     navigate(`/items/${it.id}`);
                   }}
                 >
-                  {/* #200: name + pencil inline — pencil hugs name with no excess gap */}
                   <div className="flex-1 min-w-0 flex items-center gap-0.5 cursor-pointer">
                     {editingItemId === it.id ? (
                       <input
@@ -254,29 +257,28 @@ export function AreaPage() {
                             {it.confidence != null && <span>{(it.confidence * 100).toFixed(0)}%</span>}
                           </div>
                         </div>
-                        {/* #200: pencil icon hugs name */}
                         <button
                           onClick={(e) => { e.stopPropagation(); startRenameItem(it); }}
                           className="shrink-0 w-6 h-6 flex items-center justify-center rounded-md text-ink-muted hover:text-ink hover:bg-paper-dark transition-all"
-                          aria-label="改名"
-                          title="改名"
+                          aria-label={t('home.rename')}
+                          title={t('home.rename')}
                         >
                           <Pencil size={13} strokeWidth={1.5} />
                         </button>
                       </>
                     )}
                   </div>
-                <button
-                  onClick={(e) => { e.stopPropagation(); ItemRepo.qtyDelta(it.id, -1).then(reload); }}
-                  className="min-w-[44px] min-h-[44px] rounded-full bg-paper-dark border border-[var(--border-default)] text-ink hover:border-accent text-sm flex items-center justify-center transition-all"
-                  aria-label="减少数量"
-                >−</button>
-                <span className="text-sm font-medium w-5 text-center text-ink">{it.qty}</span>
-                <button
-                  onClick={(e) => { e.stopPropagation(); ItemRepo.qtyDelta(it.id, +1).then(reload); }}
-                  className="min-w-[44px] min-h-[44px] rounded-full bg-paper-dark border border-[var(--border-default)] text-ink hover:border-accent text-sm flex items-center justify-center transition-all"
-                  aria-label="增加数量"
-                >+</button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); ItemRepo.qtyDelta(it.id, -1).then(reload); }}
+                    className="min-w-[44px] min-h-[44px] rounded-full bg-paper-dark border border-[var(--border-default)] text-ink hover:border-accent text-sm flex items-center justify-center transition-all"
+                    aria-label={t('item.decreaseQty')}
+                  >−</button>
+                  <span className="text-sm font-medium w-5 text-center text-ink">{it.qty}</span>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); ItemRepo.qtyDelta(it.id, +1).then(reload); }}
+                    className="min-w-[44px] min-h-[44px] rounded-full bg-paper-dark border border-[var(--border-default)] text-ink hover:border-accent text-sm flex items-center justify-center transition-all"
+                    aria-label={t('item.increaseQty')}
+                  >+</button>
                 </div>
                 {swipedItemId === it.id && (
                   <button
@@ -284,13 +286,13 @@ export function AreaPage() {
                     className="absolute inset-y-0 right-0 w-[88px]"
                     onClick={async (e) => {
                       e.stopPropagation();
-                      const ok = await confirm(`删除物品「${it.name}」？`, { danger: true, okText: "删除" });
+                      const ok = await confirm(t('area.deleteItemConfirm', { name: it.name }), { danger: true, okText: t('common.delete') });
                       if (!ok) { setSwipedItemId(null); return; }
                       await ItemRepo.remove(it.id);
                       setSwipedItemId(null);
                       await reload();
                     }}
-                    aria-label={`删除 ${it.name}`}
+                    aria-label={`${t('common.delete')} ${it.name}`}
                   />
                 )}
               </li>
@@ -299,7 +301,7 @@ export function AreaPage() {
         )}
       </section>
 
-      {/* ── 区域照片时间线 ──────────────────────────── */}
+      {/* ── Photos timeline ───────────────────────────── */}
       {photos.length > 0 && (
         <section>
           <button
@@ -307,13 +309,15 @@ export function AreaPage() {
             className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-ink-muted hover:text-ink transition-colors mb-2"
           >
             <span className={`inline-block transition-transform duration-150 ${showPhotos ? 'rotate-90' : ''}`}>›</span>
-            已拍照片 ({photos.length})
+            {lang === 'en' ? `Photos (${photos.length})` : `已拍照片 (${photos.length})`}
           </button>
           {showPhotos && (() => {
             const grouped = new Map<string, typeof photos>();
             for (const p of [...photos].sort((a, b) => b.taken_at - a.taken_at)) {
               const d = new Date(p.taken_at);
-              const key = `${d.getFullYear()} 年 ${d.getMonth() + 1} 月`;
+              const key = lang === 'en'
+                ? `${d.toLocaleString('en-US', { month: 'long' })} ${d.getFullYear()}`
+                : `${d.getFullYear()} 年 ${d.getMonth() + 1} 月`;
               if (!grouped.has(key)) grouped.set(key, []);
               grouped.get(key)!.push(p);
             }
@@ -326,13 +330,15 @@ export function AreaPage() {
                       {ps.map(p => {
                         const src = photoBlobUrls[p.id];
                         const _d = new Date(p.taken_at);
-                        const dateStr = `${_d.getMonth() + 1}月${_d.getDate()}日`;
+                        const dateStr = lang === 'en'
+                          ? `${_d.getMonth() + 1}/${_d.getDate()}`
+                          : `${_d.getMonth() + 1}月${_d.getDate()}日`;
                         return (
                           <div key={p.id} className="flex-shrink-0 relative group/photo">
                             {src ? (
                               <img
                                 src={src}
-                                alt={`区域照片 ${dateStr}`}
+                                alt={`photo ${dateStr}`}
                                 onClick={() => {
                                   const sortedAll = [...photos].sort((a, b) => b.taken_at - a.taken_at);
                                   const idx = sortedAll.findIndex(x => x.id === p.id);
@@ -361,14 +367,14 @@ export function AreaPage() {
         </section>
       )}
 
-      {/* ── 照片灯箱 (#185: 实时跟手 touch follow) ── */}
+      {/* ── Lightbox ──────────────────────────────────── */}
       {lightbox && (() => {
         const sortedPhotos = [...photos].sort((a, b) => b.taken_at - a.taken_at);
         const currentIdx = lightbox.index;
         const total = sortedPhotos.length;
         const currentPhoto = sortedPhotos[currentIdx];
         const fullDateStr = currentPhoto
-          ? new Date(currentPhoto.taken_at).toLocaleString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+          ? new Date(currentPhoto.taken_at).toLocaleString(lang === 'en' ? 'en-US' : 'zh-CN', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
           : '';
 
         const goNext = () => {
@@ -388,7 +394,6 @@ export function AreaPage() {
           if (src) { setSlideKey(k => k + 1); setLightbox({ src, photoId: pp.id, index: prevIdx }); setDragOffset(0); }
         };
 
-        // #185: pointer event handlers for real-time drag follow
         const onPointerDown = (e: React.PointerEvent) => {
           touchStartX.current = e.clientX;
           setIsDragging(true);
@@ -420,12 +425,12 @@ export function AreaPage() {
             tabIndex={-1}
             ref={(el) => el?.focus()}
           >
-            {/* 顶部工具栏 */}
+            {/* Toolbar */}
             <div className="flex items-center justify-between px-4 py-3 shrink-0">
               <button
                 onClick={() => setLightbox(null)}
                 className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-white/80 hover:text-white transition-colors"
-                aria-label="关闭"
+                aria-label={t('common.close')}
               >
                 <X size={22} strokeWidth={1.5} />
               </button>
@@ -442,27 +447,27 @@ export function AreaPage() {
                     a.click();
                   }}
                   className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-white/80 hover:text-white transition-colors"
-                  aria-label="下载照片"
+                  aria-label={lang === 'en' ? 'Download photo' : '下载照片'}
                 >
                   <Download size={20} strokeWidth={1.5} />
                 </button>
                 <button
                   onClick={async () => {
-                    const ok = await confirm('删除这张照片？', { danger: true, okText: '删除' });
+                    const ok = await confirm(lang === 'en' ? 'Delete this photo?' : '删除这张照片？', { danger: true, okText: t('common.delete') });
                     if (!ok) return;
                     await PhotoRepo.remove(lightbox.photoId);
                     setLightbox(null);
                     await reload();
                   }}
                   className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full text-white/80 hover:text-red-400 transition-colors"
-                  aria-label="删除照片"
+                  aria-label={lang === 'en' ? 'Delete photo' : '删除照片'}
                 >
                   <Trash2 size={20} strokeWidth={1.5} />
                 </button>
               </div>
             </div>
 
-            {/* #185: 照片主区域 — pointer events 实时跟手，spring 释放翻页 */}
+            {/* Main photo area */}
             <div
               className="flex-1 flex items-center justify-center overflow-hidden px-4 pb-4 relative select-none"
               onPointerDown={onPointerDown}
@@ -473,7 +478,7 @@ export function AreaPage() {
               <img
                 key={slideKey}
                 src={lightbox.src}
-                alt="照片预览"
+                alt="photo preview"
                 draggable={false}
                 className="max-w-full max-h-full object-contain rounded-[8px] pointer-events-none"
                 style={{
@@ -486,14 +491,14 @@ export function AreaPage() {
                   <button
                     onClick={goPrev}
                     className="absolute left-2 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-black/30 text-white/80 hover:text-white hover:bg-black/50 transition-all"
-                    aria-label="上一张"
+                    aria-label={lang === 'en' ? 'Previous' : '上一张'}
                   >
                     <ChevronLeft size={20} strokeWidth={1.5} />
                   </button>
                   <button
                     onClick={goNext}
                     className="absolute right-2 top-1/2 -translate-y-1/2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-black/30 text-white/80 hover:text-white hover:bg-black/50 transition-all"
-                    aria-label="下一张"
+                    aria-label={lang === 'en' ? 'Next' : '下一张'}
                   >
                     <ChevronRight size={20} strokeWidth={1.5} />
                   </button>

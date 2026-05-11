@@ -1,7 +1,5 @@
 /**
  * TextInput.tsx — 文字录入页 (#65, #78)
- * 视觉重构 PR-D (#97)
- * Round-10: #194 草稿卡片简化 + detail sheet; #195 新增物品排前; #196 紧凑行高
  */
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -9,6 +7,7 @@ import { AreaRepo, ItemRepo } from '../db/repos.js';
 import { parseItemsFromText, type RecognitionItem, type ExistingItem } from '../ai/router.js';
 import type { Area, Item } from '@keepsake/shared';
 import { AlertTriangle, ChevronLeft, FileText, Lightbulb, Pencil, X } from 'lucide-react';
+import { useT } from '../i18n/I18nContext.js';
 
 type AreaState = 'loading' | 'not-found' | 'ok';
 type InputMode = 'merge' | 'replace';
@@ -22,7 +21,6 @@ function toExpiresDate(raw?: string | null): string {
   return raw.slice(0, 10);
 }
 
-// #194: Detail sheet state
 interface DetailEdit {
   index: number;
   notes: string;
@@ -30,6 +28,7 @@ interface DetailEdit {
 }
 
 export function TextInputPage() {
+  const { t, lang } = useT();
   const { areaId = '' } = useParams();
   const nav = useNavigate();
 
@@ -42,7 +41,6 @@ export function TextInputPage() {
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [parsed, setParsed] = useState(false);
   const [mode, setMode] = useState<InputMode>('merge');
-  // #194: detail sheet
   const [detailEdit, setDetailEdit] = useState<DetailEdit | null>(null);
 
   const loadArea = async () => {
@@ -84,7 +82,6 @@ export function TextInputPage() {
         expiresDate: toExpiresDate(it.expires_at),
         notes: it.notes ?? '',
       }));
-      // #195: 增改模式下，新增物品排前，已有物品排后
       if (mode === 'merge') {
         const existingNames = new Set(existingItems.map(it => it.name.trim().toLowerCase()));
         const newItems = mapped.filter(d => !existingNames.has(d.name.trim().toLowerCase()));
@@ -117,10 +114,10 @@ export function TextInputPage() {
   };
 
   const commit = async () => {
-    if (!areaId) { setErrMsg('区域 ID 为空，无法保存。'); return; }
+    if (!areaId) return;
     const current = await AreaRepo.get(areaId);
     if (!current) {
-      setErrMsg('该区域已不存在，无法保存物品。请返回首页重新选择区域。');
+      setErrMsg(t('area.notFound'));
       setAreaState('not-found');
       return;
     }
@@ -128,8 +125,10 @@ export function TextInputPage() {
     if (mode === 'replace') {
       const existingCount = existingItems.length;
       const msg = existingCount > 0
-        ? `覆盖模式将删除该区域现有 ${existingCount} 个物品并替换为新清单，确定继续？`
-        : '确认将以下物品录入该区域？';
+        ? (lang === 'en'
+          ? `Replace mode will delete ${existingCount} existing item(s) and replace with new list. Continue?`
+          : `覆盖模式将删除该区域现有 ${existingCount} 个物品并替换为新清单，确定继续？`)
+        : (lang === 'en' ? 'Save these items to this area?' : '确认将以下物品录入该区域？');
       if (!window.confirm(msg)) return;
     }
 
@@ -156,18 +155,18 @@ export function TextInputPage() {
       }
       nav(`/areas/${areaId}`);
     } catch (e: unknown) {
-      setErrMsg(e instanceof Error ? e.message : '保存失败，请重试。');
+      setErrMsg(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
   };
 
-  if (areaState === 'loading') return <p className="text-ink-muted">加载中…</p>;
+  if (areaState === 'loading') return <p className="text-ink-muted">{t('common.loading')}</p>;
   if (areaState === 'not-found') {
     return (
       <div className="space-y-3">
-        <p className="text-danger-text flex items-center gap-1.5"><AlertTriangle size={16} strokeWidth={1.5} />找不到该区域（可能已被删除）。</p>
-        <Link to="/" className="text-accent hover:text-accent-hover text-sm flex items-center gap-1"><ChevronLeft size={16} strokeWidth={1.5} />返回首页</Link>
+        <p className="text-danger-text flex items-center gap-1.5"><AlertTriangle size={16} strokeWidth={1.5} />{t('area.notFound')}</p>
+        <Link to="/" className="text-accent hover:text-accent-hover text-sm flex items-center gap-1"><ChevronLeft size={16} strokeWidth={1.5} />{t('common.back')}</Link>
       </div>
     );
   }
@@ -179,57 +178,57 @@ export function TextInputPage() {
       <nav className="flex items-center gap-1 text-xs text-ink-muted">
         <Link to={`/areas/${areaId}`} className="hover:text-ink transition-colors flex items-center gap-1"><ChevronLeft size={14} strokeWidth={1.5} />{area!.name}</Link>
       </nav>
-      <h1 className="text-xl font-semibold text-ink flex items-center gap-2"><FileText size={20} strokeWidth={1.5} />文字录入 · {area!.name}</h1>
+      <h1 className="text-xl font-semibold text-ink flex items-center gap-2"><FileText size={20} strokeWidth={1.5} />{t('textInput.title')} · {area!.name}</h1>
 
-      {/* ── 模式切换 segmented control ─────────────────── */}
+      {/* Mode switch */}
       <section>
         <div className="bg-paper-card rounded-[12px] p-1 flex gap-1 border border-[var(--border-default)]">
           <button
             onClick={() => switchMode('merge')}
             className={`flex-1 py-2 rounded-[10px] text-sm font-medium transition-all duration-150 ${
-              mode === 'merge'
-                ? 'bg-ink text-paper'
-                : 'text-ink-muted hover:text-ink'
+              mode === 'merge' ? 'bg-ink text-paper' : 'text-ink-muted hover:text-ink'
             }`}
           >
-            增改模式（默认）
+            {lang === 'en' ? 'Merge (default)' : '增改模式（默认）'}
           </button>
           <button
             onClick={() => switchMode('replace')}
             className={`flex-1 py-2 rounded-[10px] text-sm font-medium transition-all duration-150 ${
-              mode === 'replace'
-                ? 'bg-warn text-paper'
-                : 'text-ink-muted hover:text-ink'
+              mode === 'replace' ? 'bg-warn text-paper' : 'text-ink-muted hover:text-ink'
             }`}
           >
-            覆盖模式
+            {lang === 'en' ? 'Replace' : '覆盖模式'}
           </button>
         </div>
         <p className="mt-2 text-xs text-ink-muted">
           {mode === 'merge'
-            ? <><Pencil size={14} strokeWidth={1.5} className="inline-block mr-1" />{'AI 将结合现有 ' + existingItems.length + ' 个物品，智能新增或更新'}</>
-            : <><AlertTriangle size={14} strokeWidth={1.5} className="inline-block mr-1" />{'将清空该区域所有 ' + existingItems.length + ' 个现有物品并全量替换'}</>
+            ? <><Pencil size={14} strokeWidth={1.5} className="inline-block mr-1" />{lang === 'en' ? `AI will combine with ${existingItems.length} existing item(s)` : `AI 将结合现有 ${existingItems.length} 个物品，智能新增或更新`}</>
+            : <><AlertTriangle size={14} strokeWidth={1.5} className="inline-block mr-1" />{lang === 'en' ? `Will delete all ${existingItems.length} existing item(s) and replace` : `将清空该区域所有 ${existingItems.length} 个现有物品并全量替换`}</>
           }
         </p>
       </section>
 
-      {/* Replace warning */}
       {mode === 'replace' && existingItems.length > 0 && (
         <div className="bg-warn-bg border border-warn/30 rounded-[12px] px-4 py-3 text-warn-text text-sm">
-          <span className="flex items-center gap-1.5"><AlertTriangle size={16} strokeWidth={1.5} />覆盖模式：确认入库将删除该区域所有 {existingItems.length} 个现有物品</span>
+          <span className="flex items-center gap-1.5">
+            <AlertTriangle size={16} strokeWidth={1.5} />
+            {lang === 'en'
+              ? `Replace mode: saving will delete all ${existingItems.length} existing item(s)`
+              : `覆盖模式：确认入库将删除该区域所有 ${existingItems.length} 个现有物品`}
+          </span>
         </div>
       )}
 
-      {/* ── 输入区 ────────────────────────────────────── */}
+      {/* Input area */}
       <section className="space-y-3">
         <textarea
           value={text}
           onChange={e => setText(e.target.value)}
-          placeholder="例如：两瓶消毒水、一盒抽纸、洗发水三瓶…"
+          placeholder={t('textInput.placeholder')}
           rows={5}
           className="w-full bg-paper-card border border-[var(--border-default)] rounded-[12px] px-4 py-3 text-sm leading-relaxed resize-none outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all duration-150 text-ink placeholder:text-ink-muted"
         />
-        <p className="text-xs text-ink-muted flex items-center gap-1"><Lightbulb size={12} strokeWidth={1.5} />可使用输入法的语音转文字功能</p>
+        <p className="text-xs text-ink-muted flex items-center gap-1"><Lightbulb size={12} strokeWidth={1.5} />{lang === 'en' ? 'You can use voice-to-text in your keyboard' : '可使用输入法的语音转文字功能'}</p>
         <div className="flex gap-2">
           <button
             onClick={parse}
@@ -239,16 +238,16 @@ export function TextInputPage() {
             {busy ? (
               <>
                 <span className="inline-block w-4 h-4 border-2 border-paper/40 border-t-paper rounded-full animate-spin" />
-                解析中…
+                {t('textInput.parsing')}
               </>
-            ) : '解析'}
+            ) : t('textInput.parse')}
           </button>
           <button
             onClick={clear}
             disabled={busy}
             className="px-4 py-2.5 rounded-[12px] border border-[var(--border-default)] text-ink-muted hover:text-ink hover:border-ink/30 disabled:opacity-50 text-sm transition-all"
           >
-            清空
+            {lang === 'en' ? 'Clear' : '清空'}
           </button>
         </div>
       </section>
@@ -259,43 +258,38 @@ export function TextInputPage() {
         </div>
       )}
 
-      {/* ── 草稿列表（#194 简化卡片 + #196 紧凑行高）──── */}
       {parsed && (
         <section className="space-y-3">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
-            草稿（共 {drafts.length} 项，请核对）
+            {lang === 'en' ? `Draft (${drafts.length} items, please review)` : `草稿（共 ${drafts.length} 项，请核对）`}
           </h2>
 
           {drafts.length === 0 && (
-            <p className="text-ink-muted text-sm">未识别到任何物品，请修改文本后重新解析。</p>
+            <p className="text-ink-muted text-sm">{t('textInput.noItems')}</p>
           )}
 
-          {/* #196: 紧凑卡片列表 space-y-1.5 */}
           <ul className="space-y-1.5">
             {drafts.map((d, i) => {
               const isExisting = existingNames.has(d.name.trim().toLowerCase());
               return (
-                // #194: 点击卡片背景 → 弹 detail sheet
                 <li
                   key={i}
                   className="bg-paper-card border border-[var(--border-default)] rounded-[12px] px-3 py-2 cursor-pointer hover:border-accent/30 transition-all"
                   onClick={() => setDetailEdit({ index: i, notes: d.notes ?? '', expiresDate: d.expiresDate })}
                 >
-                  {/* 第一行：名称 + 删除 */}
                   <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
                     <input
                       value={d.name}
                       onChange={e => updateDraft(i, { name: e.target.value })}
-                      placeholder="物品名称"
+                      placeholder={t('area.itemNamePlaceholder')}
                       className="flex-1 min-w-0 bg-paper-dark border border-[var(--border-default)] rounded-[8px] px-2 py-1 text-sm outline-none focus:border-accent transition-all text-ink placeholder:text-ink-muted"
                     />
                     <button
                       onClick={(e) => { e.stopPropagation(); removeDraft(i); }}
                       className="shrink-0 text-ink-muted hover:text-danger-text transition-colors flex items-center justify-center w-7 h-7"
-                      aria-label="删除此行"
+                      aria-label={t('textInput.removeItem')}
                     ><X size={15} strokeWidth={1.5} /></button>
                   </div>
-                  {/* 第二行：qty + unit + tag — 点击不触发 sheet */}
                   <div className="flex items-center gap-2 mt-1.5" onClick={e => e.stopPropagation()}>
                     <input
                       type="number"
@@ -303,25 +297,25 @@ export function TextInputPage() {
                       min={0}
                       onChange={e => updateDraft(i, { qty: Number(e.target.value) })}
                       className="w-14 bg-paper-dark border border-[var(--border-default)] rounded-[8px] px-2 py-1 text-sm outline-none focus:border-accent transition-all text-ink text-center"
-                      aria-label="数量"
+                      aria-label={t('textInput.qtyLabel')}
                     />
                     <input
                       value={d.unit ?? ''}
                       onChange={e => updateDraft(i, { unit: e.target.value })}
-                      placeholder="量词"
+                      placeholder={t('textInput.unitLabel')}
                       className="w-14 bg-paper-dark border border-[var(--border-default)] rounded-[8px] px-2 py-1 text-sm outline-none focus:border-accent transition-all text-ink placeholder:text-ink-muted"
-                      aria-label="量词"
+                      aria-label={t('textInput.unitLabel')}
                     />
                     {mode === 'merge' && (
                       <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${
-                        isExisting
-                          ? 'bg-warn-bg text-warn-text'
-                          : 'bg-ok-bg text-ok-text'
+                        isExisting ? 'bg-warn-bg text-warn-text' : 'bg-ok-bg text-ok-text'
                       }`}>
-                        {isExisting ? '已有' : '新增'}
+                        {isExisting
+                          ? (lang === 'en' ? 'Existing' : '已有')
+                          : (lang === 'en' ? 'New' : '新增')}
                       </span>
                     )}
-                    <span className="text-xs text-ink-muted/50 ml-auto">点击编辑详情 ›</span>
+                    <span className="text-xs text-ink-muted/50 ml-auto">{lang === 'en' ? 'Edit details ›' : '点击编辑详情 ›'}</span>
                   </div>
                 </li>
               );
@@ -332,7 +326,7 @@ export function TextInputPage() {
             onClick={() => setDrafts(arr => [...arr, { name: '', qty: 1, expiresDate: '', notes: '' }])}
             className="text-sm text-accent hover:text-accent-hover transition-colors"
           >
-            + 手动追加一项
+            + {lang === 'en' ? 'Add another item' : '手动追加一项'}
           </button>
 
           {drafts.length > 0 && (
@@ -340,25 +334,23 @@ export function TextInputPage() {
               onClick={commit}
               disabled={busy}
               className={`w-full py-3.5 rounded-[12px] font-semibold text-base shadow-card disabled:opacity-50 flex items-center justify-center gap-2 transition-all duration-150 active:scale-[0.98] ${
-                mode === 'replace'
-                  ? 'bg-warn hover:opacity-90 text-paper'
-                  : 'bg-accent hover:bg-accent-hover text-paper'
+                mode === 'replace' ? 'bg-warn hover:opacity-90 text-paper' : 'bg-accent hover:bg-accent-hover text-paper'
               }`}
             >
               {busy ? (
                 <>
                   <span className="inline-block w-4 h-4 border-2 border-paper/40 border-t-paper rounded-full animate-spin" />
-                  保存中…
+                  {t('textInput.saving')}
                 </>
               ) : mode === 'replace'
-                ? <><AlertTriangle size={16} strokeWidth={1.5} /><span>{'覆盖入库（' + drafts.filter(d => d.name.trim()).length + ' 项）'}</span></>
-                : `确认入库（${drafts.filter(d => d.name.trim()).length} 项）`}
+                ? <><AlertTriangle size={16} strokeWidth={1.5} /><span>{lang === 'en' ? `Replace (${drafts.filter(d => d.name.trim()).length} items)` : `覆盖入库（${drafts.filter(d => d.name.trim()).length} 项）`}</span></>
+                : `${t('textInput.confirm')}（${drafts.filter(d => d.name.trim()).length} ${lang === 'en' ? 'items' : '项'}）`}
             </button>
           )}
         </section>
       )}
 
-      {/* ── #194 Detail Bottom Sheet ──────────────────── */}
+      {/* Detail Bottom Sheet */}
       {detailEdit !== null && (() => {
         const d = drafts[detailEdit.index];
         if (!d) return null;
@@ -367,33 +359,33 @@ export function TextInputPage() {
             className="fixed inset-0 z-50 flex flex-col justify-end"
             onClick={() => setDetailEdit(null)}
           >
-            {/* 遮罩 */}
             <div className="absolute inset-0 bg-black/40" />
-            {/* Sheet */}
             <div
               className="relative bg-paper-card rounded-t-[20px] p-5 space-y-4 shadow-lg"
               onClick={e => e.stopPropagation()}
             >
               <div className="flex items-center justify-between mb-1">
-                <h3 className="text-base font-semibold text-ink">编辑详情：{d.name || '（未命名）'}</h3>
+                <h3 className="text-base font-semibold text-ink">
+                  {lang === 'en' ? `Edit: ${d.name || '(unnamed)'}` : `编辑详情：${d.name || '（未命名）'}`}
+                </h3>
                 <button
                   onClick={() => setDetailEdit(null)}
                   className="w-7 h-7 flex items-center justify-center text-ink-muted hover:text-ink"
-                  aria-label="关闭"
+                  aria-label={t('common.close')}
                 ><X size={16} strokeWidth={1.5} /></button>
               </div>
               <div className="space-y-3">
                 <div>
-                  <label className="text-xs text-ink-muted block mb-1">备注</label>
+                  <label className="text-xs text-ink-muted block mb-1">{t('textInput.notesLabel')}</label>
                   <input
                     value={detailEdit.notes}
                     onChange={e => setDetailEdit(s => s ? { ...s, notes: e.target.value } : s)}
-                    placeholder="可选备注…"
+                    placeholder={t('item.notesPlaceholder')}
                     className="w-full bg-paper-dark border border-[var(--border-default)] rounded-[10px] px-3 py-2 text-sm outline-none focus:border-accent transition-all text-ink placeholder:text-ink-muted"
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-ink-muted block mb-1">过期时间</label>
+                  <label className="text-xs text-ink-muted block mb-1">{t('textInput.expiresLabel')}</label>
                   <input
                     type="date"
                     value={detailEdit.expiresDate}
@@ -407,7 +399,7 @@ export function TextInputPage() {
                   onClick={() => setDetailEdit(null)}
                   className="flex-1 py-2.5 rounded-[12px] border border-[var(--border-default)] text-ink-muted hover:text-ink text-sm transition-all"
                 >
-                  取消
+                  {t('common.cancel')}
                 </button>
                 <button
                   onClick={() => {
@@ -419,7 +411,7 @@ export function TextInputPage() {
                   }}
                   className="flex-1 py-2.5 rounded-[12px] bg-accent hover:bg-accent-hover text-paper text-sm font-medium transition-all"
                 >
-                  保存
+                  {t('common.save')}
                 </button>
               </div>
             </div>

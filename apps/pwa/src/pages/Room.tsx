@@ -4,10 +4,13 @@ import { Package, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { Area, Room } from '@keepsake/shared';
 import { AreaRepo, ItemRepo, RoomRepo } from '../db/repos.js';
 import { useConfirm } from '../components/ConfirmDialog.js';
+import { useT } from '../i18n/I18nContext.js';
+import { PRESET_NAMES } from '../i18n/dict.js';
 
 const AREA_PRESETS = ['洗手台柜子', '墙壁柜', '电视柜', '沙发底下', '床底下', '吊柜', '抽屉', '工具箱'];
 
 export function RoomPage() {
+  const { t, lang } = useT();
   const { roomId = '' } = useParams();
   const [room, setRoom] = useState<Room | undefined>();
   const [areas, setAreas] = useState<Area[]>([]);
@@ -60,9 +63,9 @@ export function RoomPage() {
   const deleteArea = async (a: Area) => {
     const items = await ItemRepo.listByArea(a.id);
     const message = items.length === 0
-      ? `删除区域「${a.name}」？`
-      : `「${a.name}」下还有 ${items.length} 个物品，将一并软删除。继续？`;
-    const ok = await confirm(message, { danger: true, okText: '删除' });
+      ? t('room.deleteAreaConfirm', { name: a.name })
+      : t('room.deleteAreaWithItems', { name: a.name, n: items.length });
+    const ok = await confirm(message, { danger: true, okText: t('common.delete') });
     if (!ok) return;
     for (const it of items) await ItemRepo.remove(it.id);
     await AreaRepo.remove(a.id);
@@ -77,29 +80,32 @@ export function RoomPage() {
     return () => document.removeEventListener('click', close);
   }, []);
 
-  if (!room) return <p className="text-ink-muted">加载中…</p>;
+  const displayName = (name: string) =>
+    lang === 'en' && PRESET_NAMES[name] ? PRESET_NAMES[name] : name;
+
+  if (!room) return <p className="text-ink-muted">{t('common.loading')}</p>;
 
   return (
     <div className="space-y-4">
       {dialog}
 
-      {/* ── 面包屑兼标题 ──────────────────────────────── */}
+      {/* ── Breadcrumb ──────────────────────────────── */}
       <nav className="flex items-center gap-1 text-xl font-bold font-serif text-ink">
-        <Link to="/" className="text-ink-muted hover:text-ink transition-colors text-sm font-normal font-sans">房间</Link>
+        <Link to="/" className="text-ink-muted hover:text-ink transition-colors text-sm font-normal font-sans">{t('nav.rooms')}</Link>
         <span className="text-ink-faint text-sm font-normal mx-1">›</span>
-        <span>{room.name}</span>
+        <span>{displayName(room.name)}</span>
       </nav>
 
-      {/* ── 区域列表 ──────────────────────────────────── */}
+      {/* ── Area list ──────────────────────────────── */}
       <section>
         <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted mb-3">
-          区域 {areas.length > 0 && `(${areas.length})`}
+          {t('room.areaList')} {areas.length > 0 && `(${areas.length})`}
         </h2>
         {areas.length === 0 ? (
           <div className="flex flex-col items-center py-10 text-center">
             <Package size={40} strokeWidth={1.5} className="text-ink-muted/40 mb-3" />
-            <p className="text-ink-muted text-sm">这个房间还没有区域</p>
-            <p className="text-ink-muted/70 text-xs mt-1">点右下角 + 添加区域</p>
+            <p className="text-ink-muted text-sm">{t('room.empty')}</p>
+            <p className="text-ink-muted/70 text-xs mt-1">{t('room.emptyHint')}</p>
           </div>
         ) : (
           <ul className="bg-paper-card border border-[var(--border-default)] rounded-[12px] overflow-hidden divide-y divide-[var(--border-subtle)]">
@@ -108,16 +114,13 @@ export function RoomPage() {
                 key={a.id}
                 className="relative overflow-hidden"
                 onClick={(e) => {
-                  // 如已展开滑动状态，点击空白只收起
                   if (swipedId === a.id && !(e.target as HTMLElement).closest('[data-delete]')) {
                     e.preventDefault();
                     e.stopPropagation();
                     setSwipedId(null);
                     return;
                   }
-                  // 编辑态不跳转
                   if (editingId === a.id) return;
-                  // 按钮区不跳转
                   if ((e.target as HTMLElement).closest('button')) return;
                   navigate(`/areas/${a.id}`);
                 }}
@@ -125,7 +128,7 @@ export function RoomPage() {
                 {/* Delete background */}
                 <div className="absolute inset-y-0 right-0 flex items-center bg-danger px-5 select-none" aria-hidden="true">
                   <Trash2 size={18} strokeWidth={1.5} className="text-paper" />
-                  <span className="text-paper text-sm ml-1.5">删除</span>
+                  <span className="text-paper text-sm ml-1.5">{t('common.delete')}</span>
                 </div>
 
                 {/* Swipeable row */}
@@ -159,21 +162,22 @@ export function RoomPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-0">
                         <span className="min-w-0 truncate text-sm font-medium text-ink">
-                          {a.name}
+                          {displayName(a.name)}
                         </span>
-                        {/* #192: 改名图标紧贴名称右侧 */}
                         <button
                           onClick={(e) => { e.stopPropagation(); startRename(a); }}
                           className="ml-1.5 shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-ink-muted hover:text-ink hover:bg-paper-dark transition-all"
-                          aria-label="改名"
-                          title="改名"
+                          aria-label={t('home.rename')}
+                          title={t('home.rename')}
                         >
                           <Pencil size={14} strokeWidth={1.5} />
                         </button>
                       </div>
                       <div className="text-xs text-ink-muted">
                         {itemCounts[a.id] != null
-                          ? itemCounts[a.id] === 0 ? '暂无物品' : `${itemCounts[a.id]} 种物品`
+                          ? itemCounts[a.id] === 0
+                            ? t('area.empty')
+                            : t('room.itemCount', { n: itemCounts[a.id] })
                           : ''}
                       </div>
                     </div>
@@ -185,7 +189,7 @@ export function RoomPage() {
                     data-delete="true"
                     className="absolute inset-y-0 right-0 w-[88px]"
                     onClick={(e) => { e.stopPropagation(); deleteArea(a); }}
-                    aria-label={`删除 ${a.name}`}
+                    aria-label={`${t('common.delete')} ${displayName(a.name)}`}
                   />
                 )}
               </li>
@@ -209,7 +213,7 @@ export function RoomPage() {
         <button
           onClick={() => setFabOpen(v => !v)}
           className="w-14 h-14 rounded-full bg-accent hover:bg-accent-hover text-paper shadow-lg flex items-center justify-center transition-all duration-300 active:scale-[0.95]"
-          aria-label={fabOpen ? '关闭' : '添加区域'}
+          aria-label={fabOpen ? t('common.close') : t('room.addArea')}
         >
           <span
             className="transition-transform duration-300"
@@ -227,16 +231,16 @@ export function RoomPage() {
           }}
         >
           <div className="bg-paper-card border border-[var(--border-default)] rounded-[12px] shadow-lg p-3 space-y-2 w-64">
-            <p className="text-xs font-medium text-ink-muted">添加区域</p>
+            <p className="text-xs font-medium text-ink-muted">{t('room.addArea')}</p>
             <form onSubmit={(e) => { e.preventDefault(); add(name); }} className="flex gap-2">
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="区域名（如 洗手台柜子）"
+                placeholder={t('room.areaNamePlaceholder')}
                 className="flex-1 min-w-0 bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-2 text-sm outline-none focus:border-accent text-ink placeholder:text-ink-muted"
               />
               <button className="shrink-0 px-3 py-2 rounded-[12px] bg-accent hover:bg-accent-hover text-paper text-sm font-medium transition-all">
-                添加
+                {t('common.add')}
               </button>
             </form>
             <div className="flex flex-wrap gap-1.5">
@@ -246,7 +250,7 @@ export function RoomPage() {
                   onClick={() => add(p)}
                   className="text-xs px-2.5 py-1.5 rounded-full bg-paper-dark border border-[var(--border-default)] hover:border-accent/50 text-ink-muted transition-all"
                 >
-                  + {p}
+                  + {lang === 'en' && PRESET_NAMES[p] ? PRESET_NAMES[p] : p}
                 </button>
               ))}
             </div>

@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { RouterProvider } from 'react-router-dom';
 import { router } from './app/router.js';
 import { startSyncDaemon } from './sync/client.js';
+import { I18nProvider } from './i18n/I18nContext.js';
 import './index.css';
 
 // 纸张颗粒：读取用户偏好
@@ -14,6 +15,8 @@ startSyncDaemon();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <RouterProvider router={router} />
+    <I18nProvider>
+      <RouterProvider router={router} />
+    </I18nProvider>
   </React.StrictMode>,
 );
