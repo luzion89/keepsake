@@ -9,12 +9,12 @@
 
 ## 1. 项目背景
 
-家里低频物品（消毒水、备用工具、季节性用品）半年或一年后常常忘记放在哪里。Keepsake 是一款运行在家庭局域网内的物品管理 PWA，核心目标是：
+家里低频物品（消毒水、备用工具、季节性用品）半年或一年后常常忘记放在哪里。Keepsake 是一款运行在家庭局域网内的物品管理应用，核心目标是：
 
-- **离线优先**：家庭服务器（PC / Mac）经常关机，App 在完全断网时也能正常查询和编辑；
+- **局域网浏览器访问**：家庭成员在局域网内通过浏览器访问 `https://<server-ip>:8443`，无需安装；
+- **本地优先**：数据主要存储在本地 IndexedDB，服务器离线时仍可查询和编辑；
 - **局域网同步**：多台设备通过家庭内网与服务器保持数据一致；
-- **AI 文字解析**：用户用自然语言描述物品，AI 自动结构化为名称、数量、单位、备注；
-- **可安装 PWA**：iOS / Android 均可添加到主屏，利用 Service Worker + IndexedDB 实现离线可用。
+- **AI 文字解析**：用户用自然语言描述物品，AI 自动结构化为名称、数量、单位、备注。
 
 ---
 
@@ -61,18 +61,11 @@ AI 功能完全可选：未配置 Key 或关闭时，所有 CRUD 正常使用。
 
 客户端在每次启动时扫描物品的 `expires_at` 字段，到期或临近到期时在 App 内显示提醒横幅。不依赖 Web Push，iOS / Android 均可使用。
 
-### 2.7 PWA 安装
-
-- Web App Manifest 完整配置（名称、图标、主题色、截图）；
-- Service Worker 由 Workbox（vite-plugin-pwa）生成：静态资源 precache + 自动更新，`/blobs/*` CacheFirst，`/sync/*` NetworkFirst；
-- 支持 iOS Safari（`apple-mobile-web-app-capable`）与 Android Chrome 安装；
-- 服务端屏蔽 `localhost` 访问 SPA，强制使用局域网 IP，确保 SW / IndexedDB 的 origin 一致。
-
-### 2.8 国际化（i18n）
+### 2.7 国际化（i18n）
 
 自手搓双语支持（中文 / 英文），`apps/pwa/src/i18n/` 目录下维护完整翻译字典。语言偏好存储在 IndexedDB，AI 的 system prompt 随语言设置同步切换。
 
-### 2.9 字体
+### 2.8 字体
 
 前端自托管 Noto Serif SC（400、700），woff2 格式，放置于 `apps/pwa/public/fonts/`，不依赖 Google Fonts CDN。
 
@@ -82,11 +75,11 @@ AI 功能完全可选：未配置 Key 或关闭时，所有 CRUD 正常使用。
 
 ```
 ┌─────────────────────────────────┐         ┌──────────────────────────────┐
-│      PWA（iOS / Android）        │         │  Local Server（PC/Mac）       │
+│      浏览器（iOS / Android）     │         │  Local Server（PC/Mac）       │
 │  React 18 + Vite 5 + TS         │  HTTPS  │  Fastify + better-sqlite3    │
-│  Workbox Service Worker         │ ◄─────► │  /sync/pull  /sync/push      │
-│  Dexie（IndexedDB）              │  LAN    │  /blobs  /settings/ai        │
-│  自手搓 i18n                     │         │  SQLite 自动备份              │
+│  Dexie（IndexedDB）              │ ◄─────► │  /sync/pull  /sync/push      │
+│  自手搓 i18n                     │  LAN    │  /blobs  /settings/ai        │
+│                                 │         │  SQLite 自动备份              │
 └─────────────────────────────────┘         └──────────────────────────────┘
                 │
                 │ 客户端直连

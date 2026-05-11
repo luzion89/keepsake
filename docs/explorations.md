@@ -577,3 +577,35 @@ KEEPSAKE_TUNNEL=named KEEPSAKE_TUNNEL_TOKEN=eyJhbGci... node dist/index.js
 - **文档**：本文件（`docs/explorations.md`）即 spike 历史记录，main 仅保留此一份；
 - **数据**：spike 测试期间的 SQLite 库已被 spike 的 drop-rebuild 逻辑清空，未做生产备份（教训见 7.5 第一条）；
 - **未来**：若再考虑公网访问，优先 named tunnel + 自有域名方案，而非依赖 trycloudflare 公共 API。
+
+---
+
+## PWA 探索（已弃用）
+
+**日期：** 2026-05-11  
+**关联 Issue：** #236  
+**状态：** ✅ 已移除注入，hook 代码保留作探索记录
+
+### 背景
+
+Keepsake 早期采用 `vite-plugin-pwa` + Workbox 实现可安装 PWA：
+
+- **Web App Manifest**：`display: 'standalone'`，含名称、图标（192、512、maskable）、主题色、截图，满足 Chrome/Safari 安装横幅条件；
+- **Service Worker（Workbox）**：静态资源 precache + `autoUpdate`，`/blobs/*` CacheFirst（30 天/200 条），`/sync/*` NetworkFirst（5s 超时）；
+- **iOS Safari**：`apple-mobile-web-app-capable` / `apple-mobile-web-app-status-bar-style` 等 meta 支持 standalone 模式；
+- **安装提示 Hook**：`apps/pwa/src/pwa/useInstallPrompt.ts` 监听 `beforeinstallprompt`，供 UI 层弹出安装横幅。
+
+### 为何弃用
+
+单家庭、单服务器的使用场景下，用户只在 LAN 内用浏览器访问 `https://<server-ip>:8443`，PWA 安装路径**收益不足以抵消维护成本**：
+
+1. **iOS PWA 体验不理想**：iOS Safari 在 standalone 模式下存在样式差异，对灵动岛等新硬件支持不佳；iOS 上所有非 Safari 浏览器均不支持真正的 A2HS（苹果 WebKit 政策）；
+2. **证书硬墙**：浏览器要求 HTTPS + 可信 CA 才能触发 `beforeinstallprompt`，自签证书永远被拒，解决方案（mkcert / CF Tunnel / DNS-01）均引入额外配置成本（详见 CF Tunnel 探索章节）；
+3. **SW/origin 一致性成本**：Service Worker 注册在特定 origin 下，`localhost` 与 LAN IP 产生两套独立 IDB 数据，需要服务端屏蔽 localhost 访问来强制 origin 一致；
+4. **离线场景收益低**：家庭服务器关机时用户本来就不需要同步，本地 IndexedDB 读写完全不依赖 SW。
+
+**决策时间：2026-05-11**，移除 SW/manifest 注入，保留 `useInstallPrompt.ts` hook 代码及 `vite-plugin-pwa` 依赖、图标文件，供未来需要时参考。
+
+### 遗留处理
+
+`apps/pwa/src/main.tsx` 顶部加有一段 SW 卸载代码，在用户下次访问时清掉残留的旧 Service Worker，可于 **2026-Q3** 后删除。

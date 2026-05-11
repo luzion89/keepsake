@@ -59,7 +59,7 @@ KEEPSAKE_TLS=1 pnpm -C apps/server start
 
 ---
 
-## 5. PWA 客户端配置
+## 5. 客户端配置
 
 将客户端中配置的服务端地址从：
 
@@ -73,7 +73,7 @@ http://192.168.31.181:8443
 https://192.168.31.181:8443
 ```
 
-Service Worker / fetch 请求在 HTTPS 源下才能完整运行。
+现代浏览器的 `fetch` / IndexedDB 等功能在非 secure context 下会受到限制，建议启用 mkcert 自签 HTTPS 以确保完整功能。
 
 ---
 
