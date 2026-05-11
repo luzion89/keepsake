@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { AlertTriangle, Check, Settings as SettingsIcon, X } from 'lucide-react';
 import {
   getAiConfig, setAiConfig,
-  DEFAULT_MODEL, DEFAULT_TRANSCRIBE_MODEL,
+  DEFAULT_MODEL,
   DEFAULT_DEEPSEEK_MODEL,
   pingProvider,
   type AiConfig, type AiProvider,
@@ -287,10 +287,6 @@ export function SettingsPage() {
                       placeholder={DEFAULT_MODEL}
                       className={inputCls}
                     />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-ink-muted mb-1.5">{t('settings.transcribeModelLabel')}</label>
-                    <input value={cfg!.transcribeModel ?? ''} onChange={(e) => setCfg({ ...cfg!, transcribeModel: e.target.value })} placeholder={DEFAULT_TRANSCRIBE_MODEL} className={inputCls} />
                   </div>
                 </div>
               </SectionRow>

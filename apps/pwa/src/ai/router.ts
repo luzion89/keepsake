@@ -13,9 +13,6 @@ export type AiMode = 'on' | 'off';
 export type AiProvider = 'deepseek' | 'openrouter';
 
 export const DEFAULT_MODEL = 'google/gemini-2.5-flash-lite';
-/** @deprecated transcribe() now uses chat completions with the same model as vision. */
-export const DEFAULT_TRANSCRIBE_MODEL = DEFAULT_MODEL;
-
 export const DEFAULT_DEEPSEEK_MODEL = 'deepseek-chat';
 const DEEPSEEK_URL = 'https://api.deepseek.com/v1/chat/completions';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
@@ -135,15 +132,6 @@ export interface RecognitionDraft {
   raw?: unknown;
 }
 
-async function blobToDataUrl(b: Blob): Promise<string> {
-  return new Promise((res, rej) => {
-    const r = new FileReader();
-    r.onerror = () => rej(r.error);
-    r.onload = () => res(r.result as string);
-    r.readAsDataURL(b);
-  });
-}
-
 /**
  * Guard against missing or accidentally-serialised-as-string-"undefined" keys.
  * Fixes #52: old code paths could store the literal string "undefined" in IndexedDB
@@ -202,50 +190,6 @@ export async function pingOpenRouter(
   apiKey: string,
 ): Promise<{ ok: true; latencyMs: number } | { ok: false; error: string }> {
   return pingProvider('openrouter', apiKey);
-}
-
-/**
- * Transcribe an audio Blob via OpenRouter using chat completions with input_audio.
- * Note: transcribe is OpenRouter-only (#64 will handle provider routing for voice).
- */
-export async function transcribe(audio: Blob): Promise<{ text: string }> {
-  const cfg = await getAiConfig();
-  if (cfg.mode !== 'on' || !isValidKey(cfg.apiKey)) throw new Error('AI 未启用或未配置 OpenRouter Key');
-
-  const format = audio.type.includes('webm') ? 'webm'
-    : audio.type.includes('mp4') || audio.type.includes('m4a') ? 'mp4'
-    : audio.type.includes('wav') ? 'wav'
-    : 'webm';
-
-  const dataUrl = await blobToDataUrl(audio);
-  const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
-
-  const model = (cfg.transcribeModel && cfg.transcribeModel.trim())
-    ? cfg.transcribeModel.trim()
-    : (cfg.model || DEFAULT_MODEL);
-
-  const res = await fetch(OPENROUTER_URL, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      authorization: `Bearer ${cfg.apiKey}`,
-      'HTTP-Referer': location.origin,
-      'X-Title': 'Keepsake',
-    },
-    body: JSON.stringify({
-      model,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'text', text: 'Transcribe the audio to text. Output text in the same language as the speaker. Return only the transcript, no explanations.' },
-          { type: 'input_audio', input_audio: { data: base64, format } },
-        ],
-      }],
-    }),
-  });
-  if (!res.ok) throw new Error(`transcribe ${res.status}: ${await res.text()}`);
-  const j = await res.json();
-  return { text: j.choices?.[0]?.message?.content?.trim() ?? '' };
 }
 
 export interface SearchContext {

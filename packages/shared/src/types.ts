@@ -99,7 +99,5 @@ export const AiConfigSchema = z.object({
   deepseekApiKey: z.string().max(200).optional(),
   /** Vision-capable model id（OpenRouter 专用，DeepSeek 不支持 vision） */
   model: z.string().max(120).optional(),
-  /** Optional Whisper-class model for voice transcription（OpenRouter 专用） */
-  transcribeModel: z.string().max(120).optional(),
 }).strict();
 export type AiConfig = z.infer<typeof AiConfigSchema>;
