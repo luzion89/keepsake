@@ -220,7 +220,7 @@ export const zh = {
   'settings.testOk':              '连通（{ms} ms）',
   'settings.testFail':            '失败：{error}',
   'settings.needApiKey':          '请先填写 API Key',
-  'settings.syncOnce':            '立即同步',
+  'settings.syncOnce':            '同步',
   'settings.syncResult':          '已同步 推 {pushed} / 拉 {pulled} / 冲突 {conflicts}',
   'settings.serverUnreachable':   '服务器不可达',
   'settings.dataSection':         '本机数据',
@@ -229,8 +229,8 @@ export const zh = {
   'settings.statsValue':          '房间 {rooms} · 区域 {areas} · 物品 {items} · 照片 {photos} · 待同步 {outbox}',
   'settings.storageLabel':        '本地存储 {usage} MB / {quota} MB（{pct}%）',
   'settings.storageTight':        '空间紧张',
-  'settings.exportJson':          '导出 JSON 备份',
-  'settings.gc':                  '清理本地缓存',
+  'settings.exportJson':          '导出',
+  'settings.gc':                  '清缓存',
   'settings.gcRunning':           '清理中…',
   'settings.gcDone':              '已释放 {n} 个已同步 blob',
   'settings.gcNone':              '无可清理项',
@@ -241,9 +241,10 @@ export const zh = {
   'settings.unknownError':        '未知错误',
 
   // ── server status badge ─────────────────────────────────────────────
-  'serverStatus.checking': '检查中',
-  'serverStatus.online':   '已连接',
-  'serverStatus.offline':  'server 离线（本地操作仍正常）',
+  'serverStatus.checking': '服务器检测中',
+  'serverStatus.online':   '服务器已连接',
+  'serverStatus.offline':  '服务器离线（本地操作仍正常）',
+  'serverStatus.lastSync': '上次同步：{time}',
 
   // ── confirm dialog ──────────────────────────────────────────────────
   'confirm.ok':     '确认',
@@ -460,7 +461,7 @@ export const en: Record<Key, string> = {
   'settings.aiOn':                'Enable AI (voice input / natural language search)',
   'settings.aiOff':               'Disable AI (manual management only)',
   'settings.aiProvider':          'AI Provider',
-  'settings.deepseekRecommended': 'DeepSeek (recommended)',
+  'settings.deepseekRecommended': 'DeepSeek ★',
   'settings.deepseekKeyLabel':    'DeepSeek API Key',
   'settings.deepseekApply':       'Apply →',
   'settings.deepseekNoVision':    'DeepSeek does not support image recognition. Switch to OpenRouter for photo archiving.',
@@ -472,7 +473,7 @@ export const en: Record<Key, string> = {
   'settings.testOk':              'Connected ({ms} ms)',
   'settings.testFail':            'Failed: {error}',
   'settings.needApiKey':          'Please enter an API Key first',
-  'settings.syncOnce':            'Sync now',
+  'settings.syncOnce':            'Sync',
   'settings.syncResult':          'Synced — pushed {pushed} / pulled {pulled} / conflicts {conflicts}',
   'settings.serverUnreachable':   'Server unreachable',
   'settings.dataSection':         'Local Data',
@@ -481,8 +482,8 @@ export const en: Record<Key, string> = {
   'settings.statsValue':          'Rooms {rooms} · Areas {areas} · Items {items} · Photos {photos} · Pending {outbox}',
   'settings.storageLabel':        'Storage {usage} MB / {quota} MB ({pct}%)',
   'settings.storageTight':        'Low space',
-  'settings.exportJson':          'Export JSON backup',
-  'settings.gc':                  'Clear local cache',
+  'settings.exportJson':          'Export',
+  'settings.gc':                  'Clean cache',
   'settings.gcRunning':           'Clearing…',
   'settings.gcDone':              'Released {n} synced blob(s)',
   'settings.gcNone':              'Nothing to clear',
@@ -493,9 +494,10 @@ export const en: Record<Key, string> = {
   'settings.unknownError':        'Unknown error',
 
   // ── server status badge ─────────────────────────────────────────────
-  'serverStatus.checking': 'Checking',
-  'serverStatus.online':   'Connected',
+  'serverStatus.checking': 'Server checking',
+  'serverStatus.online':   'Server connected',
   'serverStatus.offline':  'Server offline (local ops still work)',
+  'serverStatus.lastSync': 'Last sync: {time}',
 
   // ── confirm dialog ──────────────────────────────────────────────────
   'confirm.ok':     'Confirm',

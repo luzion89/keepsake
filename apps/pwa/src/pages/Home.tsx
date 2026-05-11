@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Home as HomeIcon, Pencil, Plus, Trash2 } from 'lucide-react';
+import { DoorOpen, Home as HomeIcon, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { Area, Room } from '@keepsake/shared';
 import { AreaRepo, ItemRepo, RoomRepo } from '../db/repos.js';
 import { useConfirm } from '../components/ConfirmDialog.js';
@@ -107,7 +107,7 @@ export function HomePage() {
           </div>
         ) : metas.length === 0 ? (
           <div className="flex flex-col items-center py-12 text-center">
-            <HomeIcon size={40} strokeWidth={1.5} className="text-ink-muted/40 mb-3" />
+            <DoorOpen size={40} strokeWidth={1.5} className="text-ink-muted/40 mb-3" />
             <p className="text-ink-muted text-sm font-medium">{t('home.empty')}</p>
             <p className="text-ink-muted/70 text-xs mt-1">{t('home.emptyHint')}</p>
           </div>
@@ -148,7 +148,7 @@ export function HomePage() {
                     else if (delta > 10) setSwipedId(null);
                   }}
                 >
-                  <HomeIcon size={18} strokeWidth={1.5} className="text-ink-muted mr-3 shrink-0" />
+                  <DoorOpen size={18} strokeWidth={1.5} className="text-ink-muted mr-3 shrink-0" />
                   {editingId === r.id ? (
                     <input
                       ref={editRef}

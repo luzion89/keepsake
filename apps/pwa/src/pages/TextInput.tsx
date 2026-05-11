@@ -8,6 +8,7 @@ import { parseItemsFromText, type RecognitionItem, type ExistingItem } from '../
 import type { Area, Item } from '@keepsake/shared';
 import { AlertTriangle, ChevronLeft, FileText, Lightbulb, Pencil, X } from 'lucide-react';
 import { useT } from '../i18n/I18nContext.js';
+import { PRESET_NAMES } from '../i18n/dict.js';
 
 type AreaState = 'loading' | 'not-found' | 'ok';
 type InputMode = 'merge' | 'replace';
@@ -173,12 +174,14 @@ export function TextInputPage() {
 
   const existingNames = new Set(existingItems.map(it => it.name.trim().toLowerCase()));
 
+  const displayName = (n: string) => lang === 'en' && PRESET_NAMES[n] ? PRESET_NAMES[n] : n;
+
   return (
     <div className="space-y-5">
       <nav className="flex items-center gap-1 text-xs text-ink-muted">
-        <Link to={`/areas/${areaId}`} className="hover:text-ink transition-colors flex items-center gap-1"><ChevronLeft size={14} strokeWidth={1.5} />{area!.name}</Link>
+        <Link to={`/areas/${areaId}`} className="hover:text-ink transition-colors flex items-center gap-1"><ChevronLeft size={14} strokeWidth={1.5} />{displayName(area!.name)}</Link>
       </nav>
-      <h1 className="text-xl font-semibold text-ink flex items-center gap-2"><FileText size={20} strokeWidth={1.5} />{t('textInput.title')} · {area!.name}</h1>
+      <h1 className="text-xl font-semibold text-ink flex items-center gap-2"><FileText size={20} strokeWidth={1.5} />{t('textInput.title')} · {displayName(area!.name)}</h1>
 
       {/* Mode switch */}
       <section>
