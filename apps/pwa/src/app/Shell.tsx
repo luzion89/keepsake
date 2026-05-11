@@ -4,8 +4,10 @@ import { Bell, Home, Search, Settings, AlertTriangle, X } from 'lucide-react';
 import { db, type ConflictRow } from '../db/dexie.js';
 import { syncOnce } from '../sync/client.js';
 import { scanReminders, type TriggeredReminder } from '../notifications/scanner.js';
+import { useT } from '../i18n/I18nContext.js';
 
 function ConflictBanner() {
+  const { t } = useT();
   const [count, setCount] = useState(0);
   const [expanded, setExpanded] = useState(false);
   const [rows, setRows] = useState<ConflictRow[]>([]);
@@ -90,12 +92,12 @@ function ConflictBanner() {
     <div className="bg-danger-bg border-b border-danger/30 px-4 py-1.5 text-xs">
       <div className="flex items-center gap-2">
         <AlertTriangle size={14} strokeWidth={1.5} className="text-danger-text shrink-0" />
-        <span className="text-danger-text font-medium">检测到 {count} 条冲突</span>
+        <span className="text-danger-text font-medium">{t('shell.conflict.banner', { n: count })}</span>
         <button
           onClick={toggle}
           className="text-danger-text/80 hover:text-danger-text underline underline-offset-2"
         >
-          {expanded ? '收起' : '查看详情'}
+          {expanded ? t('shell.conflict.collapse') : t('shell.conflict.expand')}
         </button>
       </div>
       {expanded && (
@@ -104,9 +106,13 @@ function ConflictBanner() {
             <div key={r.id} className="text-danger-text bg-danger-bg rounded px-2 py-1 border border-danger/20 space-y-0.5">
               <div className="font-medium">{r.label}</div>
               <div className="text-danger-text/80">
-                字段 <span className="font-semibold">{r.field}</span>
-                {' · '}本地: <span className="text-warn-text">{r.client == null ? '（空）' : JSON.stringify(r.client)}</span>
-                {' / '}服务端: <span className="text-ink-muted">{r.server == null ? '（空）' : JSON.stringify(r.server)}</span>
+                {t('shell.conflict.field', { field: r.field })}
+                {' · '}
+                {t('shell.conflict.local')}{' '}
+                <span className="text-warn-text">{r.client == null ? t('shell.conflict.null') : JSON.stringify(r.client)}</span>
+                {' / '}
+                {t('shell.conflict.server')}{' '}
+                <span className="text-ink-muted">{r.server == null ? t('shell.conflict.null') : JSON.stringify(r.server)}</span>
               </div>
             </div>
           ))}
@@ -116,14 +122,14 @@ function ConflictBanner() {
               className="flex-1 px-3 py-1 rounded-[12px] border border-danger/40 text-danger-text font-medium transition-colors hover:bg-danger-bg/60 text-xs"
               title="保留本地数据，忽略云端差异"
             >
-              全部保留本地
+              {t('shell.conflict.keepLocal')}
             </button>
             <button
               onClick={acceptAllServer}
               className="flex-1 px-3 py-1 rounded-[12px] bg-danger hover:opacity-90 text-paper font-medium transition-colors text-xs"
               title="用云端数据覆盖本地对应字段"
             >
-              全部采用云端
+              {t('shell.conflict.useServer')}
             </button>
           </div>
         </div>
@@ -136,6 +142,7 @@ function ConflictBanner() {
  * #193: NotificationBanner 简化 — 仅显示"你有 N 条提醒 · 查看"，点击跳 /reminders
  */
 function NotificationBanner() {
+  const { t } = useT();
   const [count, setCount] = useState(0);
   const [dismissed, setDismissed] = useState(false);
   const navigate = useNavigate();
@@ -143,8 +150,8 @@ function NotificationBanner() {
   useEffect(() => {
     setDismissed(false);
     const run = async () => {
-      const t = await scanReminders();
-      setCount(t.length);
+      const tr = await scanReminders();
+      setCount(tr.length);
     };
     run();
     const id = setInterval(run, 60_000);
@@ -157,18 +164,18 @@ function NotificationBanner() {
     <div className="bg-warn-bg border-b border-warn/30 px-4 py-2 text-xs flex items-center gap-2">
       <Bell size={14} strokeWidth={1.5} className="shrink-0 text-warn-text" />
       <span className="text-warn-text font-medium flex-1">
-        你有 {count} 条提醒
+        {t('shell.reminder.banner', { n: count })}
       </span>
       <button
         onClick={() => navigate('/reminders')}
         className="text-warn-text underline underline-offset-2 hover:text-ink transition-colors shrink-0"
       >
-        查看
+        {t('shell.reminder.view')}
       </button>
       <button
         onClick={() => setDismissed(true)}
         className="text-warn-text/60 hover:text-warn-text transition-colors shrink-0 ml-1"
-        aria-label="关闭"
+        aria-label={t('common.close')}
       >
         <X size={14} strokeWidth={1.5} />
       </button>
@@ -177,6 +184,7 @@ function NotificationBanner() {
 }
 
 export function Shell() {
+  const { t } = useT();
   const loc = useLocation();
   const [pending, setPending] = useState(0);
   const [online, setOnline] = useState<boolean>(navigator.onLine);
@@ -194,17 +202,17 @@ export function Shell() {
     return () => { clearInterval(i); window.removeEventListener('online', on); window.removeEventListener('offline', off); };
   }, [loc.pathname]);
 
-  // #183: 4 tabs — 房间 / 搜索 / 提醒 / 设置
+  // #183: 4 tabs
   const tabs = [
-    { to: '/', label: '房间', Icon: Home },
-    { to: '/search', label: '搜索', Icon: Search },
-    { to: '/reminders', label: '提醒', Icon: Bell },
-    { to: '/settings', label: '设置', Icon: Settings },
+    { to: '/', label: t('nav.rooms'), Icon: Home },
+    { to: '/search', label: t('nav.search'), Icon: Search },
+    { to: '/reminders', label: t('nav.reminders'), Icon: Bell },
+    { to: '/settings', label: t('nav.settings'), Icon: Settings },
   ];
 
   return (
     <div className="min-h-full flex flex-col">
-      {/* ── Header ────────────────────────────────────── */}
+      {/* ── Header ────────────────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-10 h-14 bg-paper/95 backdrop-blur-md border-b border-ink-faint px-4 flex items-center gap-3">
         <Link
           to="/"
@@ -215,14 +223,14 @@ export function Shell() {
         <div className="flex-1" />
         <Link
           to="/search"
-          aria-label="搜索"
+          aria-label={t('common.search')}
           className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-[12px] text-ink-muted hover:text-ink hover:bg-paper-dark transition-all duration-150"
         >
           <Search size={18} strokeWidth={1.5} />
         </Link>
         <Link
           to="/settings"
-          aria-label="设置"
+          aria-label={t('common.settings')}
           className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-[12px] text-ink-muted hover:text-ink hover:bg-paper-dark transition-all duration-150"
         >
           <Settings size={18} strokeWidth={1.5} />
@@ -232,13 +240,13 @@ export function Shell() {
       {/* ── Offline / Pending banner ───────────────────── */}
       {(pending > 0 || !online) && (
         <div className="px-4 py-1.5 text-xs flex gap-3 items-center bg-paper-dark border-b border-ink-faint">
-          {!online && <span className="text-warn-text">● 离线</span>}
-          {pending > 0 && <span className="text-ink-muted">待同步 {pending}</span>}
+          {!online && <span className="text-warn-text">{t('common.offline')}</span>}
+          {pending > 0 && <span className="text-ink-muted">{t('common.pending', { n: pending })}</span>}
           <button
             onClick={() => syncOnce()}
             className="ml-auto text-accent hover:text-accent-hover underline-offset-2 hover:underline transition-colors"
           >
-            立即同步
+            {t('common.syncNow')}
           </button>
         </div>
       )}
@@ -246,7 +254,7 @@ export function Shell() {
       <ConflictBanner />
       <NotificationBanner />
 
-      {/* ── Main content ──────────────────────────────── */}
+      {/* ── Main content ──────────────────────────────────────────────────────── */}
       <main className="flex-1 px-4 py-4 max-w-3xl w-full mx-auto pb-6">
         <Outlet />
       </main>

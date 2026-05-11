@@ -4,12 +4,15 @@ import { Home as HomeIcon, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { Area, Room } from '@keepsake/shared';
 import { AreaRepo, ItemRepo, RoomRepo } from '../db/repos.js';
 import { useConfirm } from '../components/ConfirmDialog.js';
+import { useT } from '../i18n/I18nContext.js';
+import { PRESET_NAMES } from '../i18n/dict.js';
 
 const PRESETS = ['厨房', '客厅', '阳台', '主卧', '次卧', '卫生间', '储物间', '玄关'];
 
 interface RoomMeta { room: Room; areaCount: number }
 
 export function HomePage() {
+  const { t, lang } = useT();
   const [metas, setMetas] = useState<RoomMeta[]>([]);
   const [loading, setLoading] = useState(true);
   const [fabOpen, setFabOpen] = useState(false);
@@ -62,9 +65,9 @@ export function HomePage() {
     let itemCount = 0;
     for (const a of areas) itemCount += (await ItemRepo.listByArea(a.id)).length;
     const message = areas.length === 0
-      ? `删除房间「${r.name}」？`
-      : `「${r.name}」下有 ${areas.length} 个区域、${itemCount} 个物品，将一并软删除。继续？`;
-    const ok = await confirm(message, { danger: true, okText: '删除' });
+      ? t('home.deleteConfirm', { name: r.name })
+      : t('home.deleteConfirmWithItems', { name: r.name, areaCount: areas.length, itemCount });
+    const ok = await confirm(message, { danger: true, okText: t('common.delete') });
     if (!ok) return;
     for (const a of areas) {
       for (const it of await ItemRepo.listByArea(a.id)) await ItemRepo.remove(it.id);
@@ -82,30 +85,31 @@ export function HomePage() {
     return () => document.removeEventListener('click', close);
   }, []);
 
+  const displayName = (name: string) =>
+    lang === 'en' && PRESET_NAMES[name] ? PRESET_NAMES[name] : name;
+
   return (
     <div className="space-y-4">
       {dialog}
 
-      {/* ── 页面标题 (#190 #191) ─────────────────────── */}
       <h1 className="text-2xl font-bold font-serif text-ink flex items-center gap-2">
         <HomeIcon size={22} strokeWidth={1.5} />
-        房间
+        {t('home.title')}
       </h1>
 
-      {/* ── 房间列表 ──────────────────────────────────── */}
       <section>
         <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-muted mb-3">
-          我的房间 {metas.length > 0 && `(${metas.length})`}
+          {t('home.myRooms')} {metas.length > 0 && `(${metas.length})`}
         </h2>
         {loading ? (
           <div className="flex flex-col items-center py-12 text-center">
-            <p className="text-ink-muted text-sm">加载中…</p>
+            <p className="text-ink-muted text-sm">{t('home.loading')}</p>
           </div>
         ) : metas.length === 0 ? (
           <div className="flex flex-col items-center py-12 text-center">
             <HomeIcon size={40} strokeWidth={1.5} className="text-ink-muted/40 mb-3" />
-            <p className="text-ink-muted text-sm font-medium">还没有房间</p>
-            <p className="text-ink-muted/70 text-xs mt-1">点右下角 + 添加第一个房间</p>
+            <p className="text-ink-muted text-sm font-medium">{t('home.empty')}</p>
+            <p className="text-ink-muted/70 text-xs mt-1">{t('home.emptyHint')}</p>
           </div>
         ) : (
           <ul className="bg-paper-card border border-[var(--border-default)] rounded-[12px] overflow-hidden divide-y divide-[var(--border-subtle)]">
@@ -114,16 +118,13 @@ export function HomePage() {
                 key={r.id}
                 className="relative overflow-hidden"
                 onClick={(e) => {
-                  // 如已展开滑动状态，点击空白只收起（点删除按钮除外）
                   if (swipedId === r.id && !(e.target as HTMLElement).closest('[data-delete]')) {
                     e.preventDefault();
                     e.stopPropagation();
                     setSwipedId(null);
                     return;
                   }
-                  // 编辑态不跳转
                   if (editingId === r.id) return;
-                  // 按钮区不跳转（Pencil/Delete 按钮有 stopPropagation，此处兜底）
                   if ((e.target as HTMLElement).closest('button')) return;
                   navigate(`/rooms/${r.id}`);
                 }}
@@ -131,7 +132,7 @@ export function HomePage() {
                 {/* Delete background */}
                 <div className="absolute inset-y-0 right-0 flex items-center bg-danger px-5 select-none" aria-hidden="true">
                   <Trash2 size={18} strokeWidth={1.5} className="text-paper" />
-                  <span className="text-paper text-sm ml-1.5">删除</span>
+                  <span className="text-paper text-sm ml-1.5">{t('home.delete')}</span>
                 </div>
 
                 {/* Swipeable row */}
@@ -164,20 +165,19 @@ export function HomePage() {
                   ) : (
                     <div className="flex-1 min-w-0 flex items-center gap-0">
                       <span className="min-w-0 text-sm font-medium text-ink truncate">
-                        {r.name}
+                        {displayName(r.name)}
                       </span>
-                      {/* #192: 改名图标紧贴名称右侧 */}
                       <button
                         onClick={(e) => { e.stopPropagation(); startRename(r); }}
                         className="ml-1.5 shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-ink-muted hover:text-ink hover:bg-paper-dark transition-all"
-                        aria-label="改名"
-                        title="改名"
+                        aria-label={t('home.rename')}
+                        title={t('home.rename')}
                       >
                         <Pencil size={14} strokeWidth={1.5} />
                       </button>
                     </div>
                   )}
-                  <span className="text-xs text-ink-muted">{areaCount} 个区域</span>
+                  <span className="text-xs text-ink-muted">{t('home.areaCount', { n: areaCount })}</span>
                 </div>
 
                 {/* Invisible delete tap target over the red area */}
@@ -186,7 +186,7 @@ export function HomePage() {
                     data-delete="true"
                     className="absolute inset-y-0 right-0 w-[88px]"
                     onClick={(e) => { e.stopPropagation(); deleteRoom(r); }}
-                    aria-label={`删除 ${r.name}`}
+                    aria-label={`${t('home.delete')} ${displayName(r.name)}`}
                   />
                 )}
               </li>
@@ -210,7 +210,7 @@ export function HomePage() {
         <button
           onClick={() => setFabOpen(v => !v)}
           className="w-14 h-14 rounded-full bg-accent hover:bg-accent-hover text-paper shadow-lg flex items-center justify-center transition-all duration-300 active:scale-[0.95]"
-          aria-label={fabOpen ? '关闭' : '添加房间'}
+          aria-label={fabOpen ? t('home.fabClose') : t('home.fabOpen')}
         >
           <span
             className="transition-transform duration-300"
@@ -228,16 +228,16 @@ export function HomePage() {
           }}
         >
           <div className="bg-paper-card border border-[var(--border-default)] rounded-[12px] shadow-lg p-3 space-y-2 w-64">
-            <p className="text-xs font-medium text-ink-muted">添加房间</p>
+            <p className="text-xs font-medium text-ink-muted">{t('home.addRoom')}</p>
             <form onSubmit={(e) => { e.preventDefault(); add(name); }} className="flex gap-2">
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="房间名（如 厨房）"
+                placeholder={t('home.roomNamePlaceholder')}
                 className="flex-1 min-w-0 bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-2 text-sm outline-none focus:border-accent text-ink placeholder:text-ink-muted"
               />
               <button className="shrink-0 px-3 py-2 rounded-[12px] bg-accent hover:bg-accent-hover text-paper text-sm font-medium transition-all">
-                添加
+                {t('common.add')}
               </button>
             </form>
             <div className="flex flex-wrap gap-1.5">
@@ -247,7 +247,7 @@ export function HomePage() {
                   onClick={() => add(p)}
                   className="text-xs px-2.5 py-1.5 rounded-full bg-paper-dark border border-[var(--border-default)] hover:border-accent/50 text-ink-muted transition-all"
                 >
-                  + {p}
+                  + {lang === 'en' && PRESET_NAMES[p] ? PRESET_NAMES[p] : p}
                 </button>
               ))}
             </div>
