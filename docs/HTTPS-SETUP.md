@@ -1,6 +1,5 @@
 # HTTPS Setup（本地 mkcert 证书）
 
-安卓 Chrome 通过内网 IP 访问 PWA 时，HTTP 下 `navigator.mediaDevices` 为 undefined，无法使用语音输入。
 本文说明如何用 [mkcert](https://github.com/FiloSottile/mkcert) 在开发环境启用 HTTPS。
 
 ---
@@ -74,7 +73,7 @@ http://192.168.31.181:8443
 https://192.168.31.181:8443
 ```
 
-Service Worker / fetch 请求在 HTTPS 源下才能完整运行，包括麦克风等敏感 API。
+Service Worker / fetch 请求在 HTTPS 源下才能完整运行。
 
 ---
 
