@@ -166,7 +166,7 @@ export function SettingsPage() {
     }
   };
 
-  const btnCls = 'flex-1 px-3 py-2 rounded-[12px] border border-[var(--border-default)] text-sm text-ink hover:border-accent/60 hover:text-ink-hover transition-all';
+  const btnCls = 'flex-1 min-w-0 px-2 py-2 rounded-[12px] border border-[var(--border-default)] text-sm text-ink hover:border-accent/60 hover:text-ink-hover transition-all whitespace-nowrap text-center';
 
   if (!loaded) return <SettingsSkeleton />;
 
