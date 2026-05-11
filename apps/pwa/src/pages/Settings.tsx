@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useInstallPrompt } from '../pwa/useInstallPrompt.js';
-import { AlertTriangle, Check, Download, Settings as SettingsIcon, X } from 'lucide-react';
+import { AlertTriangle, Check, Settings as SettingsIcon, X } from 'lucide-react';
 import {
   getAiConfig, setAiConfig,
   DEFAULT_MODEL, DEFAULT_TRANSCRIBE_MODEL,
@@ -93,9 +92,6 @@ export function SettingsPage() {
   const [gcResult, setGcResult] = useState<number | null>(null);
   const [gcRunning, setGcRunning] = useState(false);
   const [quota, setQuota] = useState<StorageQuota | null | 'unsupported'>('unsupported');
-  // #202 / #134: PWA install prompt
-  const { canInstall, isStandalone, promptInstall } = useInstallPrompt();
-  const [installResult, setInstallResult] = useState<'accepted' | 'dismissed' | 'unavailable' | null>(null);
 
   const reloadStats = async () => setStats({
     rooms: await db.rooms.count(),
@@ -382,50 +378,6 @@ export function SettingsPage() {
               </span>
             )}
           </div>
-        </SectionRow>
-      </Section>
-
-      {/* ── #202 / #134: PWA 安装 ─────────────────────── */}
-      <Section title="安装到设备">
-        <SectionRow>
-          {isStandalone ? (
-            <p className="text-xs text-ok-text flex items-center gap-1.5">
-              <Check size={13} strokeWidth={2} />
-              已作为 PWA 安装运行
-            </p>
-          ) : canInstall ? (
-            <div className="space-y-2">
-              <p className="text-xs text-ink-muted">浏览器已准备好安装，点击下方按钮将 Keepsake 添加到主屏幕。</p>
-              <button
-                onClick={async () => {
-                  const r = await promptInstall();
-                  setInstallResult(r);
-                }}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-[12px] bg-accent hover:bg-accent-hover active:scale-[0.98] text-paper font-medium text-sm shadow-card transition-all"
-              >
-                <Download size={15} strokeWidth={1.5} />
-                安装到主屏幕
-              </button>
-              {installResult === 'dismissed' && (
-                <p className="text-xs text-ink-muted">已取消。可稍后再试。</p>
-              )}
-              {installResult === 'accepted' && (
-                <p className="text-xs text-ok-text flex items-center gap-1"><Check size={12} strokeWidth={2} />安装成功！</p>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-1">
-              <p className="text-xs text-ink-muted">
-                当前浏览器未触发安装提示。可能原因：
-              </p>
-              <ul className="text-xs text-ink-muted list-disc list-inside space-y-0.5">
-                <li>已安装过（请在已安装的应用中使用）</li>
-                <li>在 Safari 中：请使用「分享 → 添加到主屏幕」</li>
-                <li>在 Chrome 中：地址栏右侧可能有安装图标</li>
-                <li>需要在 HTTPS 或 localhost 环境下访问</li>
-              </ul>
-            </div>
-          )}
         </SectionRow>
       </Section>
 

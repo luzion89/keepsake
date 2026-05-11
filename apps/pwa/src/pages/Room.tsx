@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Package, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { Area, Room } from '@keepsake/shared';
 import { AreaRepo, ItemRepo, RoomRepo } from '../db/repos.js';
@@ -20,6 +20,7 @@ export function RoomPage() {
   const touchStartX = useRef<number | null>(null);
   const editRef = useRef<HTMLInputElement>(null);
   const { confirm, dialog } = useConfirm();
+  const navigate = useNavigate();
 
   const reload = async () => {
     setRoom(await RoomRepo.get(roomId));
@@ -107,11 +108,18 @@ export function RoomPage() {
                 key={a.id}
                 className="relative overflow-hidden"
                 onClick={(e) => {
+                  // 如已展开滑动状态，点击空白只收起
                   if (swipedId === a.id && !(e.target as HTMLElement).closest('[data-delete]')) {
                     e.preventDefault();
                     e.stopPropagation();
                     setSwipedId(null);
+                    return;
                   }
+                  // 编辑态不跳转
+                  if (editingId === a.id) return;
+                  // 按钮区不跳转
+                  if ((e.target as HTMLElement).closest('button')) return;
+                  navigate(`/areas/${a.id}`);
                 }}
               >
                 {/* Delete background */}
@@ -150,13 +158,9 @@ export function RoomPage() {
                   ) : (
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-0">
-                        <Link
-                          to={`/areas/${a.id}`}
-                          className="min-w-0 truncate text-sm font-medium text-ink hover:text-ink-hover transition-colors"
-                          onClick={(e) => { if (swipedId === a.id) e.preventDefault(); }}
-                        >
+                        <span className="min-w-0 truncate text-sm font-medium text-ink">
                           {a.name}
-                        </Link>
+                        </span>
                         {/* #192: 改名图标紧贴名称右侧 */}
                         <button
                           onClick={(e) => { e.stopPropagation(); startRename(a); }}
