@@ -1,41 +1,71 @@
+<div align="center">
+
 # Keepsake
 
-> 家里那瓶半年前买的消毒水放哪了？Keepsake 是一款跑在家庭局域网内的物品管理应用：把"房间 → 区域 → 物品"记下来，下次想找时一秒定位。AI 可选，离线可用，单家庭单服务器。
+**自托管的家庭物品管理 PWA —— 知道家里有什么、放在哪里。**
 
-<!-- 主截图占位：建议放一张房间列表 + 物品详情的拼图，宽度约 800px -->
-![screenshot](docs/img/cover.png)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](./LICENSE)
 
----
+[English](./README.en.md) · 简体中文
 
-## 为什么要做这个
+<!-- 主截图占位（建议拼接图：左边桌面端房间列表，右边手机端物品详情，宽约 800px） -->
+![cover](docs/img/cover.png)
 
-- **低频物品记忆衰减**：消毒水、备用电池、季节性衣物等，半年后基本忘记放在哪
-- **现成方案太重**：Notion / Excel 需要手敲、家庭账号同步麻烦；专业仓储软件杀鸡用牛刀
-- **不想把家里的隐私上云**：所有数据只存在你家服务器和你自己的设备里，AI Key 也是你自己的
+</div>
+
+> 单家庭、单服务器设计。所有数据只在你家局域网内流转，AI Key 也是你自己的。
+
+## 为什么会有 Keepsake
+
+家里那瓶半年前买的消毒水放哪了？阳台上的备用电池还剩几节？换季的羽绒服塞进哪个箱子了？
+
+这些问题听起来都是「下次我会记住的」，但事实是 —— 我们不会。低频物品的存放位置在大脑里几乎是写不进长期记忆的。
+
+市面上的方案要么太重（Notion / Excel 要手敲、家庭账号同步麻烦），要么太轻（拍张照片塞在相册里再也找不到），要么太重云（专业仓储管理软件、还要把家里有什么告诉别人的服务器）。
+
+Keepsake 走另一条路：
+
+- **就跑在你家**：一个 SQLite 文件 + 一个 Fastify 服务，丢在常开机的电脑或 NAS 上，全家设备通过局域网访问
+- **离线优先**：所有 CRUD 先写浏览器 IndexedDB，服务器一上线就同步；没网也能用
+- **AI 是配料不是主菜**：可选接 DeepSeek / OpenRouter，让你说一句「买了三瓶洗发水和一盒牙膏」就自动结构化；不接也照样手动管理
+- **隐私是默认**：AI Key 存在你浏览器里，请求**直接打到 AI 厂商**，不经过家庭服务器之外的任何中转。物品数据从不出局域网
 
 ## 主要特性
 
-- 🏠 **三级层级**：房间 → 区域 → 物品（例：厨房 → 洗手台柜子 → 消毒水 × 2）
-- 🤖 **AI 辅助**（可选）：用一句话描述「买了三瓶洗发水和一盒牙膏」，AI 自动结构化为物品列表
-- 🔍 **自然语言搜索**（可选）：「卫生间还有创可贴吗？」AI 从所有物品里找答案并跳转
-- 🔄 **多设备同步**：iOS / Android / 电脑浏览器都能改，自动推拉合并；冲突按字段级 LWW
-- 📴 **离线优先**：所有 CRUD 先写本地 IndexedDB，服务器一上线就同步，没网也能用
-- 💾 **自动备份**：服务端每周 `VACUUM INTO` 一份 SQLite 快照，默认保留 4 份
-- 🌏 **中英双语**：UI + AI prompt 都跟随语言切换
+**📦 物品管理**
+- 三级层级：房间 → 区域 → 物品（例：厨房 → 洗手台柜子 → 消毒水 × 2）
+- 预设房间/区域名称（厨房、阳台、洗手台柜子、抽屉…），一键添加
+- 物品支持名称、数量、单位、备注、过期日期、标签、照片
 
-## 技术栈速览
+**🤖 AI 辅助**（可选）
+- **自然语言录入**：「买了三瓶洗发水和一盒牙膏」→ 自动拆成 3 个物品
+- **自然语言搜索**：「卫生间还有创可贴吗？」→ AI 从所有物品里找答案
+- 支持 DeepSeek（便宜）和 OpenRouter（模型多）
+
+**🔄 多设备同步**
+- iOS / Android / 电脑浏览器都能改，自动推拉合并
+- 4 种同步操作（upsert / delete / qty_delta / patch），字段级 LWW
+- 联网时每 60 秒或切到前台时自动触发；冲突顶部红条提示，可手动选择保留方
+
+**📴 离线 & 备份**
+- IndexedDB 本地优先，断网也能查询和编辑
+- 服务端每周 `VACUUM INTO` 一份 SQLite 快照，默认保留 4 份
+- 设置页一键导出 JSON 全量备份
+
+**🌏 双语**
+- UI 中英文切换
+- AI 的 system prompt 同步切换语言
+
+## 技术栈
 
 | 端 | 栈 |
 |---|---|
 | 前端 | React 18 + Vite 5 + TypeScript + Tailwind + Dexie（IndexedDB）|
-| 后端 | Fastify + better-sqlite3，单进程单文件 SQLite |
-| AI | DeepSeek 或 OpenRouter，**客户端直连**，Key 存本机不经过家庭服务器 |
-| 同步 | 4 种 op：upsert / delete / qty_delta / patch（字段级 LWW）|
+| 后端 | Fastify + better-sqlite3，单进程单文件 |
+| AI | DeepSeek 或 OpenRouter，**客户端直连** |
 | 共享 | `packages/shared` 同步协议 + 合并规则，前后端复用 |
 
-更多细节见 [`docs/02-implementation.md`](docs/02-implementation.md)。
-
----
+更多细节：[`docs/02-implementation.md`](docs/02-implementation.md)
 
 ## 快速开始
 
@@ -48,7 +78,7 @@ pnpm build          # 顺序 build shared / pwa / server
 
 ### 2. 配置 HTTPS（强烈建议）
 
-现代浏览器在非 secure context 下会限制 fetch / IndexedDB / 摄像头权限，且 LAN IP 默认是 `http://`。用 mkcert 生成本地证书：
+现代浏览器在非 secure context 下会限制 fetch / IndexedDB / 摄像头权限。用 mkcert 给局域网 IP 签个本地证书：
 
 ```bash
 brew install mkcert nss
@@ -66,7 +96,7 @@ mkcert -cert-file dev-cert.pem -key-file dev-key.pem \
 KEEPSAKE_TLS=1 pnpm start
 ```
 
-终端会打印类似：
+终端会打印：
 
 ```
 ╔════════════════════════════════════════════════╗
@@ -76,59 +106,42 @@ KEEPSAKE_TLS=1 pnpm start
 ╚════════════════════════════════════════════════╝
 ```
 
-家里所有设备的浏览器打开 LAN URL 就能用了。第一次会提示证书不被信任，按浏览器的「高级 → 继续访问」即可（或在系统里信任 mkcert 的 CA）。
+家里所有设备的浏览器打开 LAN URL 即可使用。
 
 > ⚠️ `localhost` 已被服务端屏蔽（避免 IndexedDB origin 不一致导致数据看似"丢失"）。统一用 LAN IP 访问。开发时如需 localhost，设 `KEEPSAKE_ALLOW_LOCALHOST=1`。
 
 ### 4. 配置 AI（可选）
 
-进入设置页 →「AI 助手」开关 → 选 DeepSeek 或 OpenRouter → 粘贴你的 API Key → 测试连通 → 保存。
-
-- **DeepSeek**：[deepseek.com](https://platform.deepseek.com)，价格便宜
-- **OpenRouter**：[openrouter.ai](https://openrouter.ai)，可选任意兼容模型
-
-Key 存在浏览器 IndexedDB，并自动同步到家庭服务器（其他设备启动时拉取，多设备共用同一 Key）。**Key 不经过家庭服务器之外的任何中转**。
-
----
+进入设置页 →「AI 助手」开关 → 选 DeepSeek 或 OpenRouter → 粘贴你的 API Key → 测试连通 → 保存。Key 会自动同步到家庭服务器（其他设备启动时拉取，多设备共用同一份 Key）。
 
 ## 用法演示
 
-### 添加物品
+### 添加房间 / 区域 / 物品
 
-<!-- GIF 占位：从房间列表 → 进区域 → 点 + → 输入"两瓶洗发水"→ AI 解析 → 保存，10 秒以内 -->
+<!-- GIF 占位：从空房间列表 → 点 + → 选「厨房」预设 → 进入 → 加「洗手台柜子」→ 点「文字输入」→ AI 解析 -->
 ![add-item](docs/img/add-item.gif)
 
-1. 房间列表点 + 创建房间（或选预设：厨房/客厅/阳台...）
-2. 进入房间点 + 创建区域（或选预设：洗手台柜子/抽屉/吊柜...）
-3. 进入区域：
-   - **AI 模式**：点「文字输入」→ 用一句话描述「买了三瓶洗发水和一盒牙膏」→ AI 自动拆成 3 个物品
-   - **手动模式**：点 + 直接录入名称、数量、单位、备注、过期日期、标签
-
-### 找物品
+### 查找物品
 
 <!-- GIF 占位：搜索框输入"创可贴"→ 列表展示 → 点击跳转到所在区域 -->
 ![search-item](docs/img/search.gif)
 
-- 关键词搜索：物品名、备注、标签全文匹配
-- AI 自然语言（开 AI 时）：直接问「客厅有没有备用电池」「上个月买的洗发水放哪了」
-
 ### 多设备同步
 
-<!-- GIF / 截图占位：左手机右桌面，一边改另一边几秒后更新 -->
+<!-- GIF 占位：左手机右桌面，一边改另一边几秒后更新 -->
 ![sync](docs/img/sync.gif)
 
-- 联网时每 60 秒或切到前台时自动同步一次
-- 设置页有「同步」按钮可手动触发
-- 冲突自动按字段级 LWW 合并；无法自动合并的会顶部红条提示，可选择「保留本地」或「采用云端」
+## 项目结构
 
-### 数据导出 / 备份
-
-- 设置 →「本机数据」→「导出」：下载完整 JSON 快照
-- 服务端每周自动 `VACUUM INTO` 备份到 `apps/server/data/backups/`，默认保留 4 份
-  - 间隔可改：`KEEPSAKE_BACKUP_INTERVAL_DAYS=7`
-  - 保留份数可改：`KEEPSAKE_BACKUP_KEEP=4`
-
----
+```
+Keepsake/
+├── apps/
+│   ├── pwa/      # React + Vite + Dexie 前端
+│   └── server/   # Fastify + better-sqlite3 后端
+├── packages/
+│   └── shared/   # 类型 + 同步协议 + 合并规则
+└── docs/         # 设计、实现、测试、QA 报告、演进记录
+```
 
 ## 开发
 
@@ -139,7 +152,7 @@ pnpm -C packages/shared build -w
 # 终端 B：后端 hot-reload
 pnpm -C apps/server dev
 
-# 终端 C：前端 dev server（5173，自动代理 /sync /blobs /settings 到 8443）
+# 终端 C：前端 dev server (5173, 自动代理 /sync /blobs /settings 到 8443)
 pnpm -C apps/pwa dev
 ```
 
@@ -151,23 +164,7 @@ pnpm -C apps/pwa test           # AI router、i18n、item-repo、patch
 pnpm -C apps/server test        # /sync pull/push、LWW、qty_delta、patch
 ```
 
-无 e2e / Playwright，UI 验收靠人肉 + `.claude/agents/qa.md` 描述的 QA 流程。
-
----
-
-## 项目结构
-
-```
-Keepsake/
-├── apps/
-│   ├── pwa/      # React + Vite + Dexie 前端
-│   └── server/   # Fastify + better-sqlite3 后端 + 静态文件托管
-├── packages/
-│   └── shared/   # 类型 + 同步协议 + 合并规则（前后端共用）
-└── docs/         # 项目文档（设计、实现、测试、QA 报告、演进记录）
-```
-
----
+无 e2e / Playwright，UI 验收靠人肉 + [`.claude/agents/qa.md`](.claude/agents/qa.md) 描述的 QA 流程。
 
 ## 环境变量（服务端）
 
@@ -183,20 +180,26 @@ Keepsake/
 | `KEEPSAKE_ALLOW_LOCALHOST` | 未设置 | `1` 允许 localhost 访问 SPA（仅开发用） |
 | `LOG_LEVEL` | `info` | Fastify 日志级别 |
 
----
-
 ## 文档导航
 
 - [`docs/01-plan.md`](docs/01-plan.md) — 项目愿景、功能范围、架构、数据模型、同步协议
-- [`docs/02-implementation.md`](docs/02-implementation.md) — 真实技术栈、目录、关键模块（AI router / sync / i18n / 备份）
-- [`docs/03-testing.md`](docs/03-testing.md) — 测试现状（vitest）+ QA 流程
+- [`docs/02-implementation.md`](docs/02-implementation.md) — 技术栈、目录、关键模块（AI router / sync / i18n / 备份）
+- [`docs/03-testing.md`](docs/03-testing.md) — 测试现状 + QA 流程
 - [`docs/HTTPS-SETUP.md`](docs/HTTPS-SETUP.md) — mkcert + 安卓 CA 安装
 - [`docs/storage-plan.md`](docs/storage-plan.md) — IndexedDB / Blob / 备份策略
 - [`docs/explorations.md`](docs/explorations.md) — 走过的弯路（含已弃用的 PWA 方案、cloudflared 等）
 - [`docs/qa-reports/`](docs/qa-reports/) — 历轮 QA 报告归档
 
----
+## 路线图
+
+参见 [GitHub Issues](https://github.com/luzion89/keepsake/issues)。当前重点：
+
+- 完整 e2e 测试（暂用人肉 + QA agent）
+- 物品照片识别（DeepSeek 不支持视觉，等 OpenRouter 视觉模型稳定）
+- 移动端进一步优化
 
 ## License
 
-未指定（家用项目，自取自用）。
+[MIT](./LICENSE) © 2026 luzion89
+
+家用项目，欢迎 fork 折腾。如果对你也有用，给个 ⭐ 让我知道。
