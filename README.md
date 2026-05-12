@@ -126,11 +126,6 @@ KEEPSAKE_TLS=1 pnpm start
 <!-- GIF 占位：搜索框输入"创可贴"→ 列表展示 → 点击跳转到所在区域 -->
 ![search-item](docs/img/search.gif)
 
-### 多设备同步
-
-<!-- GIF 占位：左手机右桌面，一边改另一边几秒后更新 -->
-![sync](docs/img/sync.gif)
-
 ## 项目结构
 
 ```
