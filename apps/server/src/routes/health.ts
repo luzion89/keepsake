@@ -5,31 +5,24 @@ import { listBackups } from '../backup.js';
 
 const VERSION = '0.1.0';
 
-/** Cache FS stats for 10 seconds to avoid per-request disk access. */
-interface CachedStats {
+interface HealthStats {
   dbSizeBytes: number | null;
   lastBackupAt: number | null;
   backupCount: number;
-  cachedAt: number;
 }
-let statsCache: CachedStats | null = null;
-const CACHE_TTL_MS = 10_000;
 
-function getFsStats(): Omit<CachedStats, 'cachedAt'> {
-  const now = Date.now();
-  if (statsCache && now - statsCache.cachedAt < CACHE_TTL_MS) {
-    const { cachedAt: _, ...rest } = statsCache;
-    return rest;
-  }
+/** In-memory snapshot refreshed in the background every 10 seconds. */
+let _stats: HealthStats = { dbSizeBytes: null, lastBackupAt: null, backupCount: 0 };
 
+function refreshStats(): void {
   const dbPath = resolve(process.env.KEEPSAKE_DB ?? './data/keepsake.sqlite');
   let dbSizeBytes: number | null = null;
   try {
     dbSizeBytes = statSync(dbPath).size;
   } catch (e) {
-    // ENOENT is expected on first boot before any data is written; other errors are unexpected.
+    // ENOENT is expected on first boot; other errors are unexpected.
     const code = (e as NodeJS.ErrnoException).code;
-    if (code !== 'ENOENT') fastify_log_warn(`[health] unexpected stat error for ${dbPath}: ${e}`);
+    if (code !== 'ENOENT') console.warn(`[health] unexpected stat error for ${dbPath}: ${e}`);
   }
 
   const backupDir = resolve(dbPath, '../backups');
@@ -42,39 +35,32 @@ function getFsStats(): Omit<CachedStats, 'cachedAt'> {
       // Backup file was deleted between listBackups and statSync — safe to ignore.
     }
   }
-
-  const result: Omit<CachedStats, 'cachedAt'> = { dbSizeBytes, lastBackupAt, backupCount: backups.length };
-  statsCache = { ...result, cachedAt: now };
-  return result;
+  _stats = { dbSizeBytes, lastBackupAt, backupCount: backups.length };
 }
 
-// Minimal warn shim used inside getFsStats before we have a fastify instance.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function fastify_log_warn(msg: string) { console.warn(msg); }
+// Seed on module load, then refresh every 10 s in the background.
+refreshStats();
+const _refreshTimer = setInterval(refreshStats, 10_000);
+if (_refreshTimer.unref) _refreshTimer.unref();
 
 export const healthRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get('/health', async () => {
-    // Simple DB liveness check
+    // Simple DB liveness check (cheap: in-process prepared-statement, no FS I/O)
     let dbOk = false;
     try {
       fastify.db.prepare('SELECT 1').get();
       dbOk = true;
     } catch { /* DB unreachable */ }
 
-    const { dbSizeBytes, lastBackupAt, backupCount } = getFsStats();
+    // Read pre-computed FS stats — no disk I/O inside the request handler
+    const { dbSizeBytes, lastBackupAt, backupCount } = _stats;
 
     return {
       ok: dbOk,
       time: Date.now(),
       version: VERSION,
-      db: {
-        ok: dbOk,
-        sizeBytes: dbSizeBytes,
-      },
-      backup: {
-        count: backupCount,
-        lastBackupAt,
-      },
+      db: { ok: dbOk, sizeBytes: dbSizeBytes },
+      backup: { count: backupCount, lastBackupAt },
     };
   });
 };
