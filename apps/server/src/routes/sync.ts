@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
-import { PullRespSchema, PushReqSchema, PushRespSchema, type Conflict } from '@keepsake/shared';
-import { changesSince, getRow, mergeUpsert, deleteRow, logConflict } from '../db/queries.js';
+import { PullRespSchema, PushReqSchema, PushRespSchema, type Conflict, type RejectedOp } from '@keepsake/shared';
+import { changesSince, mergeUpsert, deleteRow, logConflict, applyQtyDelta, applyPatch } from '../db/queries.js';
 
 export const syncRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get<{ Querystring: { since?: string } }>('/sync/pull', async (req, reply) => {
@@ -14,11 +14,12 @@ export const syncRoutes: FastifyPluginAsync = async (fastify) => {
     const parsed = PushReqSchema.safeParse(req.body);
     if (!parsed.success) {
       reply.code(400);
-      return { error: 'invalid', details: parsed.error.flatten() };
+      return { error: 'VALIDATION_ERROR', details: parsed.error.flatten() };
     }
     const { deviceId, ops } = parsed.data;
     const accepted: string[] = [];
     const conflicts: Conflict[] = [];
+    const rejected: RejectedOp[] = [];
 
     const tx = fastify.db.transaction(() => {
       for (const op of ops) {
@@ -34,31 +35,21 @@ export const syncRoutes: FastifyPluginAsync = async (fastify) => {
           deleteRow(fastify.db, op.table, op.id, op.updated_at, deviceId);
           accepted.push(op.id);
         } else if (op.kind === 'qty_delta') {
-          const local = getRow(fastify.db, 'item', op.itemId);
-          if (local) {
-            local.qty = (local.qty ?? 0) + op.delta;
-            local.updated_at = Math.max(local.updated_at, op.updated_at);
-            local.updated_by = deviceId;
-            local.version = (local.version ?? 0) + 1;
-            mergeUpsert(fastify.db, 'item', local);
+          const ok = applyQtyDelta(fastify.db, op.itemId, op.delta, op.updated_at, deviceId);
+          if (ok) {
             accepted.push(op.itemId);
+          } else {
+            rejected.push({ opId: op.opId, entityId: op.itemId, reason: 'NOT_FOUND' });
           }
         } else if (op.kind === 'patch') {
-          const local = getRow(fastify.db, op.table, op.id);
-          if (!local) {
-            // Row not found: ignore patch (upsert should arrive first via outbox ordering)
-            console.warn(`[sync/patch] unknown id=${op.id} table=${op.table} — skipping`);
+          const result = applyPatch(fastify.db, op.table, op.id, op.fields as Record<string, unknown>, op.updated_at, op.updated_by);
+          if (!result) {
+            // Row not found: skip patch (upsert should arrive first via outbox ordering)
+            fastify.log.warn({ table: op.table, id: op.id }, '[sync/patch] unknown id — skipping');
+            rejected.push({ opId: op.opId, entityId: op.id, reason: 'NOT_FOUND' });
             continue;
           }
-          const synthetic = {
-            ...local,
-            ...op.fields,
-            updated_at: op.updated_at,
-            updated_by: op.updated_by,
-            version: local.version + 1,
-          };
-          const { conflicts: c } = mergeUpsert(fastify.db, op.table, synthetic);
-          for (const conflict of c) {
+          for (const conflict of result.conflicts) {
             if ((op.fields as any)[conflict.field] !== undefined) {
               logConflict(fastify.db, op.table, op.id, deviceId, conflict);
               conflicts.push({ id: op.id, table: op.table, field: conflict.field, client: conflict.client, server: conflict.server });
@@ -70,6 +61,6 @@ export const syncRoutes: FastifyPluginAsync = async (fastify) => {
     });
     tx();
 
-    return PushRespSchema.parse({ serverTime: Date.now(), accepted, conflicts });
+    return PushRespSchema.parse({ serverTime: Date.now(), accepted, conflicts, rejected });
   });
 };

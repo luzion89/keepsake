@@ -47,6 +47,8 @@ describe('sync routes', () => {
     });
     expect(push.statusCode).toBe(200);
     expect(push.json().accepted).toContain(room.id);
+    // response includes rejected array (empty)
+    expect(Array.isArray(push.json().rejected)).toBe(true);
 
     const pull = await app.inject({ url: '/sync/pull?since=0' });
     const body = pull.json();
@@ -77,5 +79,45 @@ describe('sync routes', () => {
     const pull = await app.inject({ url: '/sync/pull?since=0' });
     const items = pull.json().changes.filter((c: any) => c.table === 'item' && c.row.id === id);
     expect(items.at(-1).row.qty).toBe(6);
+  });
+
+  it('qty_delta on unknown item returns rejected entry', async () => {
+    const missingId = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+    const push = await app.inject({
+      method: 'POST', url: '/sync/push',
+      payload: { deviceId: 'devA', ops: [{ kind: 'qty_delta', itemId: missingId, delta: 1, updated_at: 999 }] },
+    });
+    expect(push.statusCode).toBe(200);
+    const body = push.json();
+    expect(body.accepted).not.toContain(missingId);
+    expect(body.rejected.length).toBe(1);
+    expect(body.rejected[0].reason).toBe('NOT_FOUND');
+  });
+
+  it('invalid push body returns VALIDATION_ERROR', async () => {
+    const push = await app.inject({
+      method: 'POST', url: '/sync/push',
+      payload: { bad: 'payload' },
+    });
+    expect(push.statusCode).toBe(400);
+    expect(push.json().error).toBe('VALIDATION_ERROR');
+  });
+
+  it('pull with since boundary: only returns rows updated after since', async () => {
+    const id = '55555555-5555-4555-8555-555555555555';
+    const item = {
+      id, area_id: '66666666-6666-4666-8666-666666666666',
+      name: 'boundary-item', qty: 1, tags: [], photo_ids: [], source: 'manual',
+      updated_at: 500, updated_by: 'A', deleted: false, version: 0,
+    };
+    await app.inject({ method:'POST', url:'/sync/push', payload:{ deviceId:'A', ops:[{kind:'upsert',table:'item',row:item}] } });
+    // Pull with since >= updated_at should return empty for that item
+    const pull = await app.inject({ url: `/sync/pull?since=500` });
+    const found = pull.json().changes.find((c: any) => c.row?.id === id);
+    expect(found).toBeUndefined();
+    // Pull with since < updated_at should return the item
+    const pull2 = await app.inject({ url: `/sync/pull?since=499` });
+    const found2 = pull2.json().changes.find((c: any) => c.row?.id === id);
+    expect(found2).toBeDefined();
   });
 });

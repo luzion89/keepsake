@@ -114,3 +114,83 @@ export function logConflict(db: Database.Database, table: TableName, rowId: stri
   db.prepare(`INSERT INTO conflict_log (table_name, row_id, field, client_value, server_value, device_id, created_at) VALUES (?,?,?,?,?,?,?)`)
     .run(table, rowId, conflict.field, JSON.stringify(conflict.client), JSON.stringify(conflict.server), deviceId, Date.now());
 }
+
+export interface ConflictLogRow {
+  id: number;
+  table_name: string;
+  row_id: string;
+  field: string;
+  client_value: string | null;
+  server_value: string | null;
+  device_id: string;
+  created_at: number;
+}
+
+/** Return all conflict_log rows, newest first. Limit defaults to 200. */
+export function listConflicts(db: Database.Database, limit = 200): ConflictLogRow[] {
+  return db.prepare(
+    'SELECT * FROM conflict_log ORDER BY created_at DESC LIMIT ?'
+  ).all(limit) as ConflictLogRow[];
+}
+
+/** Apply a qty delta to an existing item row in a single DB write. */
+export function applyQtyDelta(
+  db: Database.Database,
+  itemId: string,
+  delta: number,
+  updated_at: number,
+  deviceId: string,
+): boolean {
+  const local = getRow(db, 'item', itemId);
+  if (!local) return false;
+  local.qty = (local.qty ?? 0) + delta;
+  local.updated_at = Math.max(local.updated_at, updated_at);
+  local.updated_by = deviceId;
+  local.version = (local.version ?? 0) + 1;
+  mergeUpsert(db, 'item', local);
+  return true;
+}
+
+/** Allowed patch fields per table (whitelist). Fields outside this set are silently stripped. */
+const PATCH_WHITELIST: Record<TableName, Set<string>> = {
+  room: new Set(['name', 'icon', 'note']),
+  area: new Set(['name', 'note']),
+  item: new Set(['name', 'qty', 'unit', 'notes', 'expires_at', 'source', 'confidence', 'bbox', 'tags', 'photo_ids']),
+  photo: new Set(['recognition_status', 'recognition_result', 'remote_url', 'blob_ref']),
+  snapshot: new Set(['note']),
+  reminder_rule: new Set(['kind', 'threshold_at', 'threshold_qty', 'note', 'last_fired_at']),
+};
+
+/**
+ * Apply a patch op to a row in the DB, filtering to whitelist fields only.
+ * Returns the conflicts produced by the merge (if any).
+ * Returns null if the row does not exist.
+ */
+export function applyPatch(
+  db: Database.Database,
+  table: TableName,
+  id: string,
+  fields: Record<string, unknown>,
+  updated_at: number,
+  updated_by: string,
+): { conflicts: Array<{field:string;client:unknown;server:unknown}> } | null {
+  const local = getRow(db, table, id);
+  if (!local) return null;
+
+  // Strip non-whitelisted fields
+  const whitelist = PATCH_WHITELIST[table];
+  const safeFields: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(fields)) {
+    if (whitelist.has(k)) safeFields[k] = v;
+  }
+
+  const synthetic = {
+    ...local,
+    ...safeFields,
+    updated_at,
+    updated_by,
+    version: local.version + 1,
+  };
+  const { conflicts } = mergeUpsert(db, table, synthetic);
+  return { conflicts };
+}

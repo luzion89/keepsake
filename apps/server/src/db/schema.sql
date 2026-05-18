@@ -51,6 +51,7 @@ CREATE TABLE IF NOT EXISTS items (
 CREATE INDEX IF NOT EXISTS items_updated_at ON items(updated_at);
 CREATE INDEX IF NOT EXISTS items_area ON items(area_id);
 CREATE INDEX IF NOT EXISTS items_name ON items(name);
+CREATE INDEX IF NOT EXISTS items_expires_at ON items(expires_at);
 
 CREATE TABLE IF NOT EXISTS photos (
   id TEXT PRIMARY KEY,
@@ -122,3 +123,4 @@ CREATE TABLE IF NOT EXISTS reminders (
 );
 CREATE INDEX IF NOT EXISTS reminders_updated_at ON reminders(updated_at);
 CREATE INDEX IF NOT EXISTS reminders_item ON reminders(item_id);
+CREATE INDEX IF NOT EXISTS reminders_threshold_at ON reminders(threshold_at);

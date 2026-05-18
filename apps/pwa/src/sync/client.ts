@@ -48,6 +48,34 @@ async function applyRemote(changes: PullResp['changes']) {
   }
 }
 
+/** Sleep for `ms` milliseconds. */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+const RETRY_DELAYS_MS = [1_000, 2_000, 5_000];
+
+/**
+ * Attempt a fetch with simple exponential backoff.
+ * Returns the Response on success, or null after all retries are exhausted.
+ */
+async function fetchWithRetry(input: RequestInfo, init?: RequestInit): Promise<Response | null> {
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      const res = await fetch(input, init);
+      if (res.ok) return res;
+      // Don't retry client errors (4xx)
+      if (res.status >= 400 && res.status < 500) return null;
+    } catch {
+      // Network error — retry
+    }
+    if (attempt < RETRY_DELAYS_MS.length) {
+      await sleep(RETRY_DELAYS_MS[attempt]!);
+    }
+  }
+  return null;
+}
+
 let _running = false;
 export async function syncOnce(): Promise<{ pushed: number; pulled: number; conflicts: number } | null> {
   if (_running) return null;
@@ -56,24 +84,19 @@ export async function syncOnce(): Promise<{ pushed: number; pulled: number; conf
   try {
     const since = (await kvGet<number>(SYNC_CURSOR_KEY)) ?? 0;
 
-    // PULL
-    const pullRes = await fetch(`/sync/pull?since=${since}`);
-    if (!pullRes.ok) return null;
-    const pull = (await pullRes.json()) as PullResp;
-    await applyRemote(pull.changes);
-
-    // PUSH (drain outbox)
+    // PUSH first (drain outbox) — ensures local changes reach the server
+    // before we pull and apply remote state, minimising accidental overwrites.
     const pending = await db.outbox.orderBy('client_seq').limit(500).toArray();
     let pushed = 0, conflicts = 0;
     if (pending.length > 0) {
       const deviceId = await getDeviceId();
       const body: PushReq = { deviceId, ops: pending.map(p => p.op) };
-      const pushRes = await fetch('/sync/push', {
+      const pushRes = await fetchWithRetry('/sync/push', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body),
       });
-      if (pushRes.ok) {
+      if (pushRes) {
         const push = (await pushRes.json()) as PushResp;
         // record conflicts
         for (const c of push.conflicts) {
@@ -89,6 +112,12 @@ export async function syncOnce(): Promise<{ pushed: number; pulled: number; conf
         pushed = pending.length;
       }
     }
+
+    // PULL — apply remote changes after push so we see the server's merged state
+    const pullRes = await fetchWithRetry(`/sync/pull?since=${since}`);
+    if (!pullRes) return null;
+    const pull = (await pullRes.json()) as PullResp;
+    await applyRemote(pull.changes);
 
     await kvSet(SYNC_CURSOR_KEY, pull.serverTime);
 
