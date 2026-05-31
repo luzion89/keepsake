@@ -22,6 +22,7 @@ export default defineConfig({
       '/logs': 'http://localhost:8443',
     },
   },
+  base: './',
   build: { target: 'es2022' },
   test: { environment: 'jsdom', exclude: ['e2e/**', 'node_modules/**'] },
 });
