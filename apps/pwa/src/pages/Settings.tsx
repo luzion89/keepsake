@@ -8,7 +8,7 @@ import {
   type AiConfig, type AiProvider,
 } from '../ai/router.js';
 import { db, getDeviceId } from '../db/dexie.js';
-import { syncOnce } from '../sync/client.js';
+import { syncOnce, setServerUrl, getServerUrl } from '../sync/client.js';
 import { ServerStatusBadge } from '../components/ServerStatusBadge.js';
 import { gcSyncedBlobs } from '../sync/blobs.js';
 import { useT } from '../i18n/I18nContext.js';
@@ -88,6 +88,16 @@ export function SettingsPage() {
   const [gcResult, setGcResult] = useState<number | null>(null);
   const [gcRunning, setGcRunning] = useState(false);
   const [quota, setQuota] = useState<StorageQuota | null | 'unsupported'>('unsupported');
+  const [serverUrl, setServerUrlState] = useState('');
+  const [serverSaved, setServerSaved] = useState(false);
+
+  useEffect(() => { getServerUrl().then(u => setServerUrlState(u)); }, []);
+
+  const saveServerUrl = async () => {
+    await setServerUrl(serverUrl);
+    setServerSaved(true);
+    setTimeout(() => setServerSaved(false), 2000);
+  };
 
   const reloadStats = async () => setStats({
     rooms: await db.rooms.count(),
@@ -194,6 +204,25 @@ export function SettingsPage() {
                 {l === 'zh' ? t('settings.langZh') : t('settings.langEn')}
               </label>
             ))}
+          </div>
+        </SectionRow>
+      </Section>
+
+      {/* ── Server ──────────────────────────────────────────── */}
+      <Section title="同步服务器（可选）">
+        <SectionRow>
+          <p className="text-xs text-ink-muted mb-2">填写 Keepsake Server 地址后可启用多设备同步。留空则使用纯离线模式。</p>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={serverUrl}
+              onChange={e => setServerUrlState(e.target.value)}
+              placeholder="例如 http://192.168.1.100:8443"
+              className="flex-1 bg-paper-dark border border-[var(--border-default)] rounded-[12px] px-3 py-2 text-sm text-ink outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all placeholder:text-ink-muted"
+            />
+            <button onClick={saveServerUrl} className="px-3 py-2 rounded-[12px] bg-accent hover:bg-accent-hover text-paper text-sm font-medium transition-all">
+              {serverSaved ? '已保存' : '保存'}
+            </button>
           </div>
         </SectionRow>
       </Section>

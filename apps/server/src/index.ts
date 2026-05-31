@@ -150,7 +150,7 @@ export async function buildServer() {
   return fastify;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (fileURLToPath(import.meta.url) === resolve(process.argv[1]!)) {
   const port = Number(process.env.PORT ?? 8443);
   buildServer().then((app) => {
     app.listen({ host: '0.0.0.0', port }).then(() => {

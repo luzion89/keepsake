@@ -9,13 +9,29 @@ import { pushPendingBlobs, pullMissingBlobs } from './blobs.js';
 import { pushLogs, logger } from '../logging/logger.js';
 
 const SYNC_CURSOR_KEY = 'sync_cursor';
+const SERVER_URL_KEY = 'server_url';
+
+async function getServerBase(): Promise<string> {
+  const url = await kvGet<string>(SERVER_URL_KEY);
+  return url?.trim() || '';
+}
+
+export async function setServerUrl(url: string): Promise<void> {
+  await kvSet(SERVER_URL_KEY, url.trim());
+}
+
+export async function getServerUrl(): Promise<string> {
+  return (await kvGet<string>(SERVER_URL_KEY)) || '';
+}
 
 export async function isServerReachable(): Promise<boolean> {
   if (!navigator.onLine) return false;
+  const base = await getServerBase();
+  if (!base) return false; // no server configured = offline mode
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 2500);
-    const r = await fetch('/health', { signal: ctrl.signal });
+    const r = await fetch(`${base}/health`, { signal: ctrl.signal });
     clearTimeout(t);
     return r.ok;
   } catch { return false; }
@@ -57,7 +73,8 @@ export async function syncOnce(): Promise<{ pushed: number; pulled: number; conf
     const since = (await kvGet<number>(SYNC_CURSOR_KEY)) ?? 0;
 
     // PULL
-    const pullRes = await fetch(`/sync/pull?since=${since}`);
+    const base = await getServerBase();
+    const pullRes = await fetch(`${base}/sync/pull?since=${since}`);
     if (!pullRes.ok) return null;
     const pull = (await pullRes.json()) as PullResp;
     await applyRemote(pull.changes);
@@ -68,7 +85,7 @@ export async function syncOnce(): Promise<{ pushed: number; pulled: number; conf
     if (pending.length > 0) {
       const deviceId = await getDeviceId();
       const body: PushReq = { deviceId, ops: pending.map(p => p.op) };
-      const pushRes = await fetch('/sync/push', {
+      const pushRes = await fetch(`${base}/sync/push`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body),

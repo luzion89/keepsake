@@ -20,7 +20,8 @@
       "Bash(curl -sI http://127.0.0.1:8443/)",
       "Bash(curl -s http://127.0.0.1:8443/manifest.webmanifest)",
       "Bash(curl -sI http://127.0.0.1:8443/sw.js)",
-      "Bash(pkill -f \"node dist/index.js\")"
+      "Bash(pkill -f \"node dist/index.js\")",
+      "Bash(node *)"
     ]
   }
 }

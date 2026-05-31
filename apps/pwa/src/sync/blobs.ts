@@ -1,6 +1,12 @@
 import { db, kvGet, kvSet } from '../db/dexie.js';
 
 const BLOB_LAST_PULL_KEY = 'blob_last_pull';
+const SERVER_URL_KEY = 'server_url';
+
+async function getServerBase(): Promise<string> {
+  const url = await kvGet<string>(SERVER_URL_KEY);
+  return url?.trim() || '';
+}
 
 /**
  * Push all local blobs to the server.
@@ -14,7 +20,7 @@ export async function pushPendingBlobs(): Promise<void> {
     try {
       const form = new FormData();
       form.append('file', row.blob, row.id);
-      const res = await fetch(`/blobs/${row.id}`, { method: 'PUT', body: form });
+      const res = await fetch(`${await getServerBase()}/blobs/${row.id}`, { method: 'PUT', body: form });
       if (res.ok) {
         await kvSet(`blob_uploaded:${row.id}`, true);
       }
@@ -31,7 +37,7 @@ export async function pullMissingBlobs(): Promise<void> {
   const since = (await kvGet<number>(BLOB_LAST_PULL_KEY)) ?? 0;
   let list: { ids: string[] };
   try {
-    const res = await fetch(`/blobs/list?since=${since}`);
+    const res = await fetch(`${await getServerBase()}/blobs/list?since=${since}`);
     if (!res.ok) return;
     list = await res.json();
   } catch {
@@ -42,7 +48,7 @@ export async function pullMissingBlobs(): Promise<void> {
     const existing = await db.blobs.get(id);
     if (existing) continue;
     try {
-      const res = await fetch(`/blobs/id/${id}`);
+      const res = await fetch(`${await getServerBase()}/blobs/id/${id}`);
       if (!res.ok) continue;
       const blob = await res.blob();
       await db.blobs.put({ id, blob });
